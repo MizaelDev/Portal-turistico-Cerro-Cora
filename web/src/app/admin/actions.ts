@@ -1,0 +1,464 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import {
+  attractions as defaultAttractions,
+  foodPlaces as defaultFoodPlaces,
+  lodgings as defaultLodgings,
+} from "@/lib/data";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+import type { AdminEntity } from "@/lib/supabase";
+
+type ActionResult = {
+  ok: boolean;
+  message: string;
+};
+
+type UploadResult = ActionResult & {
+  urls: string[];
+};
+
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const maxImageSize = 6 * 1024 * 1024;
+
+const pathOrUrl = z
+  .string()
+  .trim()
+  .min(1, "Informe uma imagem.")
+  .refine(
+    (value) => value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://"),
+    "Use uma URL completa ou um caminho iniciado com /.",
+  );
+
+const optionalUrl = z
+  .string()
+  .trim()
+  .nullable()
+  .refine(
+    (value) => !value || value.startsWith("http://") || value.startsWith("https://"),
+    "Use uma URL iniciada com http:// ou https://.",
+  );
+
+const whatsappSchema = z
+  .string()
+  .trim()
+  .min(10, "Informe um WhatsApp com DDD.")
+  .regex(/^\d+$/, "Use apenas números no WhatsApp.");
+
+const pontoTuristicoSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome."),
+  descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
+  categoria: z.enum(["mirante", "natureza", "geoturismo", "ecoturismo", "trilha", "aventura"]),
+  localizacao: z.string().trim().min(2, "Informe a localização."),
+  imagem_url: pathOrUrl,
+  ativo: z.boolean(),
+});
+
+const pousadaSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome."),
+  descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
+  localizacao: z.string().trim().min(2, "Informe a localização."),
+  distancia_centro: z.string().trim().nullable(),
+  faixa_preco_min: z.number().nullable(),
+  faixa_preco_max: z.number().nullable(),
+  whatsapp: whatsappSchema,
+  imagens_urls: z.array(pathOrUrl).min(1, "Informe ao menos uma imagem."),
+  ativo: z.boolean(),
+});
+
+const restauranteSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome."),
+  descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
+  categoria: z.enum(["restaurante", "bar", "café", "lanchonete"]),
+  horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
+  endereco: z.string().trim().min(2, "Informe o endereço."),
+  mapa_url: optionalUrl,
+  instagram: z.string().trim().nullable(),
+  instagram_url: optionalUrl,
+  whatsapp: whatsappSchema,
+  imagem_url: pathOrUrl,
+  tags: z.array(z.string().trim().min(1)).default([]),
+  ativo: z.boolean(),
+});
+
+function optionalText(value: FormDataEntryValue | null) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
+function optionalNumber(value: FormDataEntryValue | null) {
+  const text = String(value || "").replace(",", ".").trim();
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+function imageList(value: FormDataEntryValue | null) {
+  return String(value || "")
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function requireAdmin() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/admin/login");
+  }
+
+  return supabase;
+}
+
+function parsePayload(entity: AdminEntity, formData: FormData) {
+  if (entity === "pontos_turisticos") {
+    return pontoTuristicoSchema.parse({
+      nome: formData.get("nome"),
+      descricao: formData.get("descricao"),
+      categoria: formData.get("categoria"),
+      localizacao: formData.get("localizacao"),
+      imagem_url: formData.get("imagem_url"),
+      ativo: formData.get("ativo") === "on",
+    });
+  }
+
+  if (entity === "pousadas") {
+    return pousadaSchema.parse({
+      nome: formData.get("nome"),
+      descricao: formData.get("descricao"),
+      localizacao: formData.get("localizacao"),
+      distancia_centro: optionalText(formData.get("distancia_centro")),
+      faixa_preco_min: optionalNumber(formData.get("faixa_preco_min")),
+      faixa_preco_max: optionalNumber(formData.get("faixa_preco_max")),
+      whatsapp: formData.get("whatsapp"),
+      imagens_urls: imageList(formData.get("imagens_urls")),
+      ativo: formData.get("ativo") === "on",
+    });
+  }
+
+  return restauranteSchema.parse({
+    nome: formData.get("nome"),
+    descricao: formData.get("descricao"),
+    categoria: formData.get("categoria"),
+    horario_funcionamento: formData.get("horario_funcionamento"),
+    endereco: formData.get("endereco"),
+    mapa_url: optionalText(formData.get("mapa_url")),
+    instagram: optionalText(formData.get("instagram")),
+    instagram_url: optionalText(formData.get("instagram_url")),
+    whatsapp: formData.get("whatsapp"),
+    imagem_url: formData.get("imagem_url"),
+    tags: formData.getAll("tags").map((tag) => String(tag).trim()).filter(Boolean),
+    ativo: formData.get("ativo") === "on",
+  });
+}
+
+function revalidatePublicPages() {
+  revalidatePath("/admin");
+  revalidatePath("/o-que-fazer");
+  revalidatePath("/pousadas");
+  revalidatePath("/gastronomia");
+  revalidatePath("/");
+}
+
+function attractionCategory(category: string) {
+  const normalized = category
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (["mirante", "natureza", "geoturismo", "ecoturismo", "trilha", "aventura"].includes(normalized)) {
+    return normalized;
+  }
+
+  return "natureza";
+}
+
+function restaurantCategory(category: string) {
+  const normalized = category
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  if (normalized === "bar") return "bar";
+  if (normalized === "cafeteria" || normalized === "cafe") return "café";
+  if (normalized === "hamburgueria" || normalized === "lanchonete") return "lanchonete";
+  return "restaurante";
+}
+
+function parsePriceRange(priceRange: string) {
+  const values = priceRange.match(/\d+/g)?.map(Number) || [];
+  return {
+    faixa_preco_min: values[0] || null,
+    faixa_preco_max: values[1] || null,
+  };
+}
+
+function splitLocation(location: string) {
+  const [localizacao, ...distanceParts] = location.split(" - ");
+  return {
+    localizacao: localizacao.trim(),
+    distancia_centro: distanceParts.join(" - ").trim() || null,
+  };
+}
+
+async function insertOrUpdateByName(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: AdminEntity,
+  payload: Record<string, unknown>,
+) {
+  const { data } = await supabase
+    .from(table)
+    .select("id")
+    .eq("nome", payload.nome)
+    .maybeSingle();
+
+  if (data?.id) {
+    return supabase.from(table).update(payload as never).eq("id", data.id);
+  }
+
+  return supabase.from(table).insert(payload as never);
+}
+
+export async function saveAdminItem(
+  entity: AdminEntity,
+  id: string | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const payload = parsePayload(entity, formData);
+
+    const query = id
+      ? supabase.from(entity).update(payload as never).eq("id", id).select("id,nome,ativo").single()
+      : supabase.from(entity).insert(payload as never).select("id,nome,ativo").single();
+
+    const { data, error } = await query;
+
+    if (error) {
+      if (error.message.toLowerCase().includes("could not find the table")) {
+        return {
+          ok: false,
+          message: "As tabelas do Supabase ainda não existem. Rode web/supabase/schema.sql no SQL Editor do Supabase.",
+        };
+      }
+
+      if (error.message.toLowerCase().includes("column") && error.message.toLowerCase().includes("does not exist")) {
+        return {
+          ok: false,
+          message:
+            "Faltam colunas novas no Supabase. Rode web/supabase/restaurant-enhancements.sql no SQL Editor.",
+        };
+      }
+
+      if (error.message.toLowerCase().includes("row-level security")) {
+        return {
+          ok: false,
+          message: "O Supabase bloqueou a operação por RLS. Rode novamente web/supabase/schema.sql e confirme que você está logado.",
+        };
+      }
+
+      return { ok: false, message: error.message };
+    }
+
+    if (!data) {
+      return {
+        ok: false,
+        message: "O Supabase não retornou o item salvo. Verifique as políticas RLS de leitura autenticada.",
+      };
+    }
+
+    revalidatePublicPages();
+    return {
+      ok: true,
+      message: id
+        ? `Item atualizado com sucesso: ${data.nome}.`
+        : `Item cadastrado com sucesso: ${data.nome}.`,
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível salvar. Verifique o Supabase e tente novamente." };
+  }
+}
+
+export async function deleteAdminItem(
+  entity: AdminEntity,
+  id: string,
+): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase.from(entity).delete().eq("id", id);
+
+    if (error) {
+      return { ok: false, message: error.message };
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Item excluído com sucesso." };
+  } catch {
+    return { ok: false, message: "Não foi possível excluir o item." };
+  }
+}
+
+export async function seedDefaultContent(): Promise<ActionResult> {
+  try {
+    const supabase = await requireAdmin();
+
+    for (const attraction of defaultAttractions) {
+      const payload = {
+        nome: attraction.name,
+        descricao: attraction.description,
+        categoria: attractionCategory(attraction.category),
+        localizacao: attraction.location,
+        imagem_url: attraction.image,
+        ativo: true,
+      };
+
+      const { error } = await insertOrUpdateByName(supabase, "pontos_turisticos", payload);
+      if (error) return { ok: false, message: error.message };
+    }
+
+    for (const lodging of defaultLodgings) {
+      const price = parsePriceRange(lodging.priceRange);
+      const location = splitLocation(lodging.location);
+      const payload = {
+        nome: lodging.name,
+        descricao: lodging.description,
+        localizacao: location.localizacao,
+        distancia_centro: location.distancia_centro,
+        faixa_preco_min: price.faixa_preco_min,
+        faixa_preco_max: price.faixa_preco_max,
+        whatsapp: lodging.whatsapp,
+        imagens_urls: [lodging.image, ...lodging.gallery],
+        ativo: true,
+      };
+
+      const { error } = await insertOrUpdateByName(supabase, "pousadas", payload);
+      if (error) return { ok: false, message: error.message };
+    }
+
+    for (const place of defaultFoodPlaces) {
+      const payload = {
+        nome: place.name,
+        descricao: place.description,
+        categoria: restaurantCategory(place.category),
+        horario_funcionamento: place.hours,
+        endereco: place.location,
+        mapa_url: place.mapUrl || null,
+        instagram: place.instagram,
+        instagram_url: place.instagramUrl || null,
+        whatsapp: place.whatsapp,
+        imagem_url: place.image,
+        tags: place.tags,
+        ativo: true,
+      };
+
+      const { error } = await insertOrUpdateByName(supabase, "restaurantes", payload);
+      if (error) return { ok: false, message: error.message };
+    }
+
+    revalidatePublicPages();
+
+    return {
+      ok: true,
+      message: "Dados padrão repostos no Supabase com sucesso.",
+    };
+  } catch {
+    return {
+      ok: false,
+      message: "Não foi possível repor os dados padrão. Verifique se você está logado.",
+    };
+  }
+}
+
+function sanitizeFileName(name: string) {
+  const extension = name.split(".").pop()?.toLowerCase() || "jpg";
+  const base = name
+    .replace(/\.[^/.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return `${base || "imagem"}.${extension}`;
+}
+
+export async function uploadAdminImages(
+  entity: AdminEntity,
+  formData: FormData,
+): Promise<UploadResult> {
+  try {
+    const supabase = await requireAdmin();
+    const files = formData
+      .getAll("files")
+      .filter((file): file is File => file instanceof File && file.size > 0);
+
+    if (!files.length) {
+      return { ok: false, message: "Selecione ao menos uma imagem.", urls: [] };
+    }
+
+    const urls: string[] = [];
+
+    for (const file of files) {
+      if (!allowedImageTypes.includes(file.type)) {
+        return { ok: false, message: "Use apenas imagens JPG, PNG, WebP ou GIF.", urls };
+      }
+
+      if (file.size > maxImageSize) {
+        return { ok: false, message: "Cada imagem deve ter no máximo 6 MB.", urls };
+      }
+
+      const path = `${entity}/${Date.now()}-${crypto.randomUUID()}-${sanitizeFileName(file.name)}`;
+      const { error } = await supabase.storage.from("tourism").upload(path, file, {
+        cacheControl: "31536000",
+        upsert: false,
+        contentType: file.type,
+      });
+
+      if (error) {
+        if (error.message.toLowerCase().includes("bucket not found")) {
+          return {
+            ok: false,
+            message: "O bucket 'tourism' não existe no Supabase. Rode o arquivo web/supabase/schema.sql no SQL Editor.",
+            urls,
+          };
+        }
+
+        if (error.message.toLowerCase().includes("row-level security")) {
+          return {
+            ok: false,
+            message: "O Storage bloqueou o upload por RLS. Rode novamente web/supabase/schema.sql para criar as policies.",
+            urls,
+          };
+        }
+
+        return { ok: false, message: error.message, urls };
+      }
+
+      const { data } = supabase.storage.from("tourism").getPublicUrl(path);
+      urls.push(data.publicUrl);
+    }
+
+    return {
+      ok: true,
+      message: `${urls.length} imagem${urls.length === 1 ? "" : "s"} enviada${urls.length === 1 ? "" : "s"} com sucesso.`,
+      urls,
+    };
+  } catch {
+    return { ok: false, message: "Não foi possível enviar as imagens.", urls: [] };
+  }
+}
+
+export async function logoutAction() {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  redirect("/admin/login");
+}
