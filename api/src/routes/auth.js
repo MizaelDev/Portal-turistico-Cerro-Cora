@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { getDb } from "../db.js";
 import { HttpError } from "../utils/http-error.js";
+import { getJwtIssuer, getJwtSecret } from "../utils/jwt-secret.js";
 
 export const authRouter = express.Router();
 
@@ -19,15 +20,44 @@ const loginSchema = z.object({
 });
 
 function signToken(user) {
-  const secret = process.env.JWT_SECRET || "dev-secret";
-  return jwt.sign({ email: user.email }, secret, {
+  return jwt.sign({ email: user.email }, getJwtSecret(), {
     subject: String(user.id),
+    issuer: getJwtIssuer(),
     expiresIn: "7d"
   });
 }
 
+const attempts = new Map();
+const authWindowMs = 15 * 60 * 1000;
+const maxAuthAttempts = 20;
+
+function authRateLimit(req, _res, next) {
+  const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+  const key = Array.isArray(ip) ? ip[0] : String(ip).split(",")[0].trim();
+  const now = Date.now();
+  const current = attempts.get(key);
+
+  if (!current || current.resetAt <= now) {
+    attempts.set(key, { count: 1, resetAt: now + authWindowMs });
+    return next();
+  }
+
+  current.count += 1;
+  if (current.count > maxAuthAttempts) {
+    return next(new HttpError(429, "Too many authentication attempts"));
+  }
+
+  return next();
+}
+
+authRouter.use(authRateLimit);
+
 authRouter.post("/register", async (req, res, next) => {
   try {
+    if (process.env.ALLOW_PUBLIC_REGISTRATION !== "true") {
+      throw new HttpError(403, "Registration is disabled");
+    }
+
     const input = registerSchema.parse(req.body);
     const db = await getDb();
 
@@ -64,4 +94,3 @@ authRouter.post("/login", async (req, res, next) => {
     return next(err);
   }
 });
-

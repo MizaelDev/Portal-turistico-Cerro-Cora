@@ -57,11 +57,22 @@ Não configure chave service role neste projeto. Ele usa apenas a anon key e as 
 6. Reinicie `npm run dev`.
 7. Acesse `/admin/login` e entre com o usuário criado.
 
+Depois de criar o usuário em Authentication, marque esse usuário como administrador no SQL Editor:
+
+```sql
+insert into public.admin_users (user_id)
+values ('COLE_AQUI_O_USER_ID_DO_AUTH_USERS')
+on conflict (user_id) do nothing;
+```
+
+Somente usuários cadastrados em `admin_users` podem criar, editar, excluir registros ou enviar imagens.
+
 As tabelas usadas são:
 
 - `pontos_turisticos`
 - `pousadas`
 - `restaurantes`
+- `admin_users`
 
 O site público lê apenas registros com `ativo = true`. O painel administrativo usa middleware para proteger `/admin/*` e as escritas passam por autenticação Supabase.
 

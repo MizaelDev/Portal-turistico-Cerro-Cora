@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
@@ -8,6 +9,7 @@ import {
   foodPlaces as defaultFoodPlaces,
   lodgings as defaultLodgings,
 } from "@/lib/data";
+import { requireAdminSession } from "@/lib/admin-auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { AdminEntity } from "@/lib/supabase";
 
@@ -20,7 +22,7 @@ type UploadResult = ActionResult & {
   urls: string[];
 };
 
-const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxImageSize = 6 * 1024 * 1024;
 
 const pathOrUrl = z
@@ -104,15 +106,24 @@ function imageList(value: FormDataEntryValue | null) {
 
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/admin/login");
-  }
-
+  await requireAdminSession(supabase);
   return supabase;
+}
+
+async function assertSameOrigin() {
+  const headersList = await headers();
+  const origin = headersList.get("origin");
+  const host = headersList.get("host");
+
+  if (!origin || !host) return;
+
+  const allowedOrigins = new Set(
+    [`https://${host}`, `http://${host}`, process.env.NEXT_PUBLIC_SITE_URL].filter(Boolean),
+  );
+
+  if (!allowedOrigins.has(origin)) {
+    throw new Error("Invalid server action origin.");
+  }
 }
 
 function parsePayload(entity: AdminEntity, formData: FormData) {
@@ -230,6 +241,7 @@ export async function saveAdminItem(
   formData: FormData,
 ): Promise<ActionResult> {
   try {
+    await assertSameOrigin();
     const supabase = await requireAdmin();
     const payload = parsePayload(entity, formData);
 
@@ -262,7 +274,8 @@ export async function saveAdminItem(
         };
       }
 
-      return { ok: false, message: error.message };
+      console.error(error);
+      return { ok: false, message: "Não foi possível salvar. Verifique os dados e tente novamente." };
     }
 
     if (!data) {
@@ -293,11 +306,13 @@ export async function deleteAdminItem(
   id: string,
 ): Promise<ActionResult> {
   try {
+    await assertSameOrigin();
     const supabase = await requireAdmin();
     const { error } = await supabase.from(entity).delete().eq("id", id);
 
     if (error) {
-      return { ok: false, message: error.message };
+      console.error(error);
+      return { ok: false, message: "Não foi possível excluir o item." };
     }
 
     revalidatePublicPages();
@@ -309,6 +324,7 @@ export async function deleteAdminItem(
 
 export async function seedDefaultContent(): Promise<ActionResult> {
   try {
+    await assertSameOrigin();
     const supabase = await requireAdmin();
 
     for (const attraction of defaultAttractions) {
@@ -322,7 +338,10 @@ export async function seedDefaultContent(): Promise<ActionResult> {
       };
 
       const { error } = await insertOrUpdateByName(supabase, "pontos_turisticos", payload);
-      if (error) return { ok: false, message: error.message };
+      if (error) {
+        console.error(error);
+        return { ok: false, message: "Não foi possível repor os roteiros padrão." };
+      }
     }
 
     for (const lodging of defaultLodgings) {
@@ -341,7 +360,10 @@ export async function seedDefaultContent(): Promise<ActionResult> {
       };
 
       const { error } = await insertOrUpdateByName(supabase, "pousadas", payload);
-      if (error) return { ok: false, message: error.message };
+      if (error) {
+        console.error(error);
+        return { ok: false, message: "Não foi possível repor as pousadas padrão." };
+      }
     }
 
     for (const place of defaultFoodPlaces) {
@@ -361,7 +383,10 @@ export async function seedDefaultContent(): Promise<ActionResult> {
       };
 
       const { error } = await insertOrUpdateByName(supabase, "restaurantes", payload);
-      if (error) return { ok: false, message: error.message };
+      if (error) {
+        console.error(error);
+        return { ok: false, message: "Não foi possível repor os restaurantes padrão." };
+      }
     }
 
     revalidatePublicPages();
@@ -379,7 +404,6 @@ export async function seedDefaultContent(): Promise<ActionResult> {
 }
 
 function sanitizeFileName(name: string) {
-  const extension = name.split(".").pop()?.toLowerCase() || "jpg";
   const base = name
     .replace(/\.[^/.]+$/, "")
     .normalize("NFD")
@@ -388,7 +412,38 @@ function sanitizeFileName(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-  return `${base || "imagem"}.${extension}`;
+  return base || "imagem";
+}
+
+function extensionFromType(type: string) {
+  if (type === "image/png") return "png";
+  if (type === "image/webp") return "webp";
+  return "jpg";
+}
+
+function hasImageSignature(type: string, bytes: Uint8Array) {
+  if (type === "image/jpeg") {
+    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+
+  if (type === "image/png") {
+    return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  }
+
+  if (type === "image/webp") {
+    return (
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    );
+  }
+
+  return false;
 }
 
 export async function uploadAdminImages(
@@ -396,6 +451,7 @@ export async function uploadAdminImages(
   formData: FormData,
 ): Promise<UploadResult> {
   try {
+    await assertSameOrigin();
     const supabase = await requireAdmin();
     const files = formData
       .getAll("files")
@@ -409,14 +465,21 @@ export async function uploadAdminImages(
 
     for (const file of files) {
       if (!allowedImageTypes.includes(file.type)) {
-        return { ok: false, message: "Use apenas imagens JPG, PNG, WebP ou GIF.", urls };
+        return { ok: false, message: "Use apenas imagens JPG, PNG ou WebP.", urls };
       }
 
       if (file.size > maxImageSize) {
         return { ok: false, message: "Cada imagem deve ter no máximo 6 MB.", urls };
       }
 
-      const path = `${entity}/${Date.now()}-${crypto.randomUUID()}-${sanitizeFileName(file.name)}`;
+      const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+      if (!hasImageSignature(file.type, bytes)) {
+        return { ok: false, message: "O arquivo enviado não parece ser uma imagem válida.", urls };
+      }
+
+      const safeName = sanitizeFileName(file.name);
+      const extension = extensionFromType(file.type);
+      const path = `${entity}/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`;
       const { error } = await supabase.storage.from("tourism").upload(path, file, {
         cacheControl: "31536000",
         upsert: false,
@@ -440,7 +503,8 @@ export async function uploadAdminImages(
           };
         }
 
-        return { ok: false, message: error.message, urls };
+        console.error(error);
+        return { ok: false, message: "Não foi possível enviar a imagem para o Supabase Storage.", urls };
       }
 
       const { data } = supabase.storage.from("tourism").getPublicUrl(path);

@@ -5,24 +5,43 @@ import { Card, CardContent } from "@/components/ui/card";
 import { createMetadata } from "@/lib/seo";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
-export const metadata: Metadata = createMetadata({
+const loginMetadata = createMetadata({
   title: "Login Admin",
   path: "/admin/login",
   description: "Acesso seguro ao painel administrativo do portal turístico.",
 });
 
-export default function AdminLoginPage() {
+export const metadata: Metadata = {
+  ...loginMetadata,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unauthorized?: string }>;
+}) {
+  const params = await searchParams;
+
   return (
     <section className="container flex min-h-[calc(100vh-10rem)] items-center justify-center py-20">
       <div className="w-full max-w-md">
         <SectionHeader
           eyebrow="Área restrita"
-          title="Entrar no painel"
-          description="Use o email e senha cadastrados no Supabase Auth."
+          title="Painel administrativo"
+          description=""
         />
 
         <Card className="mt-8">
           <CardContent>
+            {params.unauthorized ? (
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                Este usuário não tem permissão de administrador.
+              </div>
+            ) : null}
             {isSupabaseConfigured ? (
               <LoginForm />
             ) : (

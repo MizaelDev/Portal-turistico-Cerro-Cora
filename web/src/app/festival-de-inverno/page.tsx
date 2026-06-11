@@ -214,7 +214,7 @@ export default function FestivalPage() {
             </h2>
           </div>
           <Button asChild variant="warm" size="lg">
-            <Link href="https://wa.me/5584999999999" target="_blank">
+            <Link href="https://wa.me/5584999999999" target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-4 w-4" /> Entrar em contato
             </Link>
           </Button>

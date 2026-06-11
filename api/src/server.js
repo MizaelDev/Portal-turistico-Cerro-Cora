@@ -12,14 +12,31 @@ import { projectsRouter } from "./routes/projects.js";
 dotenv.config();
 
 export async function createApp() {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret-change-me") {
+    throw new Error("JWT_SECRET must be configured before starting the API.");
+  }
+
   const app = express();
 
   app.set("port", Number(process.env.PORT || 3001));
 
+  const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-      credentials: false
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error("CORS origin not allowed"));
+      },
+      credentials: false,
+      methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
     })
   );
   app.use(express.json());
@@ -35,4 +52,3 @@ export async function createApp() {
   app.use(errorHandler);
   return app;
 }
-

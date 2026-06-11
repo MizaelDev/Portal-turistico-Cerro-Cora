@@ -280,13 +280,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
             return { ...current, imagens_urls: nextImages };
           });
         }
-      } catch (error) {
+      } catch {
         setStatus({
           type: "error",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Não foi possível enviar as imagens. Tente fotos menores ou verifique o Supabase Storage.",
+          text: "Não foi possível enviar as imagens. Tente fotos menores ou verifique o Supabase Storage.",
         });
       }
     });
@@ -307,13 +304,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         if (result.ok && result.urls[0]) {
           setForm((current) => ({ ...current, imagem_url: result.urls[0] }));
         }
-      } catch (error) {
+      } catch {
         setStatus({
           type: "error",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
+          text: "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
         });
       }
     });
@@ -334,13 +328,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         if (result.ok && result.urls[0]) {
           setForm((current) => ({ ...current, imagem_url: result.urls[0] }));
         }
-      } catch (error) {
+      } catch {
         setStatus({
           type: "error",
-          text:
-            error instanceof Error
-              ? error.message
-              : "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
+          text: "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
         });
       }
     });

@@ -33,7 +33,7 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
           <a
             href={mapHref}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 transition-colors hover:text-primary"
           >
             <MapPin className="h-4 w-4 text-alpine-wine" /> {lodging.location}
@@ -62,12 +62,12 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">
           <Button asChild variant="outline" className="flex-1">
-            <a href={`https://wa.me/${lodging.whatsapp}`} target="_blank" rel="noreferrer">
+            <a href={`https://wa.me/${lodging.whatsapp}`} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-4 w-4" /> WhatsApp
             </a>
           </Button>
           <Button asChild variant="warm" className="flex-1">
-            <a href={`https://wa.me/${lodging.whatsapp}?text=Quero%20reservar`} target="_blank" rel="noreferrer">
+            <a href={`https://wa.me/${lodging.whatsapp}?text=Quero%20reservar`} target="_blank" rel="noopener noreferrer">
               Reservar
             </a>
           </Button>

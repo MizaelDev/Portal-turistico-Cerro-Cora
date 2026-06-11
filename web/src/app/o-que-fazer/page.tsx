@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MapPin, MessageCircle } from "lucide-react";
+import { Compass, MessageCircle } from "lucide-react";
 import { AttractionCard } from "@/components/attraction-card";
 import { MapEmbed } from "@/components/map-embed";
 import { MotionReveal } from "@/components/motion-reveal";
@@ -54,7 +54,7 @@ export default async function RoutesPage() {
         {attractions.length ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {attractions.map((attraction, index) => (
-              <MotionReveal key={attraction.slug} delay={index * 0.04}>
+              <MotionReveal key={`${attraction.slug}-${index}`} delay={index * 0.04}>
                 <div id={attraction.slug}>
                   <AttractionCard attraction={attraction} />
                 </div>
@@ -86,7 +86,7 @@ export default async function RoutesPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-alpine-sunset text-[#17251f]">
-                    <MapPin className="h-5 w-5" />
+                    <Compass className="h-5 w-5" />
                   </div>
                   <div>
                     <h3 className="font-display text-2xl font-semibold">{guide.name}</h3>
@@ -97,7 +97,7 @@ export default async function RoutesPage() {
                   </div>
                 </div>
                 <Button asChild variant="warm" className="mt-6 w-full">
-                  <a href={whatsappUrl(guide.whatsapp)} target="_blank" rel="noreferrer">
+                  <a href={whatsappUrl(guide.whatsapp)} target="_blank" rel="noopener noreferrer">
                     <MessageCircle className="h-4 w-4" />
                     Falar com guia
                   </a>

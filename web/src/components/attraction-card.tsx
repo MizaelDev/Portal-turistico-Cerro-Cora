@@ -30,7 +30,7 @@ export function AttractionCard({ attraction }: { attraction: Attraction }) {
         <a
           href={mapHref}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="mt-4 flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
         >
           <MapPin className="h-4 w-4 text-alpine-wine" /> {attraction.location}
@@ -39,7 +39,7 @@ export function AttractionCard({ attraction }: { attraction: Attraction }) {
           <a
             href={attraction.infoUrl || `/o-que-fazer#${attraction.slug}`}
             target={attraction.infoUrl ? "_blank" : undefined}
-            rel={attraction.infoUrl ? "noreferrer" : undefined}
+            rel={attraction.infoUrl ? "noopener noreferrer" : undefined}
           >
             Saiba mais <ArrowRight className="h-4 w-4" />
           </a>

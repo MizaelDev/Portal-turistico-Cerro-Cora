@@ -208,7 +208,7 @@ export default function AboutCityPage() {
             <a
               href="https://cerrocorarn.com.br/sobre-a-cidade/"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 font-semibold text-primary"
             >
               História da cidade <ExternalLink className="h-4 w-4" />
@@ -216,7 +216,7 @@ export default function AboutCityPage() {
             <a
               href="https://cerrocorarn.com.br/clima-em-cerro-cora-rn/"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 font-semibold text-primary"
             >
               Tabela climática local <ExternalLink className="h-4 w-4" />
@@ -224,7 +224,7 @@ export default function AboutCityPage() {
             <a
               href="https://pt.weatherspark.com/y/31292/Clima-caracter%C3%ADstico-em-Cerro-Cor%C3%A1-Rio-Grande-do-Norte-Brasil-durante-o-ano"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 font-semibold text-primary"
             >
               Weather Spark <ExternalLink className="h-4 w-4" />

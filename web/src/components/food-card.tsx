@@ -36,7 +36,7 @@ export function FoodCard({ place }: { place: FoodPlace }) {
           <a
             href={mapHref}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 transition-colors hover:text-primary"
           >
             <MapPin className="h-4 w-4 text-alpine-wine" /> {place.location}
@@ -44,14 +44,14 @@ export function FoodCard({ place }: { place: FoodPlace }) {
           <a
             href={instagramHref}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 transition-colors hover:text-primary"
           >
             <Instagram className="h-4 w-4 text-alpine-wine" /> {place.instagram}
           </a>
         </div>
         <Button asChild variant="warm">
-          <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noreferrer">
+          <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
         </Button>

@@ -141,7 +141,8 @@ export async function getPublicAttractions(): Promise<PublicContent<Attraction>>
     .order("nome");
 
   if (error) {
-    return { items: [], error: error.message, source: "supabase" };
+    console.error(error);
+    return { items: [], error: "Não foi possível carregar os roteiros.", source: "supabase" };
   }
 
   return {
@@ -164,7 +165,8 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
     .order("nome");
 
   if (error) {
-    return { items: [], error: error.message, source: "supabase" };
+    console.error(error);
+    return { items: [], error: "Não foi possível carregar as pousadas.", source: "supabase" };
   }
 
   return {
@@ -187,7 +189,8 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
     .order("nome");
 
   if (error) {
-    return { items: [], error: error.message, source: "supabase" };
+    console.error(error);
+    return { items: [], error: "Não foi possível carregar os estabelecimentos.", source: "supabase" };
   }
 
   return {
