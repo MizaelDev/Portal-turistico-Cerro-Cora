@@ -1,6 +1,6 @@
 # Portal Turístico Cerro Corá - RN
 
-MVP profissional em Next.js 15 para divulgar Cerro Corá, a "Suíça do Seridó", com páginas turísticas, painel administrativo protegido, SEO, dados demonstrativos e integração preparada para Supabase e Vercel.
+MVP  em Next.js 15 para divulgar Cerro Corá, a "Suíça do Seridó", com páginas turísticas, painel administrativo protegido, SEO, dados  e integração preparada para Supabase e Vercel.
 
 ## Stack
 
@@ -11,7 +11,7 @@ MVP profissional em Next.js 15 para divulgar Cerro Corá, a "Suíça do Seridó"
 - Componentes estilo Shadcn/UI
 - Supabase Auth e Database
 - `@supabase/ssr` para sessão com cookies
-- Deploy pronto para Vercel
+- 
 
 ## Principais telas
 
@@ -45,7 +45,7 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Cerro%20Cor%C3%A
 NEXT_PUBLIC_OPENWEATHER_API_KEY=
 ```
 
-Não configure chave service role neste projeto. Ele usa apenas a anon key e as permissões são controladas por Supabase Auth + RLS.
+
 
 ## Como conectar Supabase
 
@@ -74,19 +74,8 @@ As tabelas usadas são:
 - `restaurantes`
 - `admin_users`
 
-O site público lê apenas registros com `ativo = true`. O painel administrativo usa middleware para proteger `/admin/*` e as escritas passam por autenticação Supabase.
 
-No cadastro de pousadas, o painel envia as imagens para o bucket público `tourism`. A primeira imagem da lista é usada como foto principal e as seguintes aparecem na galeria.
 
-Se o banco estiver vazio, o painel também possui o botão **Repor dados padrão** para recriar os roteiros, pousadas e restaurantes que vieram no MVP.
-
-## Deploy na Vercel
-
-1. Importe o repositório na Vercel.
-2. Defina o root directory como `web`.
-3. Configure as variáveis de ambiente.
-4. Use build command `npm run build`.
-5. Publique.
 
 ## SEO e performance
 
@@ -98,6 +87,4 @@ Se o banco estiver vazio, o painel também possui o botão **Repor dados padrão
 - Imagens otimizadas com `next/image`
 - UI responsiva, dark mode automático por sistema, busca global e WhatsApp flutuante
 
-## Dados demonstrativos
 
-Os dados base ficam em `web/src/lib/data.ts`. Quando o Supabase não estiver configurado, as páginas públicas usam esses dados como fallback para manter o MVP navegável.
