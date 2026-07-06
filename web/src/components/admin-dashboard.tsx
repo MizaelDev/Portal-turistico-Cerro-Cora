@@ -310,7 +310,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
 
             return {
               ...current,
-              imagem_url: String(current.imagem_url || "").trim() || result.urls[0],
               imagens_urls: nextImages,
             };
           });
@@ -469,7 +468,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="imagem_url">Imagem principal e carrossel</Label>
+                    <Label htmlFor="imagem_url">Imagem principal e fotos adicionais</Label>
                     <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-6 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
                         <Loader2 className="mb-3 h-7 w-7 animate-spin text-muted-foreground" />
@@ -480,7 +479,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {isUploading ? "Enviando imagens..." : "Selecionar fotos do roteiro"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        A primeira foto enviada preenche a imagem principal. Todas entram no carrossel do card.
+                        O upload não altera a imagem principal. As fotos enviadas entram apenas como adicionais no carrossel.
                       </span>
                       <input
                         type="file"
@@ -514,7 +513,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       name="imagens_urls"
                       value={String(form.imagens_urls || "")}
                       onChange={(event) => updateField("imagens_urls", event.target.value)}
-                      placeholder="As URLs enviadas aparecem aqui automaticamente. Você também pode colar uma imagem por linha."
+                      placeholder="As fotos adicionais enviadas aparecem aqui automaticamente. Você também pode colar uma imagem por linha."
                     />
                   </div>
                 </>

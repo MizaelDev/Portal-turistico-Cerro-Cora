@@ -262,11 +262,17 @@ export async function saveAdminItem(
         };
       }
 
-      if (error.message.toLowerCase().includes("column") && error.message.toLowerCase().includes("does not exist")) {
+      const errorMessage = error.message.toLowerCase();
+
+      if (
+        (errorMessage.includes("column") && errorMessage.includes("does not exist")) ||
+        (errorMessage.includes("could not find") && errorMessage.includes("column")) ||
+        errorMessage.includes("schema cache")
+      ) {
         return {
           ok: false,
           message:
-            "Faltam colunas novas no Supabase. Rode web/supabase/schema.sql no SQL Editor.",
+            "Falta atualizar o Supabase. Rode web/supabase/attraction-gallery.sql no SQL Editor e tente salvar novamente.",
         };
       }
 

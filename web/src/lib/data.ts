@@ -489,9 +489,9 @@ export const festivalSchedule: FestivalScheduleItem[] = [
     artists: [
       { name: "Só Pra Contrariar", role: "principal" },
       { name: "Raynel Guedes", role: "regional" },
-      { name: "Banda Tuareg's", role: "regional" },
-      { name: "Clau Vianna", role: "convidado" },
-      { name: "Victor Costa", role: "convidado" },
+      { name: "Clau Vianna", role: "regional" },
+      { name: "Banda Tuareg's", role: "convidado" },
+      { name: "Victor Costa", role: "regional" },
     ],
   },
   {
@@ -502,8 +502,8 @@ export const festivalSchedule: FestivalScheduleItem[] = [
     highlight: "Roberta Miranda",
     artists: [
       { name: "Roberta Miranda", role: "principal" },
-      { name: "Circuito Musical", role: "regional" },
-      { name: "Joãozinho Dantas", role: "regional" },
+      { name: "Circuito Musical", role: "convidado" },
+      { name: "Joãozinho Dantas", role: "convidado" },
       { name: "The Clássicos", role: "convidado" },
       { name: "Gilson Fernandes", role: "convidado" },
     ],
@@ -516,8 +516,8 @@ export const festivalSchedule: FestivalScheduleItem[] = [
     highlight: "Banda Grafith",
     artists: [
       { name: "Banda Grafith", role: "principal" },
-      { name: "Acácio Ferinha", role: "regional" },
-      { name: "Giovane Soares", role: "convidado" },
+      { name: "Acácio Ferinha", role: "convidado" },
+      { name: "Giovane Soares", role: "regional" },
     ],
   },
 ];
