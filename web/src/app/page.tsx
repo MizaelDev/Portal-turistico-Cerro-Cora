@@ -155,7 +155,7 @@ export default async function HomePage() {
             className="text-left text-white"
             eyebrow="Gastronomia"
             title="Cafés, massas, e sabores regionais."
-            description="A cidade ganha outro ritmo quando a temperatura cai. Monte um roteiro com paradas gastronômicas."
+            description="A cidade ganha outro ritmo quando a temperatura cai. Descubra paradas gastronômicas para aproveitar o frio serrano."
           />
           {foodPlacesError ? (
             <div className="rounded-lg border border-white/12 bg-white/8 p-5 text-sm text-white/70 backdrop-blur">

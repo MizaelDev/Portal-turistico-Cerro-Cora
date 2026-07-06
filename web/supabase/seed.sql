@@ -48,6 +48,12 @@ values
   ('Pinturas Rupestres', 'Patrimônio arqueológico com registros visuais antigos, indicado para visitas guiadas e educativas.', 'natureza', 'Sítios arqueológicos da região', '/images/pinturas.jpg', true),
   ('Casa Grande / Casarão Centenário', 'Construção histórica que preserva a arquitetura e a memória cultural de Cerro Corá, sendo um marco tradicional da cidade.', 'natureza', 'Centro da cidade', '/images/casa-grande.jpg', true);
 
+update public.pontos_turisticos
+set imagens_urls = array[imagem_url]
+where coalesce(array_length(imagens_urls, 1), 0) = 0
+  and imagem_url is not null
+  and imagem_url <> '';
+
 insert into public.pousadas
   (nome, descricao, localizacao, distancia_centro, faixa_preco_min, faixa_preco_max, whatsapp, imagens_urls, ativo)
 values

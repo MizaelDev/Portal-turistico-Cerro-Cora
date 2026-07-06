@@ -9,6 +9,7 @@ create table if not exists public.pontos_turisticos (
   ),
   localizacao text not null,
   imagem_url text not null,
+  imagens_urls text[] not null default '{}',
   ativo boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -32,7 +33,7 @@ create table if not exists public.restaurantes (
   nome text not null,
   descricao text not null,
   categoria text not null check (
-    categoria in ('restaurante', 'bar', 'café', 'lanchonete')
+    categoria in ('restaurante', 'almoço', 'bar', 'café', 'lanchonete')
   ),
   horario_funcionamento text not null,
   endereco text not null,
@@ -50,6 +51,16 @@ alter table public.restaurantes
   add column if not exists mapa_url text,
   add column if not exists instagram_url text,
   add column if not exists tags text[] not null default '{}';
+
+alter table public.pontos_turisticos
+  add column if not exists imagens_urls text[] not null default '{}';
+
+alter table public.restaurantes
+  drop constraint if exists restaurantes_categoria_check;
+
+alter table public.restaurantes
+  add constraint restaurantes_categoria_check
+  check (categoria in ('restaurante', 'almoço', 'bar', 'café', 'lanchonete'));
 
 create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,

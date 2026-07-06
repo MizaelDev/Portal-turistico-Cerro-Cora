@@ -11,7 +11,7 @@ export type PontoTuristicoCategory =
   | "trilha"
   | "aventura";
 
-export type RestauranteCategory = "restaurante" | "bar" | "café" | "lanchonete";
+export type RestauranteCategory = "restaurante" | "almoço" | "bar" | "café" | "lanchonete";
 
 export type PontoTuristicoRow = {
   id: string;
@@ -20,6 +20,7 @@ export type PontoTuristicoRow = {
   categoria: PontoTuristicoCategory;
   localizacao: string;
   imagem_url: string;
+  imagens_urls?: string[] | null;
   ativo: boolean;
   created_at: string;
 };

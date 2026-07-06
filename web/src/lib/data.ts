@@ -15,6 +15,7 @@ export type Attraction = {
   slug: string;
   name: string;
   image: string;
+  gallery?: string[];
   description: string;
   location: string;
   mapUrl?: string;
@@ -24,7 +25,7 @@ export type Attraction = {
 
 export type FoodPlace = {
   name: string;
-  category: "Restaurante" | "Hamburgueria" | "Cafeteria" | "Bar" | "Lanchonete";
+  category: "Restaurante" | "Almoço" | "Hamburgueria" | "Cafeteria" | "Bar" | "Lanchonete";
   tags: string[];
   image: string;
   description: string;
@@ -63,16 +64,21 @@ export type ClimateMonth = {
   rain: number;
 };
 
-export type FestivalScheduleItem = {
-  day: string;
-  time: string;
-  title: string;
-  revealed: boolean;
+export type FestivalArtistRole = "principal" | "regional" | "convidado";
+
+export type FestivalArtistSlot = {
+  name: string;
+  role: FestivalArtistRole;
+  time?: string;
 };
 
-export type FestivalArtist = {
-  name: string;
-  revealed: boolean;
+export type FestivalScheduleItem = {
+  day: string;
+  date: string;
+  subtitle: string;
+  title: string;
+  highlight: string;
+  artists: FestivalArtistSlot[];
 };
 
 export type TourGuide = {
@@ -474,20 +480,46 @@ gallery: [
 ];
 
 export const festivalSchedule: FestivalScheduleItem[] = [
-  { day: "Sexta", time: "18h", title: "Abertura oficial e feira gastronômica", revealed: false },
-  { day: "Sexta", time: "21h", title: "Show regional no palco principal", revealed: false },
-  { day: "Sabado", time: "9h", title: "Trilha guiada e café serrano", revealed: false },
-  { day: "Sabado", time: "17h", title: "Por do sol no Mirante do Cruzeiro", revealed: false },
-  { day: "Sabado", time: "22h", title: "Atracao nacional convidada", revealed: false },
-  { day: "Domingo", time: "10h", title: "Encontro de artesanato e cultura", revealed: false },
-];
-
-export const festivalArtists: FestivalArtist[] = [
-  { name: "Forro da Serra", revealed: false },
-  { name: "Orquestra Seridó", revealed: false },
-  { name: "DJ Sunset", revealed: false },
-  { name: "Trio Neblina", revealed: false },
-  { name: "Coral de Inverno", revealed: false },
+  {
+    day: "Sexta",
+    date: "07 de agosto",
+    subtitle: "Abertura Oficial",
+    title: "Abertura com pagode, forró e artistas locais",
+    highlight: "Só Pra Contrariar",
+    artists: [
+      { name: "Só Pra Contrariar", role: "principal" },
+      { name: "Raynel Guedes", role: "regional" },
+      { name: "Banda Tuareg's", role: "regional" },
+      { name: "Clau Vianna", role: "convidado" },
+      { name: "Victor Costa", role: "convidado" },
+    ],
+  },
+  {
+    day: "Sábado",
+    date: "08 de agosto",
+    subtitle: "Noite Principal",
+    title: "Noite romântica, forró e clássicos populares",
+    highlight: "Roberta Miranda",
+    artists: [
+      { name: "Roberta Miranda", role: "principal" },
+      { name: "Circuito Musical", role: "regional" },
+      { name: "Joãozinho Dantas", role: "regional" },
+      { name: "The Clássicos", role: "convidado" },
+      { name: "Gilson Fernandes", role: "convidado" },
+    ],
+  },
+  {
+    day: "Domingo",
+    date: "09 de agosto",
+    subtitle: "Encerramento",
+    title: "Encerramento com axé, forró e artistas regionais",
+    highlight: "Banda Grafith",
+    artists: [
+      { name: "Banda Grafith", role: "principal" },
+      { name: "Acácio Ferinha", role: "regional" },
+      { name: "Giovane Soares", role: "convidado" },
+    ],
+  },
 ];
 
 export const homeHighlights = [

@@ -37,10 +37,13 @@ function titleCase(value: string) {
 }
 
 function mapPontoTuristico(row: PontoTuristicoRow): Attraction {
+  const gallery = (row.imagens_urls || []).filter(Boolean);
+
   return {
     slug: slugify(row.nome),
     name: row.nome,
     image: row.imagem_url,
+    gallery,
     description: row.descricao,
     location: row.localizacao,
     category: titleCase(row.categoria),
@@ -73,6 +76,7 @@ function mapPousada(row: PousadaRow): Lodging {
 
 const restaurantCategoryLabels: Record<RestauranteCategory, FoodPlace["category"]> = {
   restaurante: "Restaurante",
+  almoço: "Almoço",
   bar: "Bar",
   café: "Cafeteria",
   lanchonete: "Lanchonete",
@@ -92,6 +96,7 @@ function deriveRestaurantTags(row: RestauranteRow, category: FoodPlace["category
   if (text.includes("sobremesa") || text.includes("doce")) tags.add("Sobremesas");
   if (text.includes("bar")) tags.add("Bar");
   if (text.includes("delivery")) tags.add("Delivery");
+  if (text.includes("almoco")) tags.add("Almoço");
 
   return Array.from(tags);
 }

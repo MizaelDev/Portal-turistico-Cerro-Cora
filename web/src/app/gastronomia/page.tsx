@@ -23,6 +23,11 @@ const foodFilters = [
     matches: (place: FoodPlace) => place.category === "Restaurante",
   },
   {
+    title: "Almoço",
+    description: "Locais com foco em almoço, comida regional e refeições completas durante o dia.",
+    matches: (place: FoodPlace) => place.category === "Almoço" || place.tags.includes("Almoço"),
+  },
+  {
     title: "Cafés e sobremesas",
     description: "Cafeterias, açaí, doces, chocolate quente e paradas leves.",
     matches: (place: FoodPlace) =>
@@ -61,7 +66,7 @@ export default async function GastronomyPage() {
       />
 
       <div className="mt-8 flex flex-wrap justify-center gap-2">
-        {["Restaurante", "Café", "Bar", "Lanchonete", "Pizza", "Petiscos"].map((tag) => (
+        {["Restaurante", "Café", "Bar", "Lanchonete", "Pizza", "Petiscos", "Almoço"].map((tag) => (
           <Badge key={tag}>{tag}</Badge>
         ))}
       </div>
@@ -83,18 +88,18 @@ export default async function GastronomyPage() {
 
             return (
               <section key={filter.title}>
-                <div className="mb-5 flex flex-col justify-between gap-2 md:flex-row md:items-end">
-                  <div>
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
                     <h2 className="font-display text-3xl font-semibold">{filter.title}</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
                       {filter.description}
                     </p>
                   </div>
-                  <span className="text-sm font-semibold text-muted-foreground">
+                  <span className="ml-auto shrink-0 rounded-md border border-border bg-background/70 px-3 py-1 text-right text-sm font-semibold text-muted-foreground">
                     {places.length} opções
                   </span>
                 </div>
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {places.map((place) => (
                     <FoodCard key={`${filter.title}-${place.name}`} place={place} />
                   ))}

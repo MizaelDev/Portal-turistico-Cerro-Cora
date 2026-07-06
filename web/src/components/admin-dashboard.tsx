@@ -52,6 +52,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     categoria: "mirante",
     localizacao: "",
     imagem_url: "",
+    imagens_urls: "",
     ativo: true,
   },
   pousadas: {
@@ -92,6 +93,7 @@ const attractionCategories = [
 
 const restaurantCategories = [
   ["restaurante", "Restaurante"],
+  ["almoço", "Almoço"],
   ["bar", "Bar"],
   ["café", "Café"],
   ["lanchonete", "Lanchonete"],
@@ -160,6 +162,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
     categoria: attraction.categoria,
     localizacao: attraction.localizacao,
     imagem_url: attraction.imagem_url,
+    imagens_urls: (attraction.imagens_urls || []).join("\n"),
     ativo: attraction.ativo,
   };
 }
@@ -290,24 +293,32 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   }
 
   function uploadAttractionImage(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
+    if (!files?.length) return;
 
     const formData = new FormData();
-    formData.append("files", file);
+    Array.from(files).forEach((file) => formData.append("files", file));
 
     startUploadTransition(async () => {
       try {
         const result = await uploadAdminImages("pontos_turisticos", formData);
         setStatus({ type: result.ok ? "success" : "error", text: result.message });
 
-        if (result.ok && result.urls[0]) {
-          setForm((current) => ({ ...current, imagem_url: result.urls[0] }));
+        if (result.ok && result.urls.length) {
+          setForm((current) => {
+            const currentImages = String(current.imagens_urls || "").trim();
+            const nextImages = [...(currentImages ? [currentImages] : []), ...result.urls].join("\n");
+
+            return {
+              ...current,
+              imagem_url: String(current.imagem_url || "").trim() || result.urls[0],
+              imagens_urls: nextImages,
+            };
+          });
         }
       } catch {
         setStatus({
           type: "error",
-          text: "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
+          text: "Não foi possível enviar as imagens. Tente fotos menores ou verifique o Supabase Storage.",
         });
       }
     });
@@ -458,22 +469,23 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="imagem_url">Imagem</Label>
-                    <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-5 text-center transition-colors hover:bg-accent/70">
+                    <Label htmlFor="imagem_url">Imagem principal e carrossel</Label>
+                    <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-6 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
-                        <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground" />
+                        <Loader2 className="mb-3 h-7 w-7 animate-spin text-muted-foreground" />
                       ) : (
-                        <ImagePlus className="mb-3 h-6 w-6 text-muted-foreground" />
+                        <ImagePlus className="mb-3 h-7 w-7 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">
-                        {isUploading ? "Enviando imagem..." : "Selecionar foto do roteiro"}
+                        {isUploading ? "Enviando imagens..." : "Selecionar fotos do roteiro"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        A URL será preenchida automaticamente após o envio.
+                        A primeira foto enviada preenche a imagem principal. Todas entram no carrossel do card.
                       </span>
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
                         className="sr-only"
                         disabled={isUploading}
                         onChange={(event) => {
@@ -482,6 +494,13 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         }}
                       />
                     </label>
+                    {String(form.imagens_urls || "").trim() ? (
+                      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <UploadCloud className="h-3.5 w-3.5" />
+                        {String(form.imagens_urls || "").split(/\n+/).filter(Boolean).length} imagem
+                        {String(form.imagens_urls || "").split(/\n+/).filter(Boolean).length === 1 ? "" : "s"} no carrossel.
+                      </p>
+                    ) : null}
                     <Input
                       id="imagem_url"
                       name="imagem_url"
@@ -489,6 +508,13 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       value={String(form.imagem_url || "")}
                       onChange={(event) => updateField("imagem_url", event.target.value)}
                       required
+                    />
+                    <Textarea
+                      id="imagens_urls"
+                      name="imagens_urls"
+                      value={String(form.imagens_urls || "")}
+                      onChange={(event) => updateField("imagens_urls", event.target.value)}
+                      placeholder="As URLs enviadas aparecem aqui automaticamente. Você também pode colar uma imagem por linha."
                     />
                   </div>
                 </>

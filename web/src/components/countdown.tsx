@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 
 const target = new Date("2026-08-07T18:00:00-03:00").getTime();
+const initialTime = {
+  dias: "--",
+  horas: "--",
+  minutos: "--",
+  segundos: "--",
+};
 
 function calculate() {
   const diff = Math.max(target - Date.now(), 0);
@@ -19,9 +25,10 @@ function calculate() {
 }
 
 export function Countdown() {
-  const [time, setTime] = useState(calculate);
+  const [time, setTime] = useState<Record<keyof typeof initialTime, number | string>>(initialTime);
 
   useEffect(() => {
+    setTime(calculate());
     const interval = window.setInterval(() => setTime(calculate()), 1000);
     return () => window.clearInterval(interval);
   }, []);

@@ -55,6 +55,7 @@ const pontoTuristicoSchema = z.object({
   categoria: z.enum(["mirante", "natureza", "geoturismo", "ecoturismo", "trilha", "aventura"]),
   localizacao: z.string().trim().min(2, "Informe a localização."),
   imagem_url: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
   ativo: z.boolean(),
 });
 
@@ -73,7 +74,7 @@ const pousadaSchema = z.object({
 const restauranteSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
-  categoria: z.enum(["restaurante", "bar", "café", "lanchonete"]),
+  categoria: z.enum(["restaurante", "almoço", "bar", "café", "lanchonete"]),
   horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
   endereco: z.string().trim().min(2, "Informe o endereço."),
   mapa_url: optionalUrl,
@@ -134,6 +135,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
       categoria: formData.get("categoria"),
       localizacao: formData.get("localizacao"),
       imagem_url: formData.get("imagem_url"),
+      imagens_urls: imageList(formData.get("imagens_urls")),
       ativo: formData.get("ativo") === "on",
     });
   }
@@ -196,6 +198,7 @@ function restaurantCategory(category: string) {
     .toLowerCase();
 
   if (normalized === "bar") return "bar";
+  if (normalized === "almoco") return "almoço";
   if (normalized === "cafeteria" || normalized === "cafe") return "café";
   if (normalized === "hamburgueria" || normalized === "lanchonete") return "lanchonete";
   return "restaurante";
@@ -263,7 +266,7 @@ export async function saveAdminItem(
         return {
           ok: false,
           message:
-            "Faltam colunas novas no Supabase. Rode web/supabase/restaurant-enhancements.sql no SQL Editor.",
+            "Faltam colunas novas no Supabase. Rode web/supabase/schema.sql no SQL Editor.",
         };
       }
 
@@ -334,6 +337,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         categoria: attractionCategory(attraction.category),
         localizacao: attraction.location,
         imagem_url: attraction.image,
+        imagens_urls: [attraction.image, ...(attraction.gallery || [])],
         ativo: true,
       };
 
