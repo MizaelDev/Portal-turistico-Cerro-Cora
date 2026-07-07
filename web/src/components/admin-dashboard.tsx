@@ -84,7 +84,9 @@ const emptyForms: Record<AdminEntity, FormState> = {
   },
   restaurantes: {
     nome: "",
+    slug: "",
     descricao: "",
+    descricao_completa: "",
     categoria: "restaurante",
     horario_funcionamento: "",
     endereco: "",
@@ -92,8 +94,19 @@ const emptyForms: Record<AdminEntity, FormState> = {
     instagram: "",
     instagram_url: "",
     whatsapp: "",
+    telefone: "",
     imagem_url: "",
+    logo_url: "",
+    imagens_urls: "",
     tags: "",
+    formas_pagamento: "",
+    diferenciais: "",
+    especialidades: "",
+    prato_recomendado: "",
+    dica_turista: "",
+    cardapio_url: "",
+    faixa_preco: "",
+    destaque: false,
     ativo: true,
   },
 };
@@ -182,7 +195,9 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
     const restaurant = row as RestauranteRow;
     return {
       nome: restaurant.nome,
+      slug: restaurant.slug || "",
       descricao: restaurant.descricao,
+      descricao_completa: restaurant.descricao_completa || "",
       categoria: restaurant.categoria,
       horario_funcionamento: restaurant.horario_funcionamento,
       endereco: restaurant.endereco,
@@ -190,8 +205,19 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       instagram: restaurant.instagram || "",
       instagram_url: restaurant.instagram_url || "",
       whatsapp: restaurant.whatsapp,
+      telefone: restaurant.telefone || "",
       imagem_url: restaurant.imagem_url,
+      logo_url: restaurant.logo_url || "",
+      imagens_urls: (restaurant.imagens_urls || []).join("\n"),
       tags: (restaurant.tags || []).join("|"),
+      formas_pagamento: (restaurant.formas_pagamento || []).join("\n"),
+      diferenciais: (restaurant.diferenciais || []).join("\n"),
+      especialidades: (restaurant.especialidades || []).join("\n"),
+      prato_recomendado: restaurant.prato_recomendado || "",
+      dica_turista: restaurant.dica_turista || "",
+      cardapio_url: restaurant.cardapio_url || "",
+      faixa_preco: restaurant.faixa_preco || "",
+      destaque: Boolean(restaurant.destaque),
       ativo: restaurant.ativo,
     };
   }
@@ -486,6 +512,33 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         setStatus({
           type: "error",
           text: "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
+        });
+      }
+    });
+  }
+
+  function uploadRestaurantGalleryImages(files: FileList | null) {
+    if (!files?.length) return;
+
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("files", file));
+
+    startUploadTransition(async () => {
+      try {
+        const result = await uploadAdminImages("restaurantes", formData);
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+
+        if (result.ok && result.urls.length) {
+          setForm((current) => {
+            const currentImages = String(current.imagens_urls || "").trim();
+            const nextImages = [...(currentImages ? [currentImages] : []), ...result.urls].join("\n");
+            return { ...current, imagens_urls: nextImages };
+          });
+        }
+      } catch {
+        setStatus({
+          type: "error",
+          text: "Não foi possível enviar as imagens da galeria. Tente fotos menores ou verifique o Supabase Storage.",
         });
       }
     });
@@ -861,6 +914,44 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
 
               {entity === "restaurantes" ? (
                 <>
+                  <div className="rounded-lg border border-border bg-accent/20 p-4">
+                    <p className="text-sm font-semibold">Página individual do restaurante</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Esses campos alimentam a página /restaurantes/slug. Se deixar o slug vazio, ele será gerado pelo nome.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="slug">Slug da página</Label>
+                      <Input
+                        id="slug"
+                        name="slug"
+                        value={String(form.slug || "")}
+                        onChange={(event) => updateField("slug", event.target.value)}
+                        placeholder="acai-bistro"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="faixa_preco">Faixa de preço</Label>
+                      <Input
+                        id="faixa_preco"
+                        name="faixa_preco"
+                        value={String(form.faixa_preco || "")}
+                        onChange={(event) => updateField("faixa_preco", event.target.value)}
+                        placeholder="R$, R$$ ou R$$$"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="descricao_completa">Descrição completa</Label>
+                    <Textarea
+                      id="descricao_completa"
+                      name="descricao_completa"
+                      value={String(form.descricao_completa || "")}
+                      onChange={(event) => updateField("descricao_completa", event.target.value)}
+                      placeholder="Texto maior para a seção Sobre da página individual."
+                    />
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="horario_funcionamento">Horário</Label>
@@ -927,6 +1018,16 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         required
                       />
                     </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="telefone">Telefone visível</Label>
+                      <Input
+                        id="telefone"
+                        name="telefone"
+                        value={String(form.telefone || "")}
+                        onChange={(event) => updateField("telefone", event.target.value)}
+                        placeholder="(84) 99999-9999"
+                      />
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label>Tags do estabelecimento</Label>
@@ -983,6 +1084,124 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       required
                     />
                   </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="logo_url">Logo ou imagem alternativa</Label>
+                    <Input
+                      id="logo_url"
+                      name="logo_url"
+                      value={String(form.logo_url || "")}
+                      onChange={(event) => updateField("logo_url", event.target.value)}
+                      placeholder="/images/logo-restaurante.png ou https://..."
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="imagens_urls">Galeria da página individual</Label>
+                    <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-5 text-center transition-colors hover:bg-accent/70">
+                      {isUploading ? (
+                        <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <ImagePlus className="mb-3 h-6 w-6 text-muted-foreground" />
+                      )}
+                      <span className="text-sm font-medium">
+                        {isUploading ? "Enviando imagens..." : "Selecionar fotos da galeria"}
+                      </span>
+                      <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+                        Use fotos do ambiente, pratos e fachada. Elas aparecem na página individual do restaurante.
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
+                        className="sr-only"
+                        disabled={isUploading}
+                        onChange={(event) => {
+                          uploadRestaurantGalleryImages(event.target.files);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <Textarea
+                      id="imagens_urls"
+                      name="imagens_urls"
+                      value={String(form.imagens_urls || "")}
+                      onChange={(event) => updateField("imagens_urls", event.target.value)}
+                      placeholder="Uma URL de imagem por linha."
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="formas_pagamento">Formas de pagamento</Label>
+                      <Textarea
+                        id="formas_pagamento"
+                        name="formas_pagamento"
+                        value={String(form.formas_pagamento || "")}
+                        onChange={(event) => updateField("formas_pagamento", event.target.value)}
+                        placeholder="Pix&#10;Dinheiro&#10;Cartão"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="diferenciais">Diferenciais</Label>
+                      <Textarea
+                        id="diferenciais"
+                        name="diferenciais"
+                        value={String(form.diferenciais || "")}
+                        onChange={(event) => updateField("diferenciais", event.target.value)}
+                        placeholder="Delivery&#10;Reservas&#10;Estacionamento"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="especialidades">Especialidades</Label>
+                    <Textarea
+                      id="especialidades"
+                      name="especialidades"
+                      value={String(form.especialidades || "")}
+                      onChange={(event) => updateField("especialidades", event.target.value)}
+                      placeholder="Almoço regional&#10;Pizza&#10;Petiscos"
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="prato_recomendado">Recomendação da casa</Label>
+                      <Input
+                        id="prato_recomendado"
+                        name="prato_recomendado"
+                        value={String(form.prato_recomendado || "")}
+                        onChange={(event) => updateField("prato_recomendado", event.target.value)}
+                        placeholder="Prato mais famoso"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="cardapio_url">Link do cardápio</Label>
+                      <Input
+                        id="cardapio_url"
+                        name="cardapio_url"
+                        value={String(form.cardapio_url || "")}
+                        onChange={(event) => updateField("cardapio_url", event.target.value)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dica_turista">Dica para quem visita pela primeira vez</Label>
+                    <Textarea
+                      id="dica_turista"
+                      name="dica_turista"
+                      value={String(form.dica_turista || "")}
+                      onChange={(event) => updateField("dica_turista", event.target.value)}
+                      placeholder="Sugestão curta para turistas."
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="destaque"
+                      checked={Boolean(form.destaque)}
+                      onChange={(event) => updateField("destaque", event.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    Destaque na página individual
+                  </label>
                 </>
               ) : null}
 

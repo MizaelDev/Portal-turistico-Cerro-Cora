@@ -1,9 +1,11 @@
 import Image from "next/image";
-import { Clock, Instagram, MapPin, MessageCircle, Utensils } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Clock, Instagram, MapPin, MessageCircle, Utensils } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { FoodPlace } from "@/lib/data";
 import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
+import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/utils";
 
 const logoImageSignals = ["logo", "marca", "brand", "avatar", "profile"];
@@ -90,6 +92,7 @@ function FoodImage({ place }: { place: FoodPlace }) {
 export function FoodCard({ place }: { place: FoodPlace }) {
   const instagramHref = place.instagramUrl || instagramUrlFromHandle(place.instagram);
   const mapHref = place.mapUrl || googleMapsSearchUrl(place.name, place.location);
+  const detailHref = `/restaurantes/${place.slug || slugify(place.name)}`;
   const { visibleTags, hiddenCount } = getVisibleTags(place);
 
   return (
@@ -144,11 +147,18 @@ export function FoodCard({ place }: { place: FoodPlace }) {
             <span className="line-clamp-1">{place.instagram}</span>
           </a>
         </div>
-        <Button asChild variant="warm" className="mt-auto">
-          <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
+        <div className="mt-auto grid gap-2 sm:grid-cols-2">
+          <Button asChild variant="outline">
+            <Link href={detailHref}>
+              Ver detalhes <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="warm">
+            <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
             <MessageCircle className="h-4 w-4" /> WhatsApp
-          </a>
-        </Button>
+            </a>
+          </Button>
+        </div>
       </div>
     </article>
   );

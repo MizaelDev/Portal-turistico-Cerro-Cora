@@ -42,7 +42,9 @@ export type PousadaRow = {
 export type RestauranteRow = {
   id: string;
   nome: string;
+  slug?: string | null;
   descricao: string;
+  descricao_completa?: string | null;
   categoria: RestauranteCategory;
   horario_funcionamento: string;
   endereco: string;
@@ -50,10 +52,22 @@ export type RestauranteRow = {
   instagram: string | null;
   instagram_url: string | null;
   whatsapp: string;
+  telefone?: string | null;
   imagem_url: string;
+  logo_url?: string | null;
+  imagens_urls?: string[] | null;
   tags: string[] | null;
+  formas_pagamento?: string[] | null;
+  diferenciais?: string[] | null;
+  especialidades?: string[] | null;
+  prato_recomendado?: string | null;
+  dica_turista?: string | null;
+  cardapio_url?: string | null;
+  faixa_preco?: "R$" | "R$$" | "R$$$" | null;
+  destaque?: boolean | null;
   ativo: boolean;
   created_at: string;
+  updated_at?: string | null;
 };
 
 export type AdminEntity = "pontos_turisticos" | "pousadas" | "restaurantes";

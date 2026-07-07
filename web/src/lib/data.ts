@@ -21,17 +21,35 @@ export type Attraction = {
 };
 
 export type FoodPlace = {
+  id?: string;
+  slug?: string;
   name: string;
   category: "Restaurante" | "Almoço" | "Hamburgueria" | "Cafeteria" | "Bar" | "Lanchonete";
   tags: string[];
   image: string;
+  logo?: string;
+  galleryImages?: string[];
   description: string;
+  story?: string;
   hours: string;
   whatsapp: string;
+  phone?: string;
   instagram: string;
   instagramUrl?: string;
   location: string;
+  address?: string;
+  locationLabel?: string;
   mapUrl?: string;
+  menuUrl?: string;
+  priceRange?: "R$" | "R$$" | "R$$$";
+  paymentMethods?: string[];
+  features?: string[];
+  specialties?: string[];
+  recommendedDish?: string;
+  firstVisitTip?: string;
+  isFeatured?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Lodging = {
@@ -188,18 +206,37 @@ export const attractions: Attraction[] = [
 
 export const foodPlaces: FoodPlace[] = [
   {
-    name: "Açai Bistrô",
+    name: "Açaí Bistrô",
+    slug: "acai-bistro",
     category: "Restaurante",
-    tags: ["Açai", "Sobremesas", "Jantar", "Petiscos"],
+    tags: ["Açaí", "Sobremesas", "Jantar", "Petiscos"],
     image:
       "/images/logo-bistro.jpeg",
+    logo: "/images/logo-bistro.jpeg",
+    galleryImages: [
+      "/images/logo-bistro.jpeg",
+      "/images/encontro.webp",
+      "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=1200&q=85",
+    ],
     description: "Cozinha regional autoral, massas e pratos quentes para noites frias.",
+    story:
+      "Um ponto gastronômico de clima intimista para quem quer encerrar o dia em Cerro Corá com algo doce, pratos quentes e atendimento próximo.",
     hours: "Ter. a sáb.: 18h às 23h | Dom.: 15h às 22h",
     whatsapp: "5584999991001",
+    phone: "(84) 99999-1001",
     instagram: "@acaibistrocc",
     instagramUrl: "https://www.instagram.com/acaibistrocc/",
     location: "Centro",
+    address: "Centro, Cerro Corá-RN",
+    locationLabel: "Centro",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=A%C3%A7ai%20Bistr%C3%B4%20Centro%20Cerro%20Cora%20RN",
+    priceRange: "R$$",
+    paymentMethods: ["Pix", "Dinheiro", "Cartão"],
+    features: ["Ambiente familiar", "Wi-Fi", "Opções para noite fria"],
+    specialties: ["Açaí", "Sobremesas", "Massas", "Petiscos"],
+    recommendedDish: "Açaí especial da casa",
+    firstVisitTip: "Boa escolha para uma parada à noite depois dos roteiros no centro.",
+    isFeatured: true,
   },
   {
     name: "Suiça da Serra",
@@ -217,17 +254,35 @@ export const foodPlaces: FoodPlace[] = [
   },
   {
     name: "Mirante bar e petiscaria",
+    slug: "mirante-bar-e-petiscaria",
     category: "Restaurante",
     tags: ["Petiscos", "Almoço", "Bar", "Vista"],
     image:
       "/banners/mirante.jpg",
+    galleryImages: [
+      "/banners/mirante.jpg",
+      "/pousadas/POUSADA-MIRANTE/mirante-4.jpg",
+      "/pousadas/POUSADA-MIRANTE/mirante-2.jpg",
+    ],
     description: "Pratos completos, hambúrgueres, sobremesas.",
+    story:
+      "Restaurante com proposta de passeio gastronômico, combinando vista, área rural e clima de descanso para quem visita Cerro Corá.",
     hours: "Sab, Dom e feriados - 11h às 17h",
     whatsapp: "5584999991002",
+    phone: "(84) 99999-1002",
     instagram: "@mirante_pousadaerestaurante",
     instagramUrl: "https://www.instagram.com/mirante_pousadaerestaurante/",
     location: "Área Rural",
+    address: "Área rural de Cerro Corá-RN",
+    locationLabel: "Área Rural",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Mirante%20bar%20e%20petiscaria%20Area%20Rural%20Cerro%20Cora%20RN",
+    priceRange: "R$$",
+    paymentMethods: ["Pix", "Dinheiro", "Cartão"],
+    features: ["Vista panorâmica", "Estacionamento", "Ambiente ao ar livre"],
+    specialties: ["Petiscos", "Almoço", "Pratos regionais"],
+    recommendedDish: "Petiscos da casa",
+    firstVisitTip: "Ideal para combinar com um roteiro rural ou passeio de fim de semana.",
+    isFeatured: true,
   },
   {
     name: "Nordestino Bar e petiscaria",
@@ -273,17 +328,36 @@ export const foodPlaces: FoodPlace[] = [
   },
   {
     name: "Parque das Aroeiras",
+    slug: "parque-das-aroeiras",
     category: "Restaurante",
     tags: ["Almoço", "Pratos regionais", "Área verde", "Jantar","Pousada"],
     image:
       "/banners/aroeiras.jpg",
+    galleryImages: [
+      "/banners/aroeiras.jpg",
+      "/pousadas/aroeiras/aroeiras-1.jpg",
+      "/pousadas/aroeiras/aroeiras-2.jpg",
+      "/pousadas/aroeiras/aroeiras-3.jpg",
+    ],
     description: "Pratos completos, jantar, eventos e almoço",
+    story:
+      "Espaço com área verde e proposta de permanência, indicado para almoço, descanso e experiências gastronômicas em clima de serra.",
     hours: "Qua á Sab: 11h30 14h00 - Dom: 11h30 ás 15h",
     whatsapp: "5584999991002",
+    phone: "(84) 99999-1002",
     instagram: "@parquedasaroeirasrn",
     instagramUrl: "https://www.instagram.com/parquedasaroeirasrn/",
     location: "Avenida principal",
+    address: "Avenida principal, Cerro Corá-RN",
+    locationLabel: "Avenida principal",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Parque%20das%20Aroeiras%20Avenida%20principal%20Cerro%20Cora%20RN",
+    priceRange: "R$$",
+    paymentMethods: ["Pix", "Dinheiro", "Cartão"],
+    features: ["Área verde", "Estacionamento", "Hospedagem no local", "Eventos"],
+    specialties: ["Almoço regional", "Pratos completos", "Jantar"],
+    recommendedDish: "Almoço regional da casa",
+    firstVisitTip: "Boa opção para quem quer comer sem pressa e aproveitar uma área mais verde.",
+    isFeatured: true,
   },
   {
     name: "Kiosque do magão",
@@ -617,7 +691,7 @@ export const cityFacts = [
 export const galleryImages = [
   heroImage,
   "/images/Cerrocora-nariz.jpg",
-  "/images/entrada.jpg",
+  "/images/entradacc.png",
   "/images/festival.webp",
   "/images/vista-cidade.png",
 ];

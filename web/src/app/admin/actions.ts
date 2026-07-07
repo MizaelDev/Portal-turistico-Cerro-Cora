@@ -10,6 +10,7 @@ import {
   lodgings as defaultLodgings,
 } from "@/lib/data";
 import { requireAdminSession } from "@/lib/admin-auth";
+import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseUrl, type AdminEntity } from "@/lib/supabase";
 
@@ -43,6 +44,15 @@ const optionalUrl = z
     "Use uma URL iniciada com http:// ou https://.",
   );
 
+const optionalPathOrUrl = z
+  .string()
+  .trim()
+  .nullable()
+  .refine(
+    (value) => !value || value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://"),
+    "Use uma URL completa ou um caminho iniciado com /.",
+  );
+
 const whatsappSchema = z
   .string()
   .trim()
@@ -73,7 +83,9 @@ const pousadaSchema = z.object({
 
 const restauranteSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
+  slug: z.string().trim().nullable(),
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
+  descricao_completa: z.string().trim().nullable(),
   categoria: z.enum(["restaurante", "almoço", "bar", "café", "lanchonete"]),
   horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
   endereco: z.string().trim().min(2, "Informe o endereço."),
@@ -81,8 +93,19 @@ const restauranteSchema = z.object({
   instagram: z.string().trim().nullable(),
   instagram_url: optionalUrl,
   whatsapp: whatsappSchema,
+  telefone: z.string().trim().nullable(),
   imagem_url: pathOrUrl,
+  logo_url: optionalPathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
   tags: z.array(z.string().trim().min(1)).default([]),
+  formas_pagamento: z.array(z.string().trim().min(1)).default([]),
+  diferenciais: z.array(z.string().trim().min(1)).default([]),
+  especialidades: z.array(z.string().trim().min(1)).default([]),
+  prato_recomendado: z.string().trim().nullable(),
+  dica_turista: z.string().trim().nullable(),
+  cardapio_url: optionalUrl,
+  faixa_preco: z.enum(["R$", "R$$", "R$$$"]).nullable(),
+  destaque: z.boolean(),
   ativo: z.boolean(),
 });
 
@@ -112,6 +135,13 @@ function optionalNumber(value: FormDataEntryValue | null) {
 }
 
 function imageList(value: FormDataEntryValue | null) {
+  return String(value || "")
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function textList(value: FormDataEntryValue | null) {
   return String(value || "")
     .split(/[\n,]+/)
     .map((item) => item.trim())
@@ -197,7 +227,9 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
 
   return restauranteSchema.parse({
     nome: formData.get("nome"),
+    slug: optionalText(formData.get("slug")) || slugify(String(formData.get("nome") || "")),
     descricao: formData.get("descricao"),
+    descricao_completa: optionalText(formData.get("descricao_completa")),
     categoria: formData.get("categoria"),
     horario_funcionamento: formData.get("horario_funcionamento"),
     endereco: formData.get("endereco"),
@@ -205,8 +237,19 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     instagram: optionalText(formData.get("instagram")),
     instagram_url: optionalText(formData.get("instagram_url")),
     whatsapp: formData.get("whatsapp"),
+    telefone: optionalText(formData.get("telefone")),
     imagem_url: formData.get("imagem_url"),
+    logo_url: optionalText(formData.get("logo_url")),
+    imagens_urls: imageList(formData.get("imagens_urls")),
     tags: formData.getAll("tags").map((tag) => String(tag).trim()).filter(Boolean),
+    formas_pagamento: textList(formData.get("formas_pagamento")),
+    diferenciais: textList(formData.get("diferenciais")),
+    especialidades: textList(formData.get("especialidades")),
+    prato_recomendado: optionalText(formData.get("prato_recomendado")),
+    dica_turista: optionalText(formData.get("dica_turista")),
+    cardapio_url: optionalText(formData.get("cardapio_url")),
+    faixa_preco: optionalText(formData.get("faixa_preco")),
+    destaque: formData.get("destaque") === "on",
     ativo: formData.get("ativo") === "on",
   });
 }
@@ -216,6 +259,7 @@ function revalidatePublicPages() {
   revalidatePath("/o-que-fazer");
   revalidatePath("/pousadas");
   revalidatePath("/gastronomia");
+  revalidatePath("/restaurantes/[slug]", "page");
   revalidatePath("/");
 }
 
@@ -313,7 +357,7 @@ export async function saveAdminItem(
         return {
           ok: false,
           message:
-            "Falta atualizar o Supabase. Rode web/supabase/attraction-gallery.sql no SQL Editor e tente salvar novamente.",
+            "Falta atualizar o Supabase. Rode web/supabase/schema.sql no SQL Editor e tente salvar novamente.",
         };
       }
 
@@ -528,7 +572,9 @@ export async function seedDefaultContent(): Promise<ActionResult> {
     for (const place of defaultFoodPlaces) {
       const payload = {
         nome: place.name,
+        slug: place.slug || slugify(place.name),
         descricao: place.description,
+        descricao_completa: place.story || null,
         categoria: restaurantCategory(place.category),
         horario_funcionamento: place.hours,
         endereco: place.location,
@@ -536,8 +582,19 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         instagram: place.instagram,
         instagram_url: place.instagramUrl || null,
         whatsapp: place.whatsapp,
+        telefone: place.phone || null,
         imagem_url: place.image,
+        logo_url: place.logo || null,
+        imagens_urls: place.galleryImages || [],
         tags: place.tags,
+        formas_pagamento: place.paymentMethods || [],
+        diferenciais: place.features || [],
+        especialidades: place.specialties || [],
+        prato_recomendado: place.recommendedDish || null,
+        dica_turista: place.firstVisitTip || null,
+        cardapio_url: place.menuUrl || null,
+        faixa_preco: place.priceRange || null,
+        destaque: Boolean(place.isFeatured),
         ativo: true,
       };
 

@@ -154,6 +154,33 @@ export function restaurantsSchema(places: FoodPlace[]) {
   );
 }
 
+export function restaurantDetailSchema(place: FoodPlace) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: place.name,
+    description: place.story || place.description,
+    servesCuisine: place.specialties?.length ? place.specialties : place.tags,
+    image: [place.image, ...(place.galleryImages || [])].map((image) =>
+      image.startsWith("http") ? image : siteUrl(image),
+    ),
+    telephone: `+${place.whatsapp}`,
+    priceRange: place.priceRange || "R$$",
+    url: siteUrl(`/restaurantes/${place.slug}`),
+    sameAs: place.instagramUrl ? [place.instagramUrl] : undefined,
+    menu: place.menuUrl || undefined,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: place.address || place.location,
+      addressLocality: "Cerro CorÃ¡",
+      addressRegion: "RN",
+      addressCountry: "BR",
+    },
+    hasMap: place.mapUrl || undefined,
+    openingHours: place.hours,
+  };
+}
+
 export function lodgingsSchema(lodgings: Lodging[]) {
   return itemListSchema(
     "Pousadas em Cerro Corá RN",

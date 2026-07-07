@@ -31,7 +31,9 @@ create table if not exists public.pousadas (
 create table if not exists public.restaurantes (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
+  slug text,
   descricao text not null,
+  descricao_completa text,
   categoria text not null check (
     categoria in ('restaurante', 'almoço', 'bar', 'café', 'lanchonete')
   ),
@@ -41,16 +43,46 @@ create table if not exists public.restaurantes (
   instagram text,
   instagram_url text,
   whatsapp text not null,
+  telefone text,
   imagem_url text not null,
+  logo_url text,
+  imagens_urls text[] not null default '{}',
   tags text[] not null default '{}',
+  formas_pagamento text[] not null default '{}',
+  diferenciais text[] not null default '{}',
+  especialidades text[] not null default '{}',
+  prato_recomendado text,
+  dica_turista text,
+  cardapio_url text,
+  faixa_preco text,
+  destaque boolean not null default false,
   ativo boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
 );
 
 alter table public.restaurantes
   add column if not exists mapa_url text,
   add column if not exists instagram_url text,
-  add column if not exists tags text[] not null default '{}';
+  add column if not exists tags text[] not null default '{}',
+  add column if not exists slug text,
+  add column if not exists descricao_completa text,
+  add column if not exists telefone text,
+  add column if not exists logo_url text,
+  add column if not exists imagens_urls text[] not null default '{}',
+  add column if not exists formas_pagamento text[] not null default '{}',
+  add column if not exists diferenciais text[] not null default '{}',
+  add column if not exists especialidades text[] not null default '{}',
+  add column if not exists prato_recomendado text,
+  add column if not exists dica_turista text,
+  add column if not exists cardapio_url text,
+  add column if not exists faixa_preco text,
+  add column if not exists destaque boolean not null default false,
+  add column if not exists updated_at timestamptz;
+
+create unique index if not exists restaurantes_slug_unique
+  on public.restaurantes(slug)
+  where slug is not null;
 
 alter table public.pontos_turisticos
   add column if not exists imagens_urls text[] not null default '{}';

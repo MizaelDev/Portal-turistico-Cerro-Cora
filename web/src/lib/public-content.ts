@@ -7,6 +7,7 @@ import {
   type FoodPlace,
   type Lodging,
 } from "@/lib/data";
+import { slugify } from "@/lib/slug";
 import {
   isSupabaseConfigured,
   type PontoTuristicoRow,
@@ -29,6 +30,8 @@ const lodgingColumns =
   "id,nome,descricao,localizacao,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,imagens_urls,ativo,created_at";
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
+const extendedRestaurantColumns =
+  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
 
 function logPublicContentError(scope: string, error: unknown) {
   if (process.env.NODE_ENV !== "production") {
@@ -36,17 +39,17 @@ function logPublicContentError(scope: string, error: unknown) {
   }
 }
 
-function slugify(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isSchemaCacheError(error: { message?: string } | null) {
+  const message = error?.message?.toLowerCase() || "";
+  return (
+    message.includes("schema cache") ||
+    (message.includes("column") && message.includes("does not exist")) ||
+    (message.includes("could not find") && message.includes("column"))
+  );
 }
 
 function mapPontoTuristico(row: PontoTuristicoRow): Attraction {
@@ -117,19 +120,39 @@ function deriveRestaurantTags(row: RestauranteRow, category: FoodPlace["category
 function mapRestaurante(row: RestauranteRow): FoodPlace {
   const category = restaurantCategoryLabels[row.categoria] || "Restaurante";
   const tags = row.tags?.length ? row.tags : deriveRestaurantTags(row, category);
+  const galleryImages = (row.imagens_urls || []).filter(Boolean);
+  const specialties = row.especialidades?.length ? row.especialidades : tags;
 
   return {
+    id: row.id,
+    slug: row.slug || slugify(row.nome),
     name: row.nome,
     category,
     tags,
     image: row.imagem_url,
+    logo: row.logo_url || undefined,
+    galleryImages,
     description: row.descricao,
+    story: row.descricao_completa || row.descricao,
     hours: row.horario_funcionamento,
     whatsapp: row.whatsapp,
+    phone: row.telefone || undefined,
     instagram: row.instagram || "@instagram",
     instagramUrl: row.instagram_url || undefined,
     location: row.endereco,
+    address: row.endereco,
+    locationLabel: row.endereco,
     mapUrl: row.mapa_url || undefined,
+    menuUrl: row.cardapio_url || undefined,
+    priceRange: row.faixa_preco || undefined,
+    paymentMethods: row.formas_pagamento || undefined,
+    features: row.diferenciais || undefined,
+    specialties,
+    recommendedDish: row.prato_recomendado || undefined,
+    firstVisitTip: row.dica_turista || undefined,
+    isFeatured: Boolean(row.destaque),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined,
   };
 }
 
@@ -200,11 +223,24 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
     return { items: fallbackFoodPlaces, error: null, source: "mock" };
   }
 
-  const { data, error } = await supabase
+  const extendedResult = await supabase
     .from("restaurantes")
-    .select(restaurantColumns)
+    .select(extendedRestaurantColumns)
     .eq("ativo", true)
     .order("nome");
+  let data = extendedResult.data as RestauranteRow[] | null;
+  let error = extendedResult.error;
+
+  if (isSchemaCacheError(error)) {
+    const fallback = await supabase
+      .from("restaurantes")
+      .select(restaurantColumns)
+      .eq("ativo", true)
+      .order("nome");
+
+    data = fallback.data as RestauranteRow[] | null;
+    error = fallback.error;
+  }
 
   if (error) {
     logPublicContentError("food", error);
@@ -215,5 +251,29 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
     items: (data as RestauranteRow[]).map(mapRestaurante),
     error: null,
     source: "supabase",
+  };
+}
+
+export async function getPublicRestaurantPage(slug: string): Promise<
+  PublicContent<FoodPlace> & {
+    item: FoodPlace | null;
+    related: FoodPlace[];
+  }
+> {
+  const { items, error, source } = await getPublicFoodPlaces();
+  const item = items.find((place) => (place.slug || slugify(place.name)) === slug) || null;
+  const related = item
+    ? items
+        .filter((place) => (place.slug || slugify(place.name)) !== slug)
+        .filter((place) => place.category === item.category || place.tags.some((tag) => item.tags.includes(tag)))
+        .slice(0, 3)
+    : [];
+
+  return {
+    items,
+    item,
+    related,
+    error,
+    source,
   };
 }
