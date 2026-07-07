@@ -1,7 +1,7 @@
 import { MessageCircle } from "lucide-react";
 
 export function FloatingWhatsApp() {
-  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5584999999999";
+  const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5584988791401";
   const text = encodeURIComponent("Ola! Quero informações turísticas sobre Cerro Corá.");
 
   return (

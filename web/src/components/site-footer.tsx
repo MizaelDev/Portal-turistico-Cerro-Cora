@@ -50,7 +50,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-white/10 py-5 text-center text-xs text-white/55">
-        Desenvolvido por: <a href="https://go.bzsoftware.com.br" target="_blank" rel="noopener noreferrer">BZ Software</a> & Mizael Araujo
+        Desenvolvido por: <a href="https://www.instagram.com/_mizaelaraujo/" target="_blank" rel="noopener noreferrer">Mizael Araujo</a> & <a href="https://go.bzsoftware.com.br" target="_blank" rel="noopener noreferrer">BZ Software</a>
       </div>
     </footer>
   );
