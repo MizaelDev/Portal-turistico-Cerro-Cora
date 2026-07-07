@@ -14,13 +14,14 @@ import {
 } from "lucide-react";
 import { Countdown } from "@/components/countdown";
 import { FestivalProgram } from "@/components/festival-program";
+import { JsonLd } from "@/components/json-ld";
 import { MapEmbed } from "@/components/map-embed";
 import { PhotoGallery } from "@/components/photo-gallery";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { festivalSchedule } from "@/lib/data";
-import { createMetadata } from "@/lib/seo";
+import { createMetadata, festivalEventSchema } from "@/lib/seo";
 
 const festivalPoster = "/banners/festival-inverno-2026.jpg";
 
@@ -43,13 +44,15 @@ export const metadata: Metadata = createMetadata({
 export default function FestivalPage() {
   return (
     <>
+      <JsonLd data={festivalEventSchema} />
+
       <section className="relative overflow-hidden bg-[#10201b] text-white">
         <Image
           src={festivalPoster}
-          alt="Cartaz oficial do XXII Festival de Inverno de Cerro Corá-RN"
+          alt=""
           fill
-          priority
           sizes="100vw"
+          quality={45}
           className="object-cover opacity-25 blur-sm"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-[#08110e]/86 via-[#10201b]/82 to-[#10201b]" />
@@ -89,6 +92,8 @@ export default function FestivalPage() {
                 width={1080}
                 height={1350}
                 priority
+                sizes="(min-width: 1024px) 34rem, 100vw"
+                quality={82}
                 className="h-auto w-full rounded-md object-cover"
               />
             </div>

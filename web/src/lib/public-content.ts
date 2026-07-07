@@ -23,6 +23,19 @@ type PublicContent<T> = {
   source: "supabase" | "mock";
 };
 
+const attractionColumns =
+  "id,nome,descricao,categoria,localizacao,imagem_url,imagens_urls,ativo,created_at";
+const lodgingColumns =
+  "id,nome,descricao,localizacao,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,imagens_urls,ativo,created_at";
+const restaurantColumns =
+  "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
+
+function logPublicContentError(scope: string, error: unknown) {
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[public-content:${scope}]`, error);
+  }
+}
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -141,12 +154,12 @@ export async function getPublicAttractions(): Promise<PublicContent<Attraction>>
 
   const { data, error } = await supabase
     .from("pontos_turisticos")
-    .select("*")
+    .select(attractionColumns)
     .eq("ativo", true)
     .order("nome");
 
   if (error) {
-    console.error(error);
+    logPublicContentError("attractions", error);
     return { items: [], error: "Não foi possível carregar os roteiros.", source: "supabase" };
   }
 
@@ -165,12 +178,12 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
 
   const { data, error } = await supabase
     .from("pousadas")
-    .select("*")
+    .select(lodgingColumns)
     .eq("ativo", true)
     .order("nome");
 
   if (error) {
-    console.error(error);
+    logPublicContentError("lodgings", error);
     return { items: [], error: "Não foi possível carregar as pousadas.", source: "supabase" };
   }
 
@@ -189,12 +202,12 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
 
   const { data, error } = await supabase
     .from("restaurantes")
-    .select("*")
+    .select(restaurantColumns)
     .eq("ativo", true)
     .order("nome");
 
   if (error) {
-    console.error(error);
+    logPublicContentError("food", error);
     return { items: [], error: "Não foi possível carregar os estabelecimentos.", source: "supabase" };
   }
 

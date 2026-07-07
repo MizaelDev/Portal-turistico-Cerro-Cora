@@ -140,6 +140,12 @@ function storagePathFromPublicUrl(url: string) {
   }
 }
 
+function logAdminError(scope: string, error: unknown) {
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[admin:${scope}]`, error);
+  }
+}
+
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
   await requireAdminSession(supabase);
@@ -318,7 +324,7 @@ export async function saveAdminItem(
         };
       }
 
-      console.error(error);
+      logAdminError("delete", error);
       return { ok: false, message: "Não foi possível salvar. Verifique os dados e tente novamente." };
     }
 
@@ -355,7 +361,7 @@ export async function deleteAdminItem(
     const { error } = await supabase.from(entity).delete().eq("id", id);
 
     if (error) {
-      console.error(error);
+      logAdminError("gallery-update", error);
       return { ok: false, message: "Não foi possível excluir o item." };
     }
 
@@ -384,7 +390,7 @@ export async function updateAttractionGallery(input: unknown): Promise<ActionRes
       .single();
 
     if (error) {
-      console.error(error);
+      logAdminError("save", error);
       return { ok: false, message: "Não foi possível atualizar a galeria do roteiro." };
     }
 
@@ -420,7 +426,7 @@ export async function removeAttractionGalleryImage(input: unknown): Promise<Acti
         .single();
 
       if (currentError || !currentRow) {
-        console.error(currentError);
+        logAdminError("gallery-current", currentError);
         return { ok: false, message: "Não foi possível localizar o roteiro antes de remover a foto." };
       }
 
@@ -435,7 +441,7 @@ export async function removeAttractionGalleryImage(input: unknown): Promise<Acti
         .eq("id", payload.attractionId);
 
       if (updateError) {
-        console.error(updateError);
+        logAdminError("gallery-remove-update", updateError);
         return { ok: false, message: "Não foi possível atualizar o roteiro antes de remover a foto." };
       }
     }
@@ -454,7 +460,7 @@ export async function removeAttractionGalleryImage(input: unknown): Promise<Acti
             .eq("id", payload.attractionId);
         }
 
-        console.error(storageError);
+        logAdminError("gallery-storage-remove", storageError);
         return {
           ok: false,
           message:
@@ -492,7 +498,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
 
       const { error } = await insertOrUpdateByName(supabase, "pontos_turisticos", payload);
       if (error) {
-        console.error(error);
+        logAdminError("seed-attractions", error);
         return { ok: false, message: "Não foi possível repor os roteiros padrão." };
       }
     }
@@ -514,7 +520,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
 
       const { error } = await insertOrUpdateByName(supabase, "pousadas", payload);
       if (error) {
-        console.error(error);
+        logAdminError("seed-lodgings", error);
         return { ok: false, message: "Não foi possível repor as pousadas padrão." };
       }
     }
@@ -537,7 +543,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
 
       const { error } = await insertOrUpdateByName(supabase, "restaurantes", payload);
       if (error) {
-        console.error(error);
+        logAdminError("seed-restaurants", error);
         return { ok: false, message: "Não foi possível repor os restaurantes padrão." };
       }
     }
@@ -656,7 +662,7 @@ export async function uploadAdminImages(
           };
         }
 
-        console.error(error);
+        logAdminError("upload", error);
         return { ok: false, message: "Não foi possível enviar a imagem para o Supabase Storage.", urls };
       }
 

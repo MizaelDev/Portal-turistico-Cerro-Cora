@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Attraction, FoodPlace, Lodging } from "@/lib/data";
 import { siteUrl } from "./utils";
 
 type SeoInput = {
@@ -22,6 +23,7 @@ export function createMetadata({
     : "Cerro Corá Turismo | Suiça do Seridó";
 
   return {
+    metadataBase: new URL(siteUrl("/")),
     title: pageTitle,
     description,
     alternates: {
@@ -54,6 +56,9 @@ export function createMetadata({
       "Suiça do Seridó",
       "turismo no Rio Grande do Norte",
       "Festival de Inverno Cerro Corá",
+      "Turismo em Cerro Corá",
+      "O que fazer em Cerro Corá",
+      "Onde comer em Cerro Corá",
       "pousadas em Cerro Corá",
       "gastronomia serrana",
       "Seridó",
@@ -90,7 +95,110 @@ export const localBusinessSchema = {
     addressCountry: "BR",
   },
   areaServed: "Cerro Corá, Rio Grande do Norte",
-  telephone: "+55 84 99999-9999",
+  telephone: "+55 84 98879-1401",
   priceRange: "$$",
   url: siteUrl("/"),
+};
+
+function itemListSchema(name: string, items: Record<string, unknown>[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item,
+    })),
+  };
+}
+
+export function touristAttractionsSchema(attractions: Attraction[]) {
+  return itemListSchema(
+    "Roteiros e pontos turísticos em Cerro Corá RN",
+    attractions.map((attraction) => ({
+      "@type": "TouristAttraction",
+      name: attraction.name,
+      description: attraction.description,
+      image: attraction.image.startsWith("http") ? attraction.image : siteUrl(attraction.image),
+      touristType: attraction.category,
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Cerro Corá",
+        addressRegion: "RN",
+        addressCountry: "BR",
+      },
+      url: siteUrl(`/o-que-fazer#${attraction.slug}`),
+    })),
+  );
+}
+
+export function restaurantsSchema(places: FoodPlace[]) {
+  return itemListSchema(
+    "Onde comer em Cerro Corá RN",
+    places.map((place) => ({
+      "@type": "Restaurant",
+      name: place.name,
+      servesCuisine: place.tags,
+      image: place.image.startsWith("http") ? place.image : siteUrl(place.image),
+      telephone: `+${place.whatsapp}`,
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: place.location,
+        addressLocality: "Cerro Corá",
+        addressRegion: "RN",
+        addressCountry: "BR",
+      },
+      sameAs: place.instagramUrl ? [place.instagramUrl] : undefined,
+    })),
+  );
+}
+
+export function lodgingsSchema(lodgings: Lodging[]) {
+  return itemListSchema(
+    "Pousadas em Cerro Corá RN",
+    lodgings.map((lodging) => ({
+      "@type": "LodgingBusiness",
+      name: lodging.name,
+      description: lodging.description,
+      image: lodging.image.startsWith("http") ? lodging.image : siteUrl(lodging.image),
+      telephone: `+${lodging.whatsapp}`,
+      priceRange: lodging.priceRange,
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: lodging.location,
+        addressLocality: "Cerro Corá",
+        addressRegion: "RN",
+        addressCountry: "BR",
+      },
+    })),
+  );
+}
+
+export const festivalEventSchema = {
+  "@context": "https://schema.org",
+  "@type": "Festival",
+  name: "XXII Festival de Inverno de Cerro Corá",
+  description:
+    "Festival de Inverno de Cerro Corá-RN com shows, gastronomia, cultura e programação musical na Praça Pública.",
+  startDate: "2026-08-07T18:00:00-03:00",
+  endDate: "2026-08-09T23:59:00-03:00",
+  eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+  eventStatus: "https://schema.org/EventScheduled",
+  image: siteUrl("/banners/festival-inverno-2026.jpg"),
+  location: {
+    "@type": "Place",
+    name: "Praça Pública de Cerro Corá",
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Cerro Corá",
+      addressRegion: "RN",
+      addressCountry: "BR",
+    },
+  },
+  organizer: {
+    "@type": "Organization",
+    name: "Prefeitura de Cerro Corá",
+  },
+  url: siteUrl("/festival-de-inverno"),
 };

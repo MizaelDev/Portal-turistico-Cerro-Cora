@@ -1,14 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Mountain, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { navItems } from "@/lib/data";
+import { navItems } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
-import { SearchDialog } from "./search-dialog";
+
+const SearchDialog = dynamic(
+  () => import("./search-dialog").then((mod) => mod.SearchDialog),
+  { ssr: false },
+);
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -63,6 +68,8 @@ export function SiteHeader() {
             variant="outline"
             size="icon"
             aria-label="Abrir menu"
+            aria-expanded={open}
+            aria-controls="mobile-navigation"
             title="Menu"
             onClick={() => setOpen((value) => !value)}
             className="bg-background/70 backdrop-blur lg:hidden"
@@ -74,7 +81,7 @@ export function SiteHeader() {
 
       {open ? (
         <div className="border-t border-border bg-background lg:hidden">
-          <nav className="container grid gap-1 py-4">
+          <nav id="mobile-navigation" className="container grid gap-1 py-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -92,7 +99,7 @@ export function SiteHeader() {
         </div>
       ) : null}
 
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      {searchOpen ? <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} /> : null}
     </header>
   );
 }

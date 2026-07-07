@@ -15,8 +15,10 @@ export function PhotoGallery() {
         >
           <Image
             src={image}
-            alt={`Galeria turistíca Cerro Corá ${index + 1}`}
+            alt={`Galeria turística de Cerro Corá ${index + 1}`}
             fill
+            sizes={index === 0 ? "(min-width: 768px) 50vw, 100vw" : "(min-width: 768px) 25vw, 100vw"}
+            quality={76}
             className="object-cover transition-transform duration-700 hover:scale-105"
           />
         </div>

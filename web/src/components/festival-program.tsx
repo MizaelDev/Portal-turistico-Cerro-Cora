@@ -52,33 +52,6 @@ const mapUrl =
 
 const posterUrl = "/banners/festival-inverno-2026.jpg";
 
-const musicStyles = [
-  "Pagode/Samba",
-  "Sertanejo",
-  "Forró",
-  "Axé/Swingueira",
-  "Arrocha/Seresta",
-  "Prata da Casa",
-] as const;
-
-type MusicStyle = (typeof musicStyles)[number];
-
-const artistStyles: Record<string, MusicStyle[]> = {
-  "Só Pra Contrariar": ["Pagode/Samba"],
-  "Raynel Guedes": ["Forró", "Prata da Casa"],
-  "Banda Tuareg's": ["Forró"],
-  "Clau Vianna": ["Prata da Casa"],
-  "Victor Costa": ["Prata da Casa"],
-  "Roberta Miranda": ["Sertanejo"],
-  "Circuito Musical": ["Forró"],
-  "Joãozinho Dantas": ["Forró"],
-  "The Clássicos": ["Forró"],
-  "Gilson Fernandes": ["Prata da Casa"],
-  "Banda Grafith": ["Axé/Swingueira"],
-  "Acácio Ferinha": ["Arrocha/Seresta", "Forró"],
-  "Giovane Soares": ["Forró", "Arrocha/Seresta", "Prata da Casa"],
-};
-
 function formatScheduleText(schedule: FestivalScheduleItem[]) {
   return [
     "XXII Festival de Inverno de Cerro Corá-RN",
@@ -103,22 +76,7 @@ function groupedArtists(item: FestivalScheduleItem) {
 
 export function FestivalProgram({ schedule }: { schedule: FestivalScheduleItem[] }) {
   const [shareLabel, setShareLabel] = useState("Compartilhar programação");
-  const [selectedStyle, setSelectedStyle] = useState<MusicStyle | null>(null);
   const scheduleText = useMemo(() => formatScheduleText(schedule), [schedule]);
-  const filteredArtists = useMemo(() => {
-    if (!selectedStyle) return [];
-
-    return schedule.flatMap((day) =>
-      day.artists
-        .filter((artist) => artistStyles[artist.name]?.includes(selectedStyle))
-        .map((artist) => ({
-          name: artist.name,
-          day: day.day,
-          date: day.date,
-          role: artist.role,
-        })),
-    );
-  }, [schedule, selectedStyle]);
 
   async function shareSchedule() {
     const shareData = {
@@ -269,66 +227,6 @@ export function FestivalProgram({ schedule }: { schedule: FestivalScheduleItem[]
         })}
       </div>
 
-      <div className="mt-10 rounded-lg border border-border bg-card/80 p-4 shadow-sm md:p-5">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              Filtro por estilo musical
-            </p>
-            <h3 className="mt-2 font-display text-2xl font-semibold">
-              Encontre atrações pelo som que você quer curtir
-            </h3>
-          </div>
-          {selectedStyle ? (
-            <Button type="button" variant="ghost" onClick={() => setSelectedStyle(null)}>
-              Limpar filtro
-            </Button>
-          ) : null}
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {musicStyles.map((style) => (
-            <button
-              key={style}
-              type="button"
-              onClick={() => setSelectedStyle((current) => (current === style ? null : style))}
-              className={cn(
-                "rounded-md border px-4 py-2 text-sm font-semibold transition-all hover:-translate-y-0.5",
-                selectedStyle === style
-                  ? "border-alpine-sunset bg-alpine-sunset text-[#17251f] shadow-sm"
-                  : "border-border bg-background/75 text-foreground hover:bg-accent",
-              )}
-            >
-              {style}
-            </button>
-          ))}
-        </div>
-
-        {selectedStyle ? (
-          <motion.div
-            className="mt-5 grid gap-2 md:grid-cols-2 lg:grid-cols-3"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {filteredArtists.map((artist) => (
-              <div
-                key={`${selectedStyle}-${artist.day}-${artist.name}`}
-                className="rounded-md border border-border bg-background/70 p-3"
-              >
-                <p className="text-sm font-semibold">{artist.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {artist.day}, {artist.date} · {roleLabels[artist.role]}
-                </p>
-              </div>
-            ))}
-          </motion.div>
-        ) : (
-          <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            Selecione um estilo para ver rapidamente quais artistas combinam com ele.
-          </p>
-        )}
-      </div>
     </motion.section>
   );
 }

@@ -4,7 +4,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { attractions, foodPlaces, lodgings, navItems } from "@/lib/data";
+import { attractions, foodPlaces, lodgings } from "@/lib/data";
+import { navItems } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -47,10 +48,15 @@ export function SearchDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-1/2 top-24 z-50 w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 rounded-lg border border-border bg-background p-4 shadow-premium">
+          <Dialog.Title className="sr-only">Buscar no site</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            Pesquise páginas, roteiros, pousadas e estabelecimentos gastronômicos.
+          </Dialog.Description>
           <div className="flex items-center gap-2">
             <Search className="h-5 w-5 text-muted-foreground" />
             <Input
               autoFocus
+              aria-label="Digite sua busca"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar atrativos, pousadas, gastronomia..."
@@ -76,6 +82,11 @@ export function SearchDialog({
                 </span>
               </Link>
             ))}
+            {!results.length ? (
+              <p className="px-3 py-6 text-sm text-muted-foreground">
+                Nenhum resultado encontrado.
+              </p>
+            ) : null}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

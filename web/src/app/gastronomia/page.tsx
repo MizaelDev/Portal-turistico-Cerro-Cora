@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { FoodCard } from "@/components/food-card";
+import { JsonLd } from "@/components/json-ld";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPublicFoodPlaces } from "@/lib/public-content";
-import { createMetadata } from "@/lib/seo";
+import { createMetadata, restaurantsSchema } from "@/lib/seo";
 import type { FoodPlace } from "@/lib/data";
 
 export const metadata: Metadata = createMetadata({
@@ -14,7 +15,7 @@ export const metadata: Metadata = createMetadata({
     "Restaurantes, cafés, bares e lanchonetes em Cerro Corá com horário, WhatsApp, Instagram e localização.",
 });
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 const foodFilters = [
   {
@@ -59,8 +60,11 @@ export default async function GastronomyPage() {
 
   return (
     <section className="container py-20">
+      {foodPlaces.length ? <JsonLd data={restaurantsSchema(foodPlaces)} /> : null}
+
       <SectionHeader
         eyebrow="Gastronomia"
+        as="h1"
         title="Onde comer em Cerro Corá"
         description="Estabelecimentos com categoria principal, horário, WhatsApp, Instagram e localização clicável."
       />

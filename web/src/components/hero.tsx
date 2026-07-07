@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CloudSun, MapPin, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { heroImage, quickStats } from "@/lib/data";
+import { heroImage } from "@/lib/data";
 
 export function Hero() {
   return (
@@ -13,6 +13,8 @@ export function Hero() {
         alt="Paisagem serrana com neblina representando Cerro Corá"
         fill
         priority
+        sizes="100vw"
+        quality={82}
         className="object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/28 to-background" />
@@ -42,21 +44,6 @@ export function Hero() {
               </Link>
             </Button>
           </div>
-        </div>
-      </div>
-
-      <div className="container relative -mt-24 pb-10">
-        <div className="grid gap-3 rounded-lg border border-white/20 bg-white/14 p-3 shadow-glass backdrop-blur-xl md:grid-cols-4">
-          {quickStats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.label} className="rounded-md bg-white/82 p-4 text-[#17251f] dark:bg-black/35 dark:text-white">
-                <Icon className="mb-3 h-5 w-5 text-alpine-wine" />
-                <p className="text-2xl font-semibold">{stat.value}</p>
-                <p className="text-sm text-[#52635d] dark:text-white/70">{stat.label}</p>
-              </div>
-            );
-          })}
         </div>
       </div>
 

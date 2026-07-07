@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Compass, MessageCircle } from "lucide-react";
 import { AttractionCard } from "@/components/attraction-card";
+import { JsonLd } from "@/components/json-ld";
 import { MapEmbed } from "@/components/map-embed";
 import { MotionReveal } from "@/components/motion-reveal";
 import { SectionHeader } from "@/components/section-header";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { tourGuides } from "@/lib/data";
 import { getPublicAttractions } from "@/lib/public-content";
-import { createMetadata } from "@/lib/seo";
+import { createMetadata, touristAttractionsSchema } from "@/lib/seo";
 
 export const metadata: Metadata = createMetadata({
   title: "Roteiros",
@@ -17,7 +18,7 @@ export const metadata: Metadata = createMetadata({
     "Conheça Mirante do Cruzeiro, Nascente do Rio Potengi, Vale Vulcânico, Tanques Naturais, Escorrego, Serra Verde, Pinturas Rupestres e Casa Grande.",
 });
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 function whatsappUrl(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -31,11 +32,14 @@ export default async function RoutesPage() {
 
   return (
     <>
+      {attractions.length ? <JsonLd data={touristAttractionsSchema(attractions)} /> : null}
+
       <section className="bg-[#17251f] py-20 text-white">
         <div className="container">
           <SectionHeader
             className="text-white"
             eyebrow="Roteiros"
+            as="h1"
             title="Roteiros em Cerro Corá"
             description="Atrativos para montar uma viagem de fim de semana com natureza, história, fotos e experiências de serra."
           />
@@ -75,7 +79,7 @@ export default async function RoutesPage() {
           <SectionHeader
             className="text-white"
             eyebrow="Acompanhamento local"
-            title="Guias Turísticos Locais"
+            title="Guias de turismo local"
             description="Contatos para quem quer conhecer trilhas, mirantes e histórias da cidade com apoio local."
           />
           <div className="mt-10 grid gap-5 md:grid-cols-2">

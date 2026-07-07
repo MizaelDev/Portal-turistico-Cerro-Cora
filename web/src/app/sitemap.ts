@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { navItems } from "@/lib/data";
+import { navItems } from "@/lib/navigation";
 import { siteUrl } from "@/lib/utils";
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -15,7 +15,14 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
   return (
     <article className="grid overflow-hidden rounded-lg border border-border bg-card shadow-sm md:grid-cols-[1.1fr_0.9fr]">
       <div className="relative min-h-80">
-        <Image src={lodging.image} alt={lodging.name} fill className="object-cover" />
+        <Image
+          src={lodging.image}
+          alt={`Foto principal de ${lodging.name}`}
+          fill
+          sizes="(min-width: 768px) 55vw, 100vw"
+          quality={78}
+          className="object-cover"
+        />
       </div>
       <div className="p-6">
       <h3 className="font-display text-3xl font-semibold">{lodging.name}</h3>
@@ -24,7 +31,14 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
         <div className="mt-5 grid grid-cols-3 gap-2">
           {lodging.gallery.map((image) => (
             <div key={image} className="relative aspect-square overflow-hidden rounded-md">
-              <Image src={image} alt={`Galeria ${lodging.name}`} fill className="object-cover" />
+              <Image
+                src={image}
+                alt={`Galeria de fotos de ${lodging.name}`}
+                fill
+                sizes="(min-width: 768px) 10vw, 30vw"
+                quality={70}
+                className="object-cover"
+              />
             </div>
           ))}
         </div>

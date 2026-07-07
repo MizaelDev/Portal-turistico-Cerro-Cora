@@ -89,10 +89,8 @@ export default async function AdminPage() {
         {errors.length ? (
           <Card className="mb-8 border-destructive/30 bg-destructive/10">
             <CardContent className="grid gap-3 text-sm text-destructive">
-              <p className="font-semibold">Configuração do Banco de dados funcionando</p>
-              <p>
-                
-              </p>
+              <p className="font-semibold">Alguns dados não foram carregados</p>
+              <p>Confira as configurações do Supabase e tente atualizar a página.</p>
               <ul className="list-inside list-disc">
                 {errors.map((error) => (
                   <li key={error}>{error}</li>

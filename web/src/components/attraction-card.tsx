@@ -198,23 +198,25 @@ export const AttractionCard = memo(function AttractionCard({
         <p className="mt-3 min-h-24 text-sm leading-7 text-muted-foreground">
           {attraction.description}
         </p>
-        <a
-          href={mapHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
-        >
-          <MapPin className="h-4 w-4 text-alpine-wine" /> {attraction.location}
-        </a>
-        <Button asChild className="mt-auto w-full" variant="outline">
+        <div className="mt-auto pt-5">
           <a
-            href={attraction.infoUrl || `/o-que-fazer#${attraction.slug}`}
-            target={attraction.infoUrl ? "_blank" : undefined}
-            rel={attraction.infoUrl ? "noopener noreferrer" : undefined}
+            href={mapHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-5 flex items-center justify-center gap-2 text-center text-sm font-medium text-foreground transition-colors hover:text-primary"
           >
-            Saiba mais <ArrowRight className="h-4 w-4" />
+            <MapPin className="h-4 w-4 shrink-0 text-alpine-wine" /> {attraction.location}
           </a>
-        </Button>
+          <Button asChild className="w-full" variant="outline">
+            <a
+              href={attraction.infoUrl || `/o-que-fazer#${attraction.slug}`}
+              target={attraction.infoUrl ? "_blank" : undefined}
+              rel={attraction.infoUrl ? "noopener noreferrer" : undefined}
+            >
+              Saiba mais <ArrowRight className="h-4 w-4" />
+            </a>
+          </Button>
+        </div>
       </div>
     </article>
   );

@@ -28,6 +28,8 @@ export default function AboutCityPage() {
           alt="Paisagem de Cerro Corá"
           fill
           priority
+          sizes="100vw"
+          quality={82}
           className="object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/35 to-background" />

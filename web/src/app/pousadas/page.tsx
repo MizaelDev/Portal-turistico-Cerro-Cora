@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
 import { LodgingCard } from "@/components/lodging-card";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { getPublicLodgings } from "@/lib/public-content";
-import { createMetadata } from "@/lib/seo";
+import { createMetadata, lodgingsSchema } from "@/lib/seo";
 
 export const metadata: Metadata = createMetadata({
   title: "Pousadas e Chalés",
@@ -12,15 +13,18 @@ export const metadata: Metadata = createMetadata({
     "Pousadas e chalés em Cerro Corá com galeria, descrição, WhatsApp, reserva, localização e faixa de preço.",
 });
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function LodgingsPage() {
   const { items: lodgings, error } = await getPublicLodgings();
 
   return (
     <section className="container py-20">
+      {lodgings.length ? <JsonLd data={lodgingsSchema(lodgings)} /> : null}
+
       <SectionHeader
         eyebrow="Hospedagem"
+        as="h1"
         title="Pousadas e chalés em Cerro Corá"
         description="Cards com reserva por WhatsApp, galeria, localização e faixa de preço para você planejar sua estadia."
       />

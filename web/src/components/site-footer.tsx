@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Instagram, Mail, MapPin, Mountain, Phone } from "lucide-react";
-import { navItems } from "@/lib/data";
+import { navItems } from "@/lib/navigation";
 
 export function SiteFooter() {
   return (
@@ -24,7 +24,7 @@ export function SiteFooter() {
         <div>
           <p className="mb-4 font-semibold">Navegação</p>
           <div className="grid gap-2">
-            {navItems.filter((item) => item.href !== "/admin").map((item) => (
+            {navItems.map((item) => (
               <Link key={item.href} href={item.href} className="text-sm text-white/72 hover:text-white">
                 {item.label}
               </Link>

@@ -62,7 +62,16 @@ function getVisibleTags(place: FoodPlace) {
 
 function FoodImage({ place }: { place: FoodPlace }) {
   if (shouldShowPhoto(place.image)) {
-    return <Image src={place.image} alt={place.name} fill className="object-cover" />;
+    return (
+      <Image
+        src={place.image}
+        alt={`Foto de ${place.name}`}
+        fill
+        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+        quality={74}
+        className="object-cover"
+      />
+    );
   }
 
   return (
@@ -88,7 +97,7 @@ export function FoodCard({ place }: { place: FoodPlace }) {
       <div className="relative aspect-[4/3] overflow-hidden bg-[#1a2e1a]">
         <FoodImage place={place} />
       </div>
-      <div className="flex flex-1 flex-col gap-4 p-5">
+      <div className="flex flex-1 flex-col gap-5 p-5">
         <div>
           <div className="flex flex-wrap gap-2">
             {visibleTags.map((tag, index) => (
@@ -109,8 +118,7 @@ export function FoodCard({ place }: { place: FoodPlace }) {
               </Badge>
             ) : null}
           </div>
-          <h3 className="mt-4 font-display text-2xl font-semibold leading-tight">{place.name}</h3>
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{place.description}</p>
+          <h3 className="mt-5 font-display text-2xl font-semibold leading-tight">{place.name}</h3>
         </div>
         <div className="grid gap-2 rounded-md border border-border/70 bg-background/45 p-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-2">

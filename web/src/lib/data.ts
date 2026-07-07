@@ -1,11 +1,8 @@
 import {
   CalendarDays,
-  Coffee,
   Compass,
   Hotel,
-  MapPin,
   Mountain,
-  Music,
   ScrollText,
   ThermometerSun,
   Utensils,
@@ -87,18 +84,8 @@ export type TourGuide = {
   description: string;
 };
 
-export const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/sobre-a-cidade", label: "Sobre" },
-  { href: "/o-que-fazer", label: "Roteiros" },
-  { href: "/festival-de-inverno", label: "Festival" },
-  { href: "/gastronomia", label: "Gastronomia" },
-  { href: "/pousadas", label: "Pousadas" },
-  //{ href: "/admin", label: "Admin" },
-];
-
 export const heroImage =
-  "/images/cerro-cora.jpg";
+  "/images/serrapreta.png";
 
 export const attractions: Attraction[] = [
   {
@@ -630,16 +617,9 @@ export const cityFacts = [
 export const galleryImages = [
   heroImage,
   "/images/Cerrocora-nariz.jpg",
-  "/images/foto-entrada.jpg",
+  "/images/entrada.jpg",
   "/images/festival.webp",
-  "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=85",
-];
-
-export const quickStats = [
-  { label: "Altitude agradável", value: "575m", icon: Mountain },
-  { label: "Roteiros naturais", value: "8+", icon: MapPin },
-  { label: "Festival de inverno", value: "Agosto", icon: Music },
-  { label: "Cafés e sabores", value: "Serra", icon: Coffee },
+  "/images/vista-cidade.png",
 ];
 
 export const tourGuides: TourGuide[] = [
