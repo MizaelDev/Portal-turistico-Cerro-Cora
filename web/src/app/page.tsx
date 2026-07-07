@@ -79,7 +79,7 @@ export default async function HomePage() {
             <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {attractions.slice(0, 3).map((attraction, index) => (
                 <MotionReveal key={attraction.slug} delay={index * 0.06}>
-                  <AttractionCard attraction={attraction} />
+                  <AttractionCard attraction={attraction} priority={index === 0} />
                 </MotionReveal>
               ))}
             </div>

@@ -56,7 +56,7 @@ export default async function RoutesPage() {
             {attractions.map((attraction, index) => (
               <MotionReveal key={`${attraction.slug}-${index}`} delay={index * 0.04}>
                 <div id={attraction.slug}>
-                  <AttractionCard attraction={attraction} />
+                  <AttractionCard attraction={attraction} priority={index === 0} />
                 </div>
               </MotionReveal>
             ))}

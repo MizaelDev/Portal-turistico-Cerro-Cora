@@ -1,13 +1,29 @@
 "use client";
 
+import NextImage from "next/image";
 import { useMemo, useState, useTransition } from "react";
-import { DatabaseBackup, Edit3, ImagePlus, Loader2, LogOut, Plus, Save, Trash2, UploadCloud } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  DatabaseBackup,
+  Edit3,
+  ImagePlus,
+  Loader2,
+  LogOut,
+  Plus,
+  Save,
+  Star,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   deleteAdminItem,
   logoutAction,
+  removeAttractionGalleryImage,
   saveAdminItem,
   seedDefaultContent,
+  updateAttractionGallery,
   uploadAdminImages,
 } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
@@ -121,6 +137,31 @@ function selectedTags(value: string | boolean | undefined) {
     .filter(Boolean);
 }
 
+function splitImageLines(value: string | boolean | undefined) {
+  return String(value || "")
+    .split(/\n+/)
+    .map((image) => image.trim())
+    .filter(Boolean);
+}
+
+function uniqueImages(images: string[]) {
+  return Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
+}
+
+function attractionImagesFromForm(form: FormState) {
+  return uniqueImages([String(form.imagem_url || ""), ...splitImageLines(form.imagens_urls)]);
+}
+
+function serializeAdditionalImages(images: string[], coverUrl: string) {
+  return uniqueImages(images).filter((image) => image !== coverUrl).join("\n");
+}
+
+function imageSourceLabel(url: string) {
+  if (url.includes("/storage/v1/object/public/tourism/")) return "Supabase Storage";
+  if (url.startsWith("/")) return "Arquivo local";
+  return "Imagem externa";
+}
+
 function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "pousadas") {
     const lodging = row as PousadaRow;
@@ -193,13 +234,20 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   });
   const [isPending, startTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
+  const [isGalleryPending, startGalleryTransition] = useTransition();
+  const [galleryAction, setGalleryAction] = useState<string | null>(null);
 
   const rows = useMemo(() => initialData[entity] as AdminRow[], [entity, initialData]);
+  const attractionImages = useMemo(
+    () => (entity === "pontos_turisticos" ? attractionImagesFromForm(form) : []),
+    [entity, form],
+  );
 
   function selectEntity(nextEntity: AdminEntity) {
     setEntity(nextEntity);
     setForm(emptyForms[nextEntity]);
     setEditingId(null);
+    setGalleryAction(null);
     setStatus({
       type: "idle",
       text: `Pronto para gerenciar ${entityLabels[nextEntity].toLowerCase()}.`,
@@ -213,11 +261,13 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   function resetForm() {
     setForm(emptyForms[entity]);
     setEditingId(null);
+    setGalleryAction(null);
   }
 
   function editRow(row: AdminRow) {
     setForm(rowToForm(entity, row));
     setEditingId(row.id);
+    setGalleryAction(null);
     setStatus({ type: "idle", text: `Editando: ${row.nome}` });
   }
 
@@ -319,6 +369,100 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
           type: "error",
           text: "Não foi possível enviar as imagens. Tente fotos menores ou verifique o Supabase Storage.",
         });
+      }
+    });
+  }
+
+  function applyAttractionGallery(nextImages: string[], successMessage: string) {
+    const normalizedImages = uniqueImages(nextImages);
+    const nextCover = normalizedImages[0] || String(form.imagem_url || "").trim();
+    const nextGallery = serializeAdditionalImages(normalizedImages, nextCover);
+    const previousForm = form;
+
+    setForm((current) => ({
+      ...current,
+      imagem_url: nextCover,
+      imagens_urls: nextGallery,
+    }));
+
+    if (!editingId || !nextCover) {
+      setStatus({ type: "success", text: successMessage });
+      return;
+    }
+
+    setGalleryAction("update");
+    startGalleryTransition(async () => {
+      const result = await updateAttractionGallery({
+        attractionId: editingId,
+        coverUrl: nextCover,
+        imagens_urls: splitImageLines(nextGallery),
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.ok ? successMessage : result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        router.refresh();
+      } else {
+        setForm(previousForm);
+      }
+    });
+  }
+
+  function moveAttractionImage(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= attractionImages.length || isGalleryPending) return;
+
+    const nextImages = [...attractionImages];
+    [nextImages[index], nextImages[nextIndex]] = [nextImages[nextIndex], nextImages[index]];
+    applyAttractionGallery(nextImages, "Ordem das fotos atualizada.");
+  }
+
+  function setAttractionCover(image: string) {
+    if (image === String(form.imagem_url || "").trim() || isGalleryPending) return;
+    applyAttractionGallery(
+      [image, ...attractionImages.filter((item) => item !== image)],
+      "Foto definida como capa do roteiro.",
+    );
+  }
+
+  function removeAttractionImage(image: string) {
+    if (isGalleryPending) return;
+
+    if (attractionImages.length <= 1) {
+      setStatus({
+        type: "error",
+        text: "Mantenha pelo menos uma foto no roteiro para não quebrar o card público.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm("Tem certeza que deseja remover esta foto?");
+    if (!confirmed) return;
+
+    const nextImages = attractionImages.filter((item) => item !== image);
+    const nextCover = nextImages[0] || String(form.imagem_url || "").trim();
+    const nextGallery = serializeAdditionalImages(nextImages, nextCover);
+
+    setGalleryAction(image);
+    startGalleryTransition(async () => {
+      const result = await removeAttractionGalleryImage({
+        attractionId: editingId,
+        imageUrl: image,
+        coverUrl: nextCover,
+        imagens_urls: splitImageLines(nextGallery),
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        setForm((current) => ({
+          ...current,
+          imagem_url: nextCover,
+          imagens_urls: nextGallery,
+        }));
+        router.refresh();
       }
     });
   }
@@ -499,6 +643,100 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {String(form.imagens_urls || "").split(/\n+/).filter(Boolean).length} imagem
                         {String(form.imagens_urls || "").split(/\n+/).filter(Boolean).length === 1 ? "" : "s"} no carrossel.
                       </p>
+                    ) : null}
+                    {attractionImages.length ? (
+                      <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold">Fotos do carrossel</p>
+                          {isGalleryPending ? (
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Atualizando...
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="grid gap-3">
+                          {attractionImages.map((image, index) => {
+                            const isCover = image === String(form.imagem_url || "").trim();
+                            const isRemoving = galleryAction === image && isGalleryPending;
+
+                            return (
+                              <div
+                                key={image}
+                                className="grid gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-[96px_1fr] sm:items-center"
+                              >
+                                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-accent">
+                                  <NextImage
+                                    src={image}
+                                    alt={`Foto ${index + 1} de ${String(form.nome || "roteiro")}`}
+                                    fill
+                                    sizes="96px"
+                                    className="object-cover"
+                                  />
+                                  {isCover ? (
+                                    <span className="absolute left-2 top-2 rounded-md bg-alpine-sunset px-2 py-0.5 text-[10px] font-semibold text-[#17251f]">
+                                      Capa
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold">Foto {index + 1}</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">{imageSourceLabel(image)}</p>
+                                      <p className="mt-1 truncate text-xs text-muted-foreground">{image}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === 0 || isGalleryPending}
+                                        onClick={() => moveAttractionImage(index, -1)}
+                                      >
+                                        <ArrowUp className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === attractionImages.length - 1 || isGalleryPending}
+                                        onClick={() => moveAttractionImage(index, 1)}
+                                      >
+                                        <ArrowDown className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={isCover ? "secondary" : "outline"}
+                                        size="sm"
+                                        disabled={isCover || isGalleryPending}
+                                        onClick={() => setAttractionCover(image)}
+                                      >
+                                        <Star className="h-4 w-4" />
+                                        {isCover ? "Capa" : "Capa"}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={attractionImages.length <= 1 || isGalleryPending}
+                                        onClick={() => removeAttractionImage(image)}
+                                      >
+                                        {isRemoving ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                        Remover
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ) : null}
                     <Input
                       id="imagem_url"

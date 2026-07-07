@@ -11,7 +11,7 @@ import {
 } from "@/lib/data";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import type { AdminEntity } from "@/lib/supabase";
+import { supabaseUrl, type AdminEntity } from "@/lib/supabase";
 
 type ActionResult = {
   ok: boolean;
@@ -86,6 +86,19 @@ const restauranteSchema = z.object({
   ativo: z.boolean(),
 });
 
+const attractionGallerySchema = z.object({
+  attractionId: z.string().uuid("Roteiro inválido."),
+  coverUrl: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
+});
+
+const removeAttractionImageSchema = z.object({
+  attractionId: z.string().uuid("Roteiro inválido.").nullable().optional(),
+  imageUrl: pathOrUrl,
+  coverUrl: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
+});
+
 function optionalText(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
   return text || null;
@@ -103,6 +116,28 @@ function imageList(value: FormDataEntryValue | null) {
     .split(/[\n,]+/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function uniqueImageList(images: string[]) {
+  return Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
+}
+
+function storagePathFromPublicUrl(url: string) {
+  if (!supabaseUrl || !url.startsWith("http")) return null;
+
+  try {
+    const publicUrl = new URL(url);
+    const projectUrl = new URL(supabaseUrl);
+
+    if (publicUrl.hostname !== projectUrl.hostname) return null;
+
+    const publicPrefix = "/storage/v1/object/public/tourism/";
+    if (!publicUrl.pathname.startsWith(publicPrefix)) return null;
+
+    return decodeURIComponent(publicUrl.pathname.slice(publicPrefix.length));
+  } catch {
+    return null;
+  }
 }
 
 async function requireAdmin() {
@@ -328,6 +363,114 @@ export async function deleteAdminItem(
     return { ok: true, message: "Item excluído com sucesso." };
   } catch {
     return { ok: false, message: "Não foi possível excluir o item." };
+  }
+}
+
+export async function updateAttractionGallery(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = attractionGallerySchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls).filter((image) => image !== payload.coverUrl);
+
+    const { data, error } = await supabase
+      .from("pontos_turisticos")
+      .update({
+        imagem_url: payload.coverUrl,
+        imagens_urls: gallery,
+      })
+      .eq("id", payload.attractionId)
+      .select("id,nome")
+      .single();
+
+    if (error) {
+      console.error(error);
+      return { ok: false, message: "Não foi possível atualizar a galeria do roteiro." };
+    }
+
+    if (!data) {
+      return { ok: false, message: "Roteiro não encontrado para atualizar a galeria." };
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Galeria do roteiro atualizada com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível atualizar a galeria do roteiro." };
+  }
+}
+
+export async function removeAttractionGalleryImage(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = removeAttractionImageSchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls).filter((image) => image !== payload.coverUrl);
+    const storagePath = storagePathFromPublicUrl(payload.imageUrl);
+    let previousRow: { imagem_url: string; imagens_urls: string[] | null } | null = null;
+
+    if (payload.attractionId) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("pontos_turisticos")
+        .select("imagem_url,imagens_urls")
+        .eq("id", payload.attractionId)
+        .single();
+
+      if (currentError || !currentRow) {
+        console.error(currentError);
+        return { ok: false, message: "Não foi possível localizar o roteiro antes de remover a foto." };
+      }
+
+      previousRow = currentRow as { imagem_url: string; imagens_urls: string[] | null };
+
+      const { error: updateError } = await supabase
+        .from("pontos_turisticos")
+        .update({
+          imagem_url: payload.coverUrl,
+          imagens_urls: gallery,
+        })
+        .eq("id", payload.attractionId);
+
+      if (updateError) {
+        console.error(updateError);
+        return { ok: false, message: "Não foi possível atualizar o roteiro antes de remover a foto." };
+      }
+    }
+
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("tourism").remove([storagePath]);
+
+      if (storageError) {
+        if (payload.attractionId && previousRow) {
+          await supabase
+            .from("pontos_turisticos")
+            .update({
+              imagem_url: previousRow.imagem_url,
+              imagens_urls: previousRow.imagens_urls || [],
+            })
+            .eq("id", payload.attractionId);
+        }
+
+        console.error(storageError);
+        return {
+          ok: false,
+          message:
+            "Não foi possível remover a foto do Supabase Storage. A galeria foi preservada para não quebrar o site.",
+        };
+      }
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Foto removida do carrossel com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível remover a foto do carrossel." };
   }
 }
 
