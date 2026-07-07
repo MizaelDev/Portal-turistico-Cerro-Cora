@@ -923,7 +923,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         name="whatsapp"
                         value={String(form.whatsapp || "")}
                         onChange={(event) => updateField("whatsapp", event.target.value)}
-                        placeholder="5584999999999"
+                        placeholder="5584999"
                         required
                       />
                     </div>
