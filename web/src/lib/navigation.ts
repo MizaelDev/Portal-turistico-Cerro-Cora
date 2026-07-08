@@ -1,8 +1,8 @@
 export const navItems = [
   { href: "/", label: "Home" },
   { href: "/sobre-a-cidade", label: "Sobre" },
-  { href: "/o-que-fazer", label: "Roteiros" },
-  { href: "/festival-de-inverno", label: "Festival" },
+  { href: "/o-que-fazer", label: "Roteiros turísticos" },
+  { href: "/festival-de-inverno", label: "Eventos" },
   { href: "/gastronomia", label: "Gastronomia" },
-  { href: "/pousadas", label: "Pousadas" },
+  { href: "/pousadas", label: "Hospedagem" },
 ] as const;

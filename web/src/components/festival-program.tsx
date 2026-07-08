@@ -20,8 +20,8 @@ import { cn } from "@/lib/utils";
 
 const roleLabels: Record<FestivalArtistRole, string> = {
   principal: "Atração principal",
-  regional: "Atrações regionais",
-  convidado: "Artistas convidados",
+  regional: "Atrações locais",
+  convidado: "Artistas nacionais",
 };
 
 const roleOrder: FestivalArtistRole[] = ["principal", "regional", "convidado"];

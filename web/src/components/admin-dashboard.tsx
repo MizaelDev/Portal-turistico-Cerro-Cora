@@ -22,10 +22,13 @@ import {
   deleteAdminItem,
   logoutAction,
   removeAttractionGalleryImage,
+  removeLodgingGalleryImage,
   removeRestaurantGalleryImage,
   saveAdminItem,
   seedDefaultContent,
   updateAttractionGallery,
+  updateLodgingGallery,
+  updateLodgingLogoImage,
   updateRestaurantAssetImage,
   updateRestaurantGallery,
   uploadAdminImages,
@@ -77,13 +80,33 @@ const emptyForms: Record<AdminEntity, FormState> = {
   },
   pousadas: {
     nome: "",
+    slug: "",
     descricao: "",
+    historia: "",
+    categoria: "Pousada",
     localizacao: "",
+    endereco: "",
+    mapa_url: "",
     distancia_centro: "",
     faixa_preco_min: "",
     faixa_preco_max: "",
     whatsapp: "",
+    telefone: "",
+    instagram: "",
+    instagram_url: "",
+    logo_url: "",
+    hero_image_url: "",
     imagens_urls: "",
+    check_in: "",
+    check_out: "",
+    capacidade: "",
+    tipos_acomodacao: "",
+    formas_pagamento: "",
+    comodidades: "",
+    diferenciais: "",
+    diferencial_principal: "",
+    aceita_reservas: true,
+    destaque: false,
     ativo: true,
   },
   restaurantes: {
@@ -169,6 +192,35 @@ const restaurantOfferings = [
   "Vista panorâmica",
 ] as const;
 
+const lodgingAmenities = [
+  "Café da manhã",
+  "Piscina",
+  "Wi-Fi",
+  "Ar-condicionado",
+  "TV",
+  "Frigobar",
+  "Estacionamento",
+  "Área Kids",
+  "Pet Friendly",
+  "Vista panorâmica",
+  "Restaurante",
+  "Churrasqueira",
+  "Cozinha",
+  "Acessibilidade",
+  "Área verde",
+] as const;
+
+const lodgingHighlights = [
+  "Vista para a serra",
+  "Ambiente familiar",
+  "Próximo aos pontos turísticos",
+  "Excelente para casais",
+  "Ideal para famílias",
+  "Contato com a natureza",
+  "Silêncio",
+  "Clima serrano",
+] as const;
+
 function selectedTags(value: string | boolean | undefined) {
   return String(value || "")
     .split("|")
@@ -183,6 +235,15 @@ function selectedOfferings(value: string | boolean | undefined) {
     ...restaurantOfferings,
     ...selected.filter((offering) => !defaultOptions.has(offering)),
   ];
+}
+
+function selectedLodgingOptions(
+  value: string | boolean | undefined,
+  options: readonly string[],
+) {
+  const selected = selectedTags(value);
+  const defaultOptions = new Set<string>(options);
+  return [...options, ...selected.filter((item) => !defaultOptions.has(item))];
 }
 
 function splitImageLines(value: string | boolean | undefined) {
@@ -204,6 +265,10 @@ function restaurantImagesFromForm(form: FormState) {
   return uniqueImages([String(form.imagem_url || ""), ...splitImageLines(form.imagens_urls)]);
 }
 
+function lodgingImagesFromForm(form: FormState) {
+  return uniqueImages(splitImageLines(form.imagens_urls));
+}
+
 function serializeAdditionalImages(images: string[], coverUrl: string) {
   return uniqueImages(images).filter((image) => image !== coverUrl).join("\n");
 }
@@ -219,13 +284,33 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
     const lodging = row as PousadaRow;
     return {
       nome: lodging.nome,
+      slug: lodging.slug || "",
       descricao: lodging.descricao,
+      historia: lodging.historia || "",
+      categoria: lodging.categoria || "Pousada",
       localizacao: lodging.localizacao,
+      endereco: lodging.endereco || "",
+      mapa_url: lodging.mapa_url || "",
       distancia_centro: lodging.distancia_centro || "",
       faixa_preco_min: lodging.faixa_preco_min?.toString() || "",
       faixa_preco_max: lodging.faixa_preco_max?.toString() || "",
       whatsapp: lodging.whatsapp,
+      telefone: lodging.telefone || "",
+      instagram: lodging.instagram || "",
+      instagram_url: lodging.instagram_url || "",
+      logo_url: lodging.logo_url || "",
+      hero_image_url: lodging.hero_image_url || "",
       imagens_urls: lodging.imagens_urls.join("\n"),
+      check_in: lodging.check_in || "",
+      check_out: lodging.check_out || "",
+      capacidade: lodging.capacidade || "",
+      tipos_acomodacao: (lodging.tipos_acomodacao || []).join("\n"),
+      formas_pagamento: (lodging.formas_pagamento || []).join("\n"),
+      comodidades: (lodging.comodidades || []).join("|"),
+      diferenciais: (lodging.diferenciais || []).join("|"),
+      diferencial_principal: lodging.diferencial_principal || "",
+      aceita_reservas: lodging.aceita_reservas ?? true,
+      destaque: Boolean(lodging.destaque),
       ativo: lodging.ativo,
     };
   }
@@ -306,6 +391,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   const rows = useMemo(() => initialData[entity] as AdminRow[], [entity, initialData]);
   const attractionImages = useMemo(
     () => (entity === "pontos_turisticos" ? attractionImagesFromForm(form) : []),
+    [entity, form],
+  );
+  const lodgingImages = useMemo(
+    () => (entity === "pousadas" ? lodgingImagesFromForm(form) : []),
     [entity, form],
   );
   const restaurantImages = useMemo(
@@ -397,17 +486,228 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         setStatus({ type: result.ok ? "success" : "error", text: result.message });
 
         if (result.ok && result.urls.length) {
-          setForm((current) => {
-            const currentImages = String(current.imagens_urls || "").trim();
-            const nextImages = [...(currentImages ? [currentImages] : []), ...result.urls].join("\n");
-            return { ...current, imagens_urls: nextImages };
-          });
+          applyLodgingGallery([...lodgingImages, ...result.urls], "Fotos adicionadas à pousada com sucesso.");
         }
       } catch {
         setStatus({
           type: "error",
           text: "Não foi possível enviar as imagens. Tente fotos menores ou verifique o Supabase Storage.",
         });
+      }
+    });
+  }
+
+  function uploadLodgingLogoImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("files", file);
+    const previousLogo = String(form.logo_url || "").trim();
+
+    startUploadTransition(async () => {
+      try {
+        const result = await uploadAdminImages("pousadas", formData);
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+
+        if (result.ok && result.urls[0]) {
+          const nextUrl = result.urls[0];
+
+          if (editingId) {
+            const updateResult = await updateLodgingLogoImage({
+              lodgingId: editingId,
+              imageUrl: previousLogo || null,
+              nextUrl,
+            });
+            setStatus({ type: updateResult.ok ? "success" : "error", text: updateResult.message });
+            if (!updateResult.ok) return;
+            router.refresh();
+          }
+
+          setForm((current) => ({ ...current, logo_url: nextUrl }));
+        }
+      } catch {
+        setStatus({
+          type: "error",
+          text: "Não foi possível enviar a logo. Tente uma imagem menor ou verifique o Supabase Storage.",
+        });
+      }
+    });
+  }
+
+  function removeLodgingLogo() {
+    const currentLogo = String(form.logo_url || "").trim();
+    if (!currentLogo || isGalleryPending) return;
+
+    const confirmed = window.confirm("Tem certeza que deseja remover a logo desta pousada?");
+    if (!confirmed) return;
+
+    setGalleryAction("lodging-logo");
+    startGalleryTransition(async () => {
+      if (editingId) {
+        const result = await updateLodgingLogoImage({
+          lodgingId: editingId,
+          imageUrl: currentLogo,
+          nextUrl: null,
+        });
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        setGalleryAction(null);
+        if (!result.ok) return;
+        router.refresh();
+      }
+
+      setForm((current) => ({ ...current, logo_url: "" }));
+      setStatus({ type: "success", text: "Logo removida da pousada." });
+      setGalleryAction(null);
+    });
+  }
+
+  function uploadLodgingHeroImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("files", file);
+    const previousHeroImage = String(form.hero_image_url || "").trim();
+
+    startUploadTransition(async () => {
+      try {
+        const result = await uploadAdminImages("pousadas", formData);
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+
+        if (result.ok && result.urls[0]) {
+          const nextUrl = result.urls[0];
+
+          if (editingId) {
+            const updateResult = await updateLodgingLogoImage({
+              lodgingId: editingId,
+              field: "hero_image_url",
+              imageUrl: previousHeroImage || null,
+              nextUrl,
+            });
+            setStatus({ type: updateResult.ok ? "success" : "error", text: updateResult.message });
+            if (!updateResult.ok) return;
+            router.refresh();
+          }
+
+          setForm((current) => ({ ...current, hero_image_url: nextUrl }));
+        }
+      } catch {
+        setStatus({
+          type: "error",
+          text: "Não foi possível enviar a imagem principal. Use uma foto horizontal menor ou verifique o Supabase Storage.",
+        });
+      }
+    });
+  }
+
+  function removeLodgingHeroImage() {
+    const currentHeroImage = String(form.hero_image_url || "").trim();
+    if (!currentHeroImage || isGalleryPending) return;
+
+    const confirmed = window.confirm("Tem certeza que deseja remover a imagem principal do Hero desta pousada?");
+    if (!confirmed) return;
+
+    setGalleryAction("lodging-hero");
+    startGalleryTransition(async () => {
+      if (editingId) {
+        const result = await updateLodgingLogoImage({
+          lodgingId: editingId,
+          field: "hero_image_url",
+          imageUrl: currentHeroImage,
+          nextUrl: null,
+        });
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        setGalleryAction(null);
+        if (!result.ok) return;
+        router.refresh();
+      }
+
+      setForm((current) => ({ ...current, hero_image_url: "" }));
+      setStatus({ type: "success", text: "Imagem principal da pousada removida." });
+      setGalleryAction(null);
+    });
+  }
+
+  function applyLodgingGallery(nextImages: string[], successMessage: string) {
+    const normalizedImages = uniqueImages(nextImages);
+    const previousForm = form;
+
+    setForm((current) => ({
+      ...current,
+      imagens_urls: normalizedImages.join("\n"),
+    }));
+
+    if (!editingId || !normalizedImages.length) {
+      setStatus({ type: "success", text: successMessage });
+      return;
+    }
+
+    setGalleryAction("lodging-gallery");
+    startGalleryTransition(async () => {
+      const result = await updateLodgingGallery({
+        lodgingId: editingId,
+        imagens_urls: normalizedImages,
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.ok ? successMessage : result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        router.refresh();
+      } else {
+        setForm(previousForm);
+      }
+    });
+  }
+
+  function moveLodgingImage(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= lodgingImages.length || isGalleryPending) return;
+
+    const nextImages = [...lodgingImages];
+    [nextImages[index], nextImages[nextIndex]] = [nextImages[nextIndex], nextImages[index]];
+    applyLodgingGallery(nextImages, "Ordem das fotos da pousada atualizada.");
+  }
+
+  function setLodgingCover(image: string) {
+    if (image === lodgingImages[0] || isGalleryPending) return;
+    applyLodgingGallery(
+      [image, ...lodgingImages.filter((item) => item !== image)],
+      "Foto definida como capa da pousada.",
+    );
+  }
+
+  function removeLodgingImage(image: string) {
+    if (isGalleryPending) return;
+
+    if (lodgingImages.length <= 1) {
+      setStatus({
+        type: "error",
+        text: "Mantenha pelo menos uma foto na pousada para não quebrar o card público.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm("Tem certeza que deseja remover esta foto?");
+    if (!confirmed) return;
+
+    const nextImages = lodgingImages.filter((item) => item !== image);
+
+    setGalleryAction(image);
+    startGalleryTransition(async () => {
+      const result = await removeLodgingGalleryImage({
+        lodgingId: editingId,
+        imageUrl: image,
+        imagens_urls: nextImages,
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        setForm((current) => ({ ...current, imagens_urls: nextImages.join("\n") }));
+        router.refresh();
       }
     });
   }
@@ -787,6 +1087,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     });
   }
 
+  function toggleLodgingOption(field: "comodidades" | "diferenciais", option: string, checked: boolean) {
+    setForm((current) => {
+      const values = new Set(selectedTags(current[field]));
+      if (checked) {
+        values.add(option);
+      } else {
+        values.delete(option);
+      }
+      return { ...current, [field]: Array.from(values).join("|") };
+    });
+  }
+
   return (
     <div className="grid gap-8">
       <div className="flex flex-col justify-between gap-4 rounded-lg border border-border bg-card p-4 shadow-sm md:flex-row md:items-center">
@@ -1043,6 +1355,57 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
 
               {entity === "pousadas" ? (
                 <>
+                  <div className="rounded-lg border border-border bg-accent/20 p-4">
+                    <p className="text-sm font-semibold">Página individual da pousada</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Esses campos alimentam a página /pousadas/slug. A imagem principal do Hero, a logo e a galeria
+                      são gerenciadas separadamente.
+                    </p>
+                    {editingId && String(form.slug || "").trim() ? (
+                      <Button asChild type="button" variant="outline" size="sm" className="mt-3">
+                        <a
+                          href={`/pousadas/${String(form.slug).trim()}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Ver página publicada
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="slug">Slug da página</Label>
+                      <Input
+                        id="slug"
+                        name="slug"
+                        value={String(form.slug || "")}
+                        onChange={(event) => updateField("slug", event.target.value)}
+                        placeholder="pousada-serido"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="categoria">Categoria</Label>
+                      <Input
+                        id="categoria"
+                        name="categoria"
+                        value={String(form.categoria || "")}
+                        onChange={(event) => updateField("categoria", event.target.value)}
+                        placeholder="Pousada, Chalé, Camping..."
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="historia">História / texto completo</Label>
+                    <Textarea
+                      id="historia"
+                      name="historia"
+                      value={String(form.historia || "")}
+                      onChange={(event) => updateField("historia", event.target.value)}
+                      placeholder="Texto maior para a seção Sobre a hospedagem."
+                    />
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="localizacao">Localização</Label>
@@ -1055,6 +1418,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                     <div className="grid gap-2">
+                      <Label htmlFor="endereco">Endereço completo</Label>
+                      <Input
+                        id="endereco"
+                        name="endereco"
+                        value={String(form.endereco || "")}
+                        onChange={(event) => updateField("endereco", event.target.value)}
+                        placeholder="Rua, bairro, zona rural..."
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
                       <Label htmlFor="distancia_centro">Distância do centro</Label>
                       <Input
                         id="distancia_centro"
@@ -1062,6 +1437,16 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         value={String(form.distancia_centro || "")}
                         onChange={(event) => updateField("distancia_centro", event.target.value)}
                         placeholder="Ex: 0,6 km do centro"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="mapa_url">Link do Google Maps</Label>
+                      <Input
+                        id="mapa_url"
+                        name="mapa_url"
+                        value={String(form.mapa_url || "")}
+                        onChange={(event) => updateField("mapa_url", event.target.value)}
+                        placeholder="https://maps.google.com/..."
                       />
                     </div>
                   </div>
@@ -1087,6 +1472,60 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        name="aceita_reservas"
+                        checked={Boolean(form.aceita_reservas)}
+                        onChange={(event) => updateField("aceita_reservas", event.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Aceita reservas
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        name="destaque"
+                        checked={Boolean(form.destaque)}
+                        onChange={(event) => updateField("destaque", event.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Destacar esta hospedagem
+                    </label>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="check_in">Check-in</Label>
+                      <Input
+                        id="check_in"
+                        name="check_in"
+                        value={String(form.check_in || "")}
+                        onChange={(event) => updateField("check_in", event.target.value)}
+                        placeholder="14h"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="check_out">Check-out</Label>
+                      <Input
+                        id="check_out"
+                        name="check_out"
+                        value={String(form.check_out || "")}
+                        onChange={(event) => updateField("check_out", event.target.value)}
+                        placeholder="12h"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="capacidade">Capacidade</Label>
+                    <Input
+                      id="capacidade"
+                      name="capacidade"
+                      value={String(form.capacidade || "")}
+                      onChange={(event) => updateField("capacidade", event.target.value)}
+                      placeholder="Até 20 hóspedes"
+                    />
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="whatsapp">WhatsApp</Label>
                     <Input
@@ -1097,6 +1536,175 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="5584999999999"
                       required
                     />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="telefone">Telefone visível</Label>
+                      <Input
+                        id="telefone"
+                        name="telefone"
+                        value={String(form.telefone || "")}
+                        onChange={(event) => updateField("telefone", event.target.value)}
+                        placeholder="(84) 99999-9999"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input
+                        id="instagram"
+                        name="instagram"
+                        value={String(form.instagram || "")}
+                        onChange={(event) => updateField("instagram", event.target.value)}
+                        placeholder="@perfil"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="instagram_url">Link do Instagram</Label>
+                    <Input
+                      id="instagram_url"
+                      name="instagram_url"
+                      value={String(form.instagram_url || "")}
+                      onChange={(event) => updateField("instagram_url", event.target.value)}
+                      placeholder="https://www.instagram.com/perfil/"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="hero_image_url">Imagem principal do Hero</Label>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Use uma foto horizontal em boa qualidade. Não envie logo neste campo. Imagem recomendada:
+                      1600x900 ou maior.
+                    </p>
+                    <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 md:grid-cols-[minmax(220px,320px)_1fr] md:items-center">
+                      <div className="relative aspect-video overflow-hidden rounded-lg border border-border bg-accent/40">
+                        {String(form.hero_image_url || "").trim() ? (
+                          <NextImage
+                            src={String(form.hero_image_url || "")}
+                            alt={`Imagem principal de ${String(form.nome || "pousada")}`}
+                            fill
+                            sizes="320px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-muted-foreground">
+                            <ImagePlus className="h-6 w-6" />
+                            Foto horizontal para o topo da página
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid gap-3">
+                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-4 text-center transition-colors hover:bg-accent/70">
+                          {isUploading ? (
+                            <Loader2 className="mb-2 h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <ImagePlus className="mb-2 h-5 w-5 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {isUploading ? "Enviando imagem..." : "Selecionar imagem principal"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="sr-only"
+                            disabled={isUploading}
+                            onChange={(event) => {
+                              uploadLodgingHeroImage(event.target.files);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            id="hero_image_url"
+                            name="hero_image_url"
+                            value={String(form.hero_image_url || "")}
+                            onChange={(event) => updateField("hero_image_url", event.target.value)}
+                            placeholder="/images/pousada-hero.jpg ou https://..."
+                          />
+                          {String(form.hero_image_url || "").trim() ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={isGalleryPending}
+                              onClick={removeLodgingHeroImage}
+                            >
+                              {galleryAction === "lodging-hero" && isGalleryPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="logo_url">Logo da pousada</Label>
+                    <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 sm:grid-cols-[96px_1fr] sm:items-center">
+                      <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white p-2">
+                        {String(form.logo_url || "").trim() ? (
+                          <NextImage
+                            src={String(form.logo_url || "")}
+                            alt={`Logo de ${String(form.nome || "pousada")}`}
+                            fill
+                            sizes="96px"
+                            className="object-contain p-2"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs font-semibold text-muted-foreground">
+                            Sem logo
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid gap-3">
+                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-4 text-center transition-colors hover:bg-accent/70">
+                          {isUploading ? (
+                            <Loader2 className="mb-2 h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <ImagePlus className="mb-2 h-5 w-5 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {isUploading ? "Enviando logo..." : "Selecionar logo"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="sr-only"
+                            disabled={isUploading}
+                            onChange={(event) => {
+                              uploadLodgingLogoImage(event.target.files);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            id="logo_url"
+                            name="logo_url"
+                            value={String(form.logo_url || "")}
+                            onChange={(event) => updateField("logo_url", event.target.value)}
+                            placeholder="/images/logo.png ou https://..."
+                          />
+                          {String(form.logo_url || "").trim() ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={isGalleryPending}
+                              onClick={removeLodgingLogo}
+                            >
+                              {galleryAction === "lodging-logo" && isGalleryPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="imagens_urls">Imagens da galeria</Label>
@@ -1110,7 +1718,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {isUploading ? "Enviando imagens..." : "Selecionar fotos da pousada"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        A primeira imagem enviada será usada como foto principal. As demais aparecem na galeria.
+                        Essas fotos aparecem na galeria e nos cards. A imagem de fundo do Hero é definida no campo separado acima.
                       </span>
                       <input
                         type="file"
@@ -1131,6 +1739,105 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {String(form.imagens_urls || "").split(/\n+/).filter(Boolean).length === 1 ? "" : "s"} na lista.
                       </p>
                     ) : null}
+                    {lodgingImages.length ? (
+                      <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold">Fotos da pousada</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              A primeira foto é a capa da listagem. O Hero usa o campo Imagem principal do Hero.
+                            </p>
+                          </div>
+                          {isGalleryPending ? (
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Atualizando...
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="grid gap-3">
+                          {lodgingImages.map((image, index) => {
+                            const isCover = index === 0;
+                            const isRemoving = galleryAction === image && isGalleryPending;
+
+                            return (
+                              <div
+                                key={image}
+                                className="grid gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-[96px_1fr] sm:items-center"
+                              >
+                                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-accent">
+                                  <NextImage
+                                    src={image}
+                                    alt={`Foto ${index + 1} de ${String(form.nome || "pousada")}`}
+                                    fill
+                                    sizes="96px"
+                                    className="object-cover"
+                                  />
+                                  {isCover ? (
+                                    <span className="absolute left-2 top-2 rounded-md bg-alpine-sunset px-2 py-0.5 text-[10px] font-semibold text-[#17251f]">
+                                      Capa
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold">Foto {index + 1}</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">{imageSourceLabel(image)}</p>
+                                      <p className="mt-1 truncate text-xs text-muted-foreground">{image}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === 0 || isGalleryPending}
+                                        onClick={() => moveLodgingImage(index, -1)}
+                                      >
+                                        <ArrowUp className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === lodgingImages.length - 1 || isGalleryPending}
+                                        onClick={() => moveLodgingImage(index, 1)}
+                                      >
+                                        <ArrowDown className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={isCover ? "secondary" : "outline"}
+                                        size="sm"
+                                        disabled={isCover || isGalleryPending}
+                                        onClick={() => setLodgingCover(image)}
+                                      >
+                                        <Star className="h-4 w-4" />
+                                        Capa
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={lodgingImages.length <= 1 || isGalleryPending}
+                                        onClick={() => removeLodgingImage(image)}
+                                      >
+                                        {isRemoving ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                        Remover
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                     <Textarea
                       id="imagens_urls"
                       name="imagens_urls"
@@ -1138,6 +1845,80 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       onChange={(event) => updateField("imagens_urls", event.target.value)}
                       placeholder="As URLs enviadas aparecem aqui automaticamente. Você também pode colar uma imagem por linha."
                       required
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="tipos_acomodacao">Tipos de acomodação</Label>
+                      <Textarea
+                        id="tipos_acomodacao"
+                        name="tipos_acomodacao"
+                        value={String(form.tipos_acomodacao || "")}
+                        onChange={(event) => updateField("tipos_acomodacao", event.target.value)}
+                        placeholder="Quarto Casal&#10;Suíte&#10;Chalé"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="formas_pagamento">Formas de pagamento</Label>
+                      <Textarea
+                        id="formas_pagamento"
+                        name="formas_pagamento"
+                        value={String(form.formas_pagamento || "")}
+                        onChange={(event) => updateField("formas_pagamento", event.target.value)}
+                        placeholder="Pix&#10;Dinheiro&#10;Cartão"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Comodidades</Label>
+                    <div className="grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-border bg-accent/25 p-4 sm:grid-cols-2">
+                      {selectedLodgingOptions(form.comodidades, lodgingAmenities).map((amenity) => {
+                        const checked = selectedTags(form.comodidades).includes(amenity);
+                        return (
+                          <label key={amenity} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              name="comodidades"
+                              value={amenity}
+                              checked={checked}
+                              onChange={(event) => toggleLodgingOption("comodidades", amenity, event.target.checked)}
+                              className="h-4 w-4 rounded border-border"
+                            />
+                            {amenity}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Diferenciais</Label>
+                    <div className="grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-border bg-accent/25 p-4 sm:grid-cols-2">
+                      {selectedLodgingOptions(form.diferenciais, lodgingHighlights).map((highlight) => {
+                        const checked = selectedTags(form.diferenciais).includes(highlight);
+                        return (
+                          <label key={highlight} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              name="diferenciais"
+                              value={highlight}
+                              checked={checked}
+                              onChange={(event) => toggleLodgingOption("diferenciais", highlight, event.target.checked)}
+                              className="h-4 w-4 rounded border-border"
+                            />
+                            {highlight}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="diferencial_principal">Diferencial principal</Label>
+                    <Input
+                      id="diferencial_principal"
+                      name="diferencial_principal"
+                      value={String(form.diferencial_principal || "")}
+                      onChange={(event) => updateField("diferencial_principal", event.target.value)}
+                      placeholder="Ex: Vista para a serra e ambiente silencioso"
                     />
                   </div>
                 </>

@@ -102,13 +102,33 @@ const pontoTuristicoSchema = z.object({
 
 const pousadaSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
+  slug: slugSchema,
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
+  historia: z.string().trim().nullable(),
+  categoria: z.string().trim().nullable(),
   localizacao: z.string().trim().min(2, "Informe a localização."),
+  endereco: z.string().trim().nullable(),
+  mapa_url: optionalGoogleMapsUrl,
   distancia_centro: z.string().trim().nullable(),
   faixa_preco_min: z.number().nullable(),
   faixa_preco_max: z.number().nullable(),
   whatsapp: whatsappSchema,
+  telefone: z.string().trim().nullable(),
+  instagram: z.string().trim().nullable(),
+  instagram_url: optionalInstagramUrl,
+  logo_url: optionalPathOrUrl,
+  hero_image_url: optionalPathOrUrl,
   imagens_urls: z.array(pathOrUrl).min(1, "Informe ao menos uma imagem."),
+  check_in: z.string().trim().nullable(),
+  check_out: z.string().trim().nullable(),
+  capacidade: z.string().trim().nullable(),
+  tipos_acomodacao: z.array(z.string().trim().min(1)).default([]),
+  formas_pagamento: z.array(z.string().trim().min(1)).default([]),
+  comodidades: z.array(z.string().trim().min(1)).default([]),
+  diferenciais: z.array(z.string().trim().min(1)).default([]),
+  diferencial_principal: z.string().trim().nullable(),
+  aceita_reservas: z.boolean(),
+  destaque: z.boolean(),
   ativo: z.boolean(),
 });
 
@@ -170,6 +190,24 @@ const removeRestaurantImageSchema = z.object({
 const restaurantAssetSchema = z.object({
   restaurantId: z.string().uuid("Restaurante inválido.").nullable().optional(),
   field: z.enum(["logo_url", "imagem_url"]),
+  imageUrl: pathOrUrl.nullable(),
+  nextUrl: optionalPathOrUrl,
+});
+
+const lodgingGallerySchema = z.object({
+  lodgingId: z.string().uuid("Pousada inválida."),
+  imagens_urls: z.array(pathOrUrl).min(1, "Mantenha pelo menos uma foto na pousada."),
+});
+
+const removeLodgingImageSchema = z.object({
+  lodgingId: z.string().uuid("Pousada inválida.").nullable().optional(),
+  imageUrl: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).min(1, "Mantenha pelo menos uma foto na pousada."),
+});
+
+const lodgingAssetSchema = z.object({
+  field: z.enum(["logo_url", "hero_image_url"]).default("logo_url"),
+  lodgingId: z.string().uuid("Pousada inválida.").nullable().optional(),
   imageUrl: pathOrUrl.nullable(),
   nextUrl: optionalPathOrUrl,
 });
@@ -266,13 +304,33 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
   if (entity === "pousadas") {
     return pousadaSchema.parse({
       nome: formData.get("nome"),
+      slug: optionalText(formData.get("slug")) || slugify(String(formData.get("nome") || "")),
       descricao: formData.get("descricao"),
+      historia: optionalText(formData.get("historia")),
+      categoria: optionalText(formData.get("categoria")) || "Pousada",
       localizacao: formData.get("localizacao"),
+      endereco: optionalText(formData.get("endereco")),
+      mapa_url: optionalText(formData.get("mapa_url")),
       distancia_centro: optionalText(formData.get("distancia_centro")),
       faixa_preco_min: optionalNumber(formData.get("faixa_preco_min")),
       faixa_preco_max: optionalNumber(formData.get("faixa_preco_max")),
       whatsapp: formData.get("whatsapp"),
+      telefone: optionalText(formData.get("telefone")),
+      instagram: optionalText(formData.get("instagram")),
+      instagram_url: optionalText(formData.get("instagram_url")),
+      logo_url: optionalText(formData.get("logo_url")),
+      hero_image_url: optionalText(formData.get("hero_image_url")),
       imagens_urls: imageList(formData.get("imagens_urls")),
+      check_in: optionalText(formData.get("check_in")),
+      check_out: optionalText(formData.get("check_out")),
+      capacidade: optionalText(formData.get("capacidade")),
+      tipos_acomodacao: textList(formData.get("tipos_acomodacao")),
+      formas_pagamento: textList(formData.get("formas_pagamento")),
+      comodidades: formData.getAll("comodidades").map((item) => String(item).trim()).filter(Boolean),
+      diferenciais: formData.getAll("diferenciais").map((item) => String(item).trim()).filter(Boolean),
+      diferencial_principal: optionalText(formData.get("diferencial_principal")),
+      aceita_reservas: formData.get("aceita_reservas") === "on",
+      destaque: formData.get("destaque") === "on",
       ativo: formData.get("ativo") === "on",
     });
   }
@@ -311,6 +369,7 @@ function revalidatePublicPages() {
   revalidatePath("/admin");
   revalidatePath("/o-que-fazer");
   revalidatePath("/pousadas");
+  revalidatePath("/pousadas/[slug]", "page");
   revalidatePath("/gastronomia");
   revalidatePath("/restaurantes/[slug]", "page");
   revalidatePath("/");
@@ -386,22 +445,22 @@ export async function saveAdminItem(
     const supabase = await requireAdmin();
     const payload = parsePayload(entity, formData);
 
-    if (entity === "restaurantes") {
-      const restaurantPayload = payload as z.infer<typeof restauranteSchema>;
-      if (restaurantPayload.slug) {
-        let slugQuery = supabase.from("restaurantes").select("id").eq("slug", restaurantPayload.slug);
+    if (entity === "restaurantes" || entity === "pousadas") {
+      const slugPayload = payload as z.infer<typeof restauranteSchema> | z.infer<typeof pousadaSchema>;
+      if (slugPayload.slug) {
+        let slugQuery = supabase.from(entity).select("id").eq("slug", slugPayload.slug);
         if (id) {
           slugQuery = slugQuery.neq("id", id);
         }
 
-        const { data: existingSlug, error: slugError } = await slugQuery.maybeSingle();
+        const { data: existingSlugs, error: slugError } = await slugQuery.limit(1);
         if (slugError) {
           logAdminError("slug-check", slugError);
           return { ok: false, message: "Não foi possível validar o slug. Tente novamente." };
         }
 
-        if (existingSlug) {
-          return { ok: false, message: "Este slug já está sendo usado por outro restaurante." };
+        if (existingSlugs?.length) {
+          return { ok: false, message: "Este slug já está sendo usado por outro cadastro." };
         }
       }
     }
@@ -770,6 +829,169 @@ export async function updateRestaurantAssetImage(input: unknown): Promise<Action
   }
 }
 
+export async function updateLodgingGallery(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = lodgingGallerySchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls);
+
+    const { data, error } = await supabase
+      .from("pousadas")
+      .update({ imagens_urls: gallery })
+      .eq("id", payload.lodgingId)
+      .select("id,nome")
+      .single();
+
+    if (error) {
+      logAdminError("lodging-gallery-update", error);
+      return { ok: false, message: "Não foi possível atualizar as fotos da pousada." };
+    }
+
+    if (!data) {
+      return { ok: false, message: "Pousada não encontrada para atualizar as fotos." };
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Fotos da pousada atualizadas com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível atualizar as fotos da pousada." };
+  }
+}
+
+export async function removeLodgingGalleryImage(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = removeLodgingImageSchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls);
+    const storagePath = storagePathFromPublicUrl(payload.imageUrl);
+    let previousRow: { imagens_urls: string[] | null } | null = null;
+
+    if (payload.lodgingId) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("pousadas")
+        .select("imagens_urls")
+        .eq("id", payload.lodgingId)
+        .single();
+
+      if (currentError || !currentRow) {
+        logAdminError("lodging-gallery-current", currentError);
+        return { ok: false, message: "Não foi possível localizar a pousada antes de remover a foto." };
+      }
+
+      previousRow = currentRow as { imagens_urls: string[] | null };
+
+      const { error: updateError } = await supabase
+        .from("pousadas")
+        .update({ imagens_urls: gallery })
+        .eq("id", payload.lodgingId);
+
+      if (updateError) {
+        logAdminError("lodging-gallery-remove-update", updateError);
+        return { ok: false, message: "Não foi possível atualizar a pousada antes de remover a foto." };
+      }
+    }
+
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("tourism").remove([storagePath]);
+
+      if (storageError) {
+        if (payload.lodgingId && previousRow) {
+          await supabase
+            .from("pousadas")
+            .update({ imagens_urls: previousRow.imagens_urls || [] })
+            .eq("id", payload.lodgingId);
+        }
+
+        logAdminError("lodging-gallery-storage-remove", storageError);
+        return {
+          ok: false,
+          message:
+            "Não foi possível remover a foto do Supabase Storage. As fotos foram preservadas para não quebrar o site.",
+        };
+      }
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Foto removida da pousada com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível remover a foto da pousada." };
+  }
+}
+
+export async function updateLodgingLogoImage(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = lodgingAssetSchema.parse(input);
+    const field = payload.field;
+    const label = field === "hero_image_url" ? "imagem principal do Hero" : "logo";
+    const storagePath = payload.imageUrl && payload.imageUrl !== payload.nextUrl
+      ? storagePathFromPublicUrl(payload.imageUrl)
+      : null;
+    let previousValue: string | null = null;
+
+    if (payload.lodgingId) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("pousadas")
+        .select(field)
+        .eq("id", payload.lodgingId)
+        .single();
+
+      if (currentError || !currentRow) {
+        logAdminError("lodging-logo-current", currentError);
+        return { ok: false, message: `Não foi possível localizar a pousada antes de atualizar a ${label}.` };
+      }
+
+      previousValue = String((currentRow as Record<string, unknown>)[field] || "") || null;
+
+      const { error: updateError } = await supabase
+        .from("pousadas")
+        .update({ [field]: payload.nextUrl })
+        .eq("id", payload.lodgingId);
+
+      if (updateError) {
+        logAdminError("lodging-logo-update", updateError);
+        return { ok: false, message: `Não foi possível atualizar a ${label} da pousada.` };
+      }
+    }
+
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("tourism").remove([storagePath]);
+
+      if (storageError) {
+        if (payload.lodgingId) {
+          await supabase.from("pousadas").update({ [field]: previousValue }).eq("id", payload.lodgingId);
+        }
+
+        logAdminError("lodging-logo-storage-remove", storageError);
+        return {
+          ok: false,
+          message: `Não foi possível remover a ${label} antiga do Storage. A alteração foi desfeita.`,
+        };
+      }
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: `${label.charAt(0).toUpperCase() + label.slice(1)} da pousada atualizada com sucesso.` };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível atualizar a imagem da pousada." };
+  }
+}
+
 export async function seedDefaultContent(): Promise<ActionResult> {
   try {
     await assertSameOrigin();
@@ -798,13 +1020,33 @@ export async function seedDefaultContent(): Promise<ActionResult> {
       const location = splitLocation(lodging.location);
       const payload = {
         nome: lodging.name,
+        slug: lodging.slug || slugify(lodging.name),
         descricao: lodging.description,
+        historia: lodging.story || null,
+        categoria: lodging.category || "Pousada",
         localizacao: location.localizacao,
+        endereco: lodging.address || location.localizacao,
+        mapa_url: lodging.mapUrl || null,
         distancia_centro: location.distancia_centro,
         faixa_preco_min: price.faixa_preco_min,
         faixa_preco_max: price.faixa_preco_max,
         whatsapp: lodging.whatsapp,
+        telefone: lodging.phone || null,
+        instagram: lodging.instagram || null,
+        instagram_url: lodging.instagramUrl || null,
+        logo_url: lodging.logo || null,
+        hero_image_url: lodging.heroImage || null,
         imagens_urls: [lodging.image, ...lodging.gallery],
+        check_in: lodging.checkIn || null,
+        check_out: lodging.checkOut || null,
+        capacidade: lodging.capacity || null,
+        tipos_acomodacao: lodging.accommodationTypes || [],
+        formas_pagamento: lodging.paymentMethods || [],
+        comodidades: lodging.amenities || [],
+        diferenciais: lodging.highlights || [],
+        diferencial_principal: lodging.mainDifferential || null,
+        aceita_reservas: lodging.acceptsReservations ?? true,
+        destaque: Boolean(lodging.isFeatured),
         ativo: true,
       };
 

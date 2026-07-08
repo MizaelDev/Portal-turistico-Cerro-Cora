@@ -28,15 +28,36 @@ export type PontoTuristicoRow = {
 export type PousadaRow = {
   id: string;
   nome: string;
+  slug?: string | null;
   descricao: string;
+  historia?: string | null;
+  categoria?: string | null;
   localizacao: string;
+  endereco?: string | null;
+  mapa_url?: string | null;
   distancia_centro: string | null;
   faixa_preco_min: number | null;
   faixa_preco_max: number | null;
   whatsapp: string;
+  telefone?: string | null;
+  instagram?: string | null;
+  instagram_url?: string | null;
+  logo_url?: string | null;
+  hero_image_url?: string | null;
   imagens_urls: string[];
+  check_in?: string | null;
+  check_out?: string | null;
+  capacidade?: string | null;
+  tipos_acomodacao?: string[] | null;
+  formas_pagamento?: string[] | null;
+  comodidades?: string[] | null;
+  diferenciais?: string[] | null;
+  diferencial_principal?: string | null;
+  aceita_reservas?: boolean | null;
+  destaque?: boolean | null;
   ativo: boolean;
   created_at: string;
+  updated_at?: string | null;
 };
 
 export type RestauranteRow = {

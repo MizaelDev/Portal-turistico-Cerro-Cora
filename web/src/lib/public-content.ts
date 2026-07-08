@@ -28,6 +28,8 @@ const attractionColumns =
   "id,nome,descricao,categoria,localizacao,imagem_url,imagens_urls,ativo,created_at";
 const lodgingColumns =
   "id,nome,descricao,localizacao,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,imagens_urls,ativo,created_at";
+const extendedLodgingColumns =
+  "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,ativo,created_at,updated_at";
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const extendedRestaurantColumns =
@@ -75,18 +77,39 @@ function formatPriceRange(min: number | null, max: number | null) {
 
 function mapPousada(row: PousadaRow): Lodging {
   const images = row.imagens_urls.filter(Boolean);
-  const location = row.distancia_centro
-    ? `${row.localizacao} - ${row.distancia_centro}`
-    : row.localizacao;
+  const location = row.distancia_centro ? `${row.localizacao} - ${row.distancia_centro}` : row.localizacao;
 
   return {
+    id: row.id,
+    slug: row.slug || slugify(row.nome),
     name: row.nome,
+    category: row.categoria || "Pousada",
     image: images[0] || "/images/cerro-cora.jpg",
-    gallery: images.slice(1, 4),
+    heroImage: row.hero_image_url || undefined,
+    logo: row.logo_url || undefined,
+    gallery: images.slice(1),
     description: row.descricao,
+    story: row.historia || row.descricao,
+    mainDifferential: row.diferencial_principal || row.diferenciais?.[0] || undefined,
     whatsapp: row.whatsapp,
+    phone: row.telefone || undefined,
+    instagram: row.instagram || undefined,
+    instagramUrl: row.instagram_url || undefined,
     location,
+    address: row.endereco || row.localizacao,
+    mapUrl: row.mapa_url || undefined,
     priceRange: formatPriceRange(row.faixa_preco_min, row.faixa_preco_max),
+    checkIn: row.check_in || undefined,
+    checkOut: row.check_out || undefined,
+    capacity: row.capacidade || undefined,
+    accommodationTypes: row.tipos_acomodacao || undefined,
+    paymentMethods: row.formas_pagamento || undefined,
+    amenities: row.comodidades || undefined,
+    highlights: row.diferenciais || undefined,
+    acceptsReservations: row.aceita_reservas ?? true,
+    isFeatured: Boolean(row.destaque),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined,
   };
 }
 
@@ -199,11 +222,24 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
     return { items: fallbackLodgings, error: null, source: "mock" };
   }
 
-  const { data, error } = await supabase
+  const extendedResult = await supabase
     .from("pousadas")
-    .select(lodgingColumns)
+    .select(extendedLodgingColumns)
     .eq("ativo", true)
     .order("nome");
+  let data = extendedResult.data as PousadaRow[] | null;
+  let error = extendedResult.error;
+
+  if (isSchemaCacheError(error)) {
+    const fallback = await supabase
+      .from("pousadas")
+      .select(lodgingColumns)
+      .eq("ativo", true)
+      .order("nome");
+
+    data = fallback.data as PousadaRow[] | null;
+    error = fallback.error;
+  }
 
   if (error) {
     logPublicContentError("lodgings", error);
@@ -251,6 +287,26 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
     items: (data as RestauranteRow[]).map(mapRestaurante),
     error: null,
     source: "supabase",
+  };
+}
+
+export async function getPublicLodgingPage(
+  slug: string,
+): Promise<PublicContent<Lodging> & { item: Lodging | null; related: Lodging[] }> {
+  const { items, error, source } = await getPublicLodgings();
+  const item = items.find((lodging) => (lodging.slug || slugify(lodging.name)) === slug) || null;
+
+  return {
+    items,
+    item,
+    related: item
+      ? items
+          .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
+          .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+          .slice(0, 3)
+      : [],
+    error,
+    source,
   };
 }
 

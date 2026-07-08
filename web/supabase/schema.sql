@@ -17,15 +17,36 @@ create table if not exists public.pontos_turisticos (
 create table if not exists public.pousadas (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
+  slug text,
   descricao text not null,
+  historia text,
+  categoria text,
   localizacao text not null,
+  endereco text,
+  mapa_url text,
   distancia_centro text,
   faixa_preco_min numeric(10, 2),
   faixa_preco_max numeric(10, 2),
   whatsapp text not null,
+  telefone text,
+  instagram text,
+  instagram_url text,
+  logo_url text,
+  hero_image_url text,
   imagens_urls text[] not null default '{}',
+  check_in text,
+  check_out text,
+  capacidade text,
+  tipos_acomodacao text[] not null default '{}',
+  formas_pagamento text[] not null default '{}',
+  comodidades text[] not null default '{}',
+  diferenciais text[] not null default '{}',
+  diferencial_principal text,
+  aceita_reservas boolean not null default true,
+  destaque boolean not null default false,
   ativo boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz
 );
 
 create table if not exists public.restaurantes (
@@ -81,6 +102,33 @@ alter table public.restaurantes
   add column if not exists faixa_preco text,
   add column if not exists destaque boolean not null default false,
   add column if not exists updated_at timestamptz;
+
+alter table public.pousadas
+  add column if not exists slug text,
+  add column if not exists historia text,
+  add column if not exists categoria text,
+  add column if not exists endereco text,
+  add column if not exists mapa_url text,
+  add column if not exists telefone text,
+  add column if not exists instagram text,
+  add column if not exists instagram_url text,
+  add column if not exists logo_url text,
+  add column if not exists hero_image_url text,
+  add column if not exists check_in text,
+  add column if not exists check_out text,
+  add column if not exists capacidade text,
+  add column if not exists tipos_acomodacao text[] not null default '{}',
+  add column if not exists formas_pagamento text[] not null default '{}',
+  add column if not exists comodidades text[] not null default '{}',
+  add column if not exists diferenciais text[] not null default '{}',
+  add column if not exists diferencial_principal text,
+  add column if not exists aceita_reservas boolean not null default true,
+  add column if not exists destaque boolean not null default false,
+  add column if not exists updated_at timestamptz;
+
+create unique index if not exists pousadas_slug_unique
+  on public.pousadas(slug)
+  where slug is not null;
 
 create unique index if not exists restaurantes_slug_unique
   on public.restaurantes(slug)

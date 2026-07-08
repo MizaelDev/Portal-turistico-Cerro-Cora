@@ -53,16 +53,37 @@ export type FoodPlace = {
 };
 
 export type Lodging = {
+  id?: string;
+  slug?: string;
   name: string;
+  category?: string;
   image: string;
+  heroImage?: string;
+  logo?: string;
   gallery: string[];
   description: string;
+  story?: string;
+  mainDifferential?: string;
   whatsapp: string;
+  phone?: string;
+  instagram?: string;
+  instagramUrl?: string;
   location: string;
+  address?: string;
   mapUrl?: string;
   priceRange: string;
   priceDisclaimer?: string;
-  
+  checkIn?: string;
+  checkOut?: string;
+  capacity?: string;
+  accommodationTypes?: string[];
+  paymentMethods?: string[];
+  amenities?: string[];
+  highlights?: string[];
+  acceptsReservations?: boolean;
+  isFeatured?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type HistoryMilestone = {

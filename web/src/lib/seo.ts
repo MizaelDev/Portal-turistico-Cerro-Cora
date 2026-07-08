@@ -202,6 +202,40 @@ export function lodgingsSchema(lodgings: Lodging[]) {
   );
 }
 
+export function lodgingDetailSchema(lodging: Lodging) {
+  const slug = lodging.slug || "";
+  const images = [lodging.heroImage, lodging.image, ...(lodging.gallery || [])].filter(
+    (image): image is string => Boolean(image),
+  );
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: lodging.name,
+    description: lodging.story || lodging.description,
+    image: images.map((image) => (image.startsWith("http") ? image : siteUrl(image))),
+    telephone: lodging.phone || `+${lodging.whatsapp}`,
+    priceRange: lodging.priceRange,
+    url: siteUrl(slug ? `/pousadas/${slug}` : "/pousadas"),
+    sameAs: lodging.instagramUrl ? [lodging.instagramUrl] : undefined,
+    amenityFeature: lodging.amenities?.map((amenity) => ({
+      "@type": "LocationFeatureSpecification",
+      name: amenity,
+      value: true,
+    })),
+    checkinTime: lodging.checkIn || undefined,
+    checkoutTime: lodging.checkOut || undefined,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: lodging.address || lodging.location,
+      addressLocality: "Cerro Corá",
+      addressRegion: "RN",
+      addressCountry: "BR",
+    },
+    hasMap: lodging.mapUrl || undefined,
+  };
+}
+
 export const festivalEventSchema = {
   "@context": "https://schema.org",
   "@type": "Festival",
