@@ -13,12 +13,12 @@ export function SiteFooter() {
             </span>
             <div>
               <p className="font-display text-2xl font-semibold">Cerro Corá</p>
-              <p className="text-sm text-white/70">Portal turístico oficial  </p>
+              <p className="text-sm text-white/70">Portal turístico</p>
             </div>
           </div>
           <p className="max-w-md text-sm leading-7 text-white/72">
-            Um guia digital para descobrir a Suiça do Seridó: natureza, clima frio,
-            gastronomia, hospedagem, cultura e experiências de inverno no RN.
+            Guia digital de Cerro Corá-RN com roteiros, hospedagem,
+            gastronomia, cultura e informações para visitar a cidade.
           </p>
         </div>
         <div>

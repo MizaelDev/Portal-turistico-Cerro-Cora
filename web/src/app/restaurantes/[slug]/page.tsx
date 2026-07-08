@@ -3,19 +3,38 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
-  CalendarCheck2,
+  Accessibility,
+  Baby,
+  Beer,
+  CakeSlice,
+  Car,
   CheckCircle2,
+  ChefHat,
   Clock,
+  Coffee,
   CreditCard,
+  CupSoda,
   ExternalLink,
+  GlassWater,
+  IceCreamBowl,
   Instagram,
   MapPin,
   MessageCircle,
+  Martini,
+  Music,
+  PawPrint,
+  Pizza,
+  Snowflake,
   Sparkles,
+  Sandwich,
+  Soup,
+  Trees,
+  Truck,
   Utensils,
   WalletCards,
+  Wifi,
+  Wine,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -39,6 +58,10 @@ type RestaurantPageProps = {
 
 export const revalidate = 300;
 
+const logoImageSignals = ["logo", "marca", "brand", "avatar", "profile"];
+const fallbackHeroImage =
+  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1800&q=85";
+
 function restaurantSlug(place: FoodPlace) {
   return place.slug || slugify(place.name);
 }
@@ -51,9 +74,113 @@ function restaurantInstagramUrl(place: FoodPlace) {
   return place.instagramUrl || instagramUrlFromHandle(place.instagram);
 }
 
+function isLogoImage(image?: string) {
+  if (!image) return false;
+  const normalized = image.toLowerCase();
+  return logoImageSignals.some((signal) => normalized.includes(signal));
+}
+
+function uniqueImages(images: string[]) {
+  return Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getHeroImage(place: FoodPlace) {
+  const candidates = uniqueImages([...(place.galleryImages || []), place.image]);
+  return candidates.find((image) => !isLogoImage(image)) || fallbackHeroImage;
+}
+
+function getLogoImage(place: FoodPlace) {
+  return place.logo || (isLogoImage(place.image) ? place.image : null);
+}
+
+function getRecommendedImage(place: FoodPlace, heroImage: string) {
+  const candidates = uniqueImages([...(place.galleryImages || []), place.image]);
+  return candidates.find((image) => image !== heroImage && !isLogoImage(image)) || heroImage;
+}
+
 function detailDescription(place: FoodPlace) {
   const specialty = place.specialties?.[0] || place.tags[0] || place.category;
-  return `ConheÃ§a ${place.name} em Cerro CorÃ¡-RN: ${specialty.toLowerCase()}, horÃ¡rios, fotos, localizaÃ§Ã£o e contato para visitantes.`;
+  return `Conheça ${place.name} em Cerro Corá-RN: ${specialty.toLowerCase()}, horários, fotos, localização e contato para visitantes.`;
+}
+
+function formatPriceRange(priceRange?: FoodPlace["priceRange"]) {
+  return priceRange || "R$ - R$$$";
+}
+
+function getOpeningStatus() {
+  return null as { label: string; tone: "open" | "closed" | "neutral" } | null;
+}
+
+type HouseOffering = {
+  label: string;
+  icon: LucideIcon;
+};
+
+const offeringRules: Array<{
+  label: string;
+  icon: LucideIcon;
+  matches: string[];
+}> = [
+  { label: "Wi-Fi", icon: Wifi, matches: ["wi-fi", "wifi", "internet"] },
+  { label: "Delivery", icon: Truck, matches: ["delivery", "entrega"] },
+  { label: "Pizza", icon: Pizza, matches: ["pizza", "pizzas", "pizzaria"] },
+  { label: "Hambúrgueres", icon: Sandwich, matches: ["hamburguer", "hambúrguer", "hamburgueres", "hambúrgueres"] },
+  { label: "Bebidas", icon: CupSoda, matches: ["bebida", "bebidas", "refrigerante", "sucos", "suco"] },
+  { label: "Drinks", icon: Martini, matches: ["drink", "drinks", "coquetel", "bar"] },
+  { label: "Cafés", icon: Coffee, matches: ["cafe", "cafes", "cafeteria", "chocolate quente"] },
+  { label: "Sorvetes/açaí", icon: IceCreamBowl, matches: ["sorvete", "sorvetes", "acai", "açaí"] },
+  { label: "Sobremesas", icon: CakeSlice, matches: ["sobremesa", "sobremesas", "doce", "doces"] },
+  { label: "Pratos", icon: Soup, matches: ["prato", "pratos", "refeicao", "refeição", "almoco", "almoço", "jantar"] },
+  { label: "Petiscos", icon: Utensils, matches: ["petisco", "petiscos", "espetinho"] },
+  { label: "Cervejas", icon: Beer, matches: ["cerveja", "cervejas"] },
+  { label: "Vinhos", icon: Wine, matches: ["vinho", "vinhos"] },
+  { label: "Ambiente climatizado", icon: Snowflake, matches: ["climatizado", "ar condicionado"] },
+  { label: "Ambiente externo", icon: Trees, matches: ["ambiente externo", "area externa", "área externa", "ao ar livre"] },
+  { label: "Música ao vivo", icon: Music, matches: ["musica", "música", "ao vivo"] },
+  { label: "Estacionamento", icon: Car, matches: ["estacionamento"] },
+  { label: "Espaço Kids", icon: Baby, matches: ["kids", "crianca", "criança", "infantil"] },
+  { label: "Pet Friendly", icon: PawPrint, matches: ["pet", "animal"] },
+  { label: "Acessibilidade", icon: Accessibility, matches: ["acessibilidade", "acessivel", "acessível"] },
+  { label: "Vista panorâmica", icon: GlassWater, matches: ["vista", "panoramica", "panorâmica", "mirante"] },
+];
+
+function iconForOffering(label: string) {
+  const normalized = normalizeText(label);
+  return offeringRules.find((rule) => rule.matches.some((match) => normalized.includes(normalizeText(match))))?.icon;
+}
+
+function getHouseOfferings(place: FoodPlace, specialties: string[], features: string[]): HouseOffering[] {
+  const textPool = [...features, ...specialties, ...place.tags, place.category];
+  const offerings = new Map<string, HouseOffering>();
+
+  for (const feature of features) {
+    const label = feature.trim();
+    if (label) {
+      offerings.set(normalizeText(label), {
+        label,
+        icon: iconForOffering(label) || CheckCircle2,
+      });
+    }
+  }
+
+  const normalizedText = textPool.map(normalizeText).join(" ");
+  for (const rule of offeringRules) {
+    if (rule.matches.some((match) => normalizedText.includes(normalizeText(match)))) {
+      offerings.set(normalizeText(rule.label), {
+        label: rule.label,
+        icon: rule.icon,
+      });
+    }
+  }
+
+  return Array.from(offerings.values()).slice(0, 10);
 }
 
 export async function generateStaticParams() {
@@ -67,80 +194,97 @@ export async function generateMetadata({ params }: RestaurantPageProps): Promise
 
   if (!item) {
     return createMetadata({
-      title: "Restaurante nÃ£o encontrado",
+      title: "Restaurante não encontrado",
       path: `/restaurantes/${slug}`,
-      description: "Restaurante nÃ£o encontrado no guia gastronÃ´mico de Cerro CorÃ¡-RN.",
+      description: "Restaurante não encontrado no guia gastronômico de Cerro Corá-RN.",
     });
   }
 
   return createMetadata({
-    title: `${item.name} em Cerro CorÃ¡-RN`,
+    title: `${item.name} em Cerro Corá-RN`,
     path: `/restaurantes/${restaurantSlug(item)}`,
     description: detailDescription(item),
-    image: item.image,
+    image: getHeroImage(item),
   });
 }
 
-function InfoItem({
+function SectionShell({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid content-start gap-5">
+      <div className="max-w-2xl">
+        {eyebrow ? (
+          <span className="text-xs font-semibold uppercase tracking-[0.28em] text-alpine-wine">{eyebrow}</span>
+        ) : null}
+        <h2 className="mt-2 font-display text-3xl font-semibold leading-tight md:text-4xl">{title}</h2>
+        {description ? <p className="mt-3 leading-7 text-muted-foreground">{description}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function InfoCard({
   icon: Icon,
   label,
   value,
   href,
+  helper,
 }: {
   icon: LucideIcon;
   label: string;
   value?: string | null;
   href?: string;
+  helper?: string | null;
 }) {
   if (!value) return null;
 
-  const content = (
+  const inner = (
     <>
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-alpine-wine" />
-      <span>
-        <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          {label}
-        </span>
-        <span className="mt-1 block leading-6 text-foreground">{value}</span>
-      </span>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-accent/55 text-alpine-wine">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+        <p className="mt-1 break-words text-sm font-semibold leading-6 text-foreground">{value}</p>
+        {helper ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{helper}</p> : null}
+      </div>
     </>
   );
 
+  const className =
+    "flex min-h-24 gap-3 rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-premium";
+
   if (href) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex gap-3 rounded-md border border-border bg-background/55 p-3 text-sm transition-colors hover:border-primary/40 hover:bg-accent/60"
-      >
-        {content}
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {inner}
       </a>
     );
   }
 
-  return <div className="flex gap-3 rounded-md border border-border bg-background/55 p-3 text-sm">{content}</div>;
+  return <div className={className}>{inner}</div>;
 }
 
-function DetailSection({
-  title,
-  eyebrow,
-  children,
-}: {
-  title: string;
-  eyebrow?: string;
-  children: ReactNode;
-}) {
+function OfferingPill({ offering }: { offering: HouseOffering }) {
+  const Icon = offering.icon;
+
   return (
-    <section className="grid gap-5">
-      <div>
-        {eyebrow ? (
-          <span className="text-xs font-semibold uppercase tracking-[0.28em] text-alpine-wine">{eyebrow}</span>
-        ) : null}
-        <h2 className="mt-2 font-display text-3xl font-semibold md:text-4xl">{title}</h2>
-      </div>
-      {children}
-    </section>
+    <span className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-semibold text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/20">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-alpine-wine">
+        <Icon className="h-4 w-4" />
+      </span>
+      {offering.label}
+    </span>
   );
 }
 
@@ -153,208 +297,228 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
   }
 
   const mapUrl = restaurantMapUrl(place);
-  const instagramUrl = restaurantInstagramUrl(place);
-  const galleryImages = [place.image, ...(place.galleryImages || [])].filter(Boolean);
+  const instagramUrl = place.instagram ? restaurantInstagramUrl(place) : null;
+  const heroImage = getHeroImage(place);
+  const logoImage = getLogoImage(place);
+  const recommendedImage = getRecommendedImage(place, heroImage);
+  const galleryImages = uniqueImages(place.galleryImages || []).filter((image) => image !== logoImage);
   const specialties = place.specialties?.length ? place.specialties : place.tags;
   const features = place.features || [];
+  const houseOfferings = getHouseOfferings(place, specialties, features);
   const paymentMethods = place.paymentMethods || [];
+  const openingStatus = getOpeningStatus();
+  const priceRange = formatPriceRange(place.priceRange);
 
   return (
     <>
       <JsonLd data={restaurantDetailSchema({ ...place, slug: restaurantSlug(place) })} />
 
-      <section className="relative min-h-[68vh] overflow-hidden bg-[#10201b] text-white">
-        <Image
-          src={place.image}
-          alt={`Foto de ${place.name}`}
-          fill
-          sizes="100vw"
-          priority
-          className="object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/78 via-black/48 to-black/16" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0c1814] via-transparent to-transparent" />
+      <section className="relative overflow-hidden border-b border-border bg-[#10201b] text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(234,169,90,0.10),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_55%)]" />
+        <div className="container relative z-10 grid min-h-[280px] content-center py-14 md:min-h-[340px] md:py-16">
+          <div className="mx-auto grid max-w-4xl justify-items-center gap-4 text-center md:gap-5">
+            {logoImage ? (
+              <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2.5 shadow-glass ring-1 ring-black/5 md:h-28 md:w-28 md:p-3">
+                <Image
+                  src={logoImage}
+                  alt={`Logo de ${place.name}`}
+                  fill
+                  sizes="(min-width: 768px) 112px, 80px"
+                  className="object-contain p-2"
+                />
+              </div>
+            ) : null}
 
-        <div className="container relative z-10 flex min-h-[68vh] items-end py-16">
-          <div className="max-w-3xl">
-            <Button asChild variant="glass" size="sm" className="mb-8">
-              <Link href="/gastronomia">
-                <ArrowLeft className="h-4 w-4" /> Voltar para Gastronomia
-              </Link>
-            </Button>
-
-            <div className="flex flex-wrap gap-2">
-              <Badge className="border-white/20 bg-white/15 text-white backdrop-blur-md">{place.category}</Badge>
-              {place.priceRange ? (
-                <Badge className="border-white/20 bg-white/15 text-white backdrop-blur-md">{place.priceRange}</Badge>
-              ) : null}
-              {place.isFeatured ? (
-                <Badge className="border-alpine-sunset/40 bg-alpine-sunset text-[#17251f]">Destaque</Badge>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">{place.category}</Badge>
+              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">{priceRange}</Badge>
+              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">
+                <MapPin className="h-3.5 w-3.5" /> {place.locationLabel || place.location}
+              </Badge>
+              {openingStatus ? (
+                <Badge className="border-primary/30 bg-primary/20 text-white backdrop-blur-md">
+                  {openingStatus.label}
+                </Badge>
               ) : null}
             </div>
 
-            <h1 className="mt-5 font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{place.name}</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/82">
-              {place.locationLabel || place.location} em Cerro CorÃ¡, com informaÃ§Ãµes de contato, horÃ¡rios e dicas para
-              quem visita a cidade.
-            </p>
+            <h1 className="font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{place.name}</h1>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Button asChild variant="warm" size="lg">
-                <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
-                </a>
-              </Button>
-              <Button asChild variant="glass" size="lg">
-                <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
-                  <Instagram className="h-4 w-4" /> Instagram
-                </a>
-              </Button>
-              <Button asChild variant="glass" size="lg">
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
-                  <MapPin className="h-4 w-4" /> Como chegar
-                </a>
-              </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              {specialties.slice(0, 3).map((specialty) => (
+                <Badge key={specialty} className="border-white/15 bg-black/20 text-white/88 backdrop-blur-md">
+                  <Utensils className="h-3.5 w-3.5" /> {specialty}
+                </Badge>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      <main className="container grid gap-16 py-16">
-        <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <DetailSection title="Sobre o restaurante" eyebrow="ExperiÃªncia">
-            <Card>
-              <CardContent className="grid gap-6 p-6 md:p-8">
-                <p className="text-base leading-8 text-muted-foreground">{place.story || place.description}</p>
+      <main className="container grid gap-10 py-12 md:gap-12 md:py-14">
+        {(place.recommendedDish || place.firstVisitTip) ? (
+          <Card className="overflow-hidden border-alpine-sunset/30 bg-card shadow-premium">
+            <CardContent className="grid gap-0 p-0 md:grid-cols-[220px_1fr_auto] md:items-center">
+              <div className="relative aspect-[4/3] min-h-44 bg-muted md:aspect-auto md:h-full">
+                <Image
+                  src={recommendedImage}
+                  alt={`Sugestão da casa em ${place.name}`}
+                  fill
+                  sizes="(min-width: 768px) 220px, 100vw"
+                  className="object-cover"
+                />
+              </div>
+              <div className="p-5 md:p-6">
+                <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-alpine-wine">
+                  <ChefHat className="h-4 w-4" /> Prato recomendado
+                </span>
+                <h2 className="mt-3 font-display text-2xl font-semibold md:text-3xl">
+                  {place.recommendedDish || "Sugestão da casa"}
+                </h2>
+                {place.firstVisitTip ? (
+                  <p className="mt-2 max-w-2xl leading-7 text-muted-foreground">{place.firstVisitTip}</p>
+                ) : null}
+              </div>
+              <div className="px-5 pb-5 md:px-6 md:pb-0">
+                <Button asChild variant="warm">
+                  <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
+                    Chamar no WhatsApp <MessageCircle className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
-                {specialties.length ? (
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                      Especialidades da casa
-                    </h3>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {specialties.map((specialty) => (
-                        <Badge key={specialty} className="bg-background/70">
-                          <Utensils className="h-3.5 w-3.5" /> {specialty}
-                        </Badge>
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+          <SectionShell title="Sobre o restaurante" eyebrow="Experiência gastronômica">
+            <Card>
+              <CardContent className="grid gap-5 p-5 md:p-6">
+                <p className="max-w-3xl text-base leading-8 text-muted-foreground">
+                  {place.story || place.description}
+                </p>
+
+                {houseOfferings.length ? (
+                  <div className="grid gap-3 border-t border-border pt-5">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                        A casa oferece
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                        Estrutura e opções que ajudam a escolher a melhor parada para o seu roteiro.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      {houseOfferings.map((offering) => (
+                        <OfferingPill key={offering.label} offering={offering} />
                       ))}
                     </div>
                   </div>
                 ) : null}
               </CardContent>
             </Card>
-          </DetailSection>
+          </SectionShell>
 
-          <DetailSection title="InformaÃ§Ãµes Ãºteis" eyebrow="Planeje a visita">
-            <Card>
-              <CardContent className="grid gap-3 p-5">
-                <InfoItem icon={Clock} label="HorÃ¡rio" value={place.hours} />
-                <InfoItem icon={MapPin} label="EndereÃ§o" value={place.address || place.location} href={mapUrl} />
-                <InfoItem icon={MessageCircle} label="WhatsApp" value={place.phone || `+${place.whatsapp}`} href={`https://wa.me/${place.whatsapp}`} />
-                <InfoItem icon={Instagram} label="Instagram" value={place.instagram} href={instagramUrl} />
-                <InfoItem icon={WalletCards} label="Faixa de preÃ§o" value={place.priceRange || "Consulte valores"} />
-              </CardContent>
-            </Card>
-          </DetailSection>
+          <SectionShell title="Informações úteis" eyebrow="Planeje a visita">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <InfoCard
+                icon={Clock}
+                label="Horário"
+                value={place.hours}
+                helper={openingStatus?.label || "Confirme o horário com o estabelecimento antes de sair."}
+              />
+              <InfoCard icon={WalletCards} label="Faixa de preço" value={priceRange} />
+              <InfoCard icon={MapPin} label="Endereço" value={place.address || place.location} href={mapUrl} />
+              <InfoCard
+                icon={MessageCircle}
+                label="WhatsApp"
+                value={place.phone || `+${place.whatsapp}`}
+                href={`https://wa.me/${place.whatsapp}`}
+              />
+              <InfoCard icon={Instagram} label="Instagram" value={place.instagram} href={instagramUrl || undefined} />
+              {paymentMethods.length ? (
+                <InfoCard icon={CreditCard} label="Pagamento" value={paymentMethods.join(", ")} />
+              ) : null}
+            </div>
+          </SectionShell>
         </div>
 
-        {(paymentMethods.length || features.length) ? (
-          <section className="grid gap-5 md:grid-cols-2">
-            {paymentMethods.length ? (
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3">
-                    <CreditCard className="h-5 w-5 text-alpine-wine" />
-                    <h2 className="font-display text-2xl font-semibold">Formas de pagamento</h2>
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {paymentMethods.map((method) => (
-                      <Badge key={method} className="bg-background/70">
-                        {method}
-                      </Badge>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-
-            {features.length ? (
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-alpine-wine" />
-                    <h2 className="font-display text-2xl font-semibold">Diferenciais</h2>
-                  </div>
-                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                    {features.map((feature) => (
-                      <span key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CheckCircle2 className="h-4 w-4 text-primary" /> {feature}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-          </section>
+        {galleryImages.length ? (
+          <SectionShell
+            title="Fotos do restaurante"
+            eyebrow="Ambiente e pratos"
+            description="Imagens cadastradas pelo estabelecimento para ajudar na escolha da visita."
+          >
+            <RestaurantGallery images={galleryImages} name={place.name} />
+          </SectionShell>
         ) : null}
 
-        <DetailSection title="Galeria" eyebrow="Ambiente e pratos">
-          <RestaurantGallery images={galleryImages} name={place.name} />
-        </DetailSection>
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          {(place.recommendedDish || place.firstVisitTip) ? (
-            <Card className="border-alpine-sunset/30 bg-alpine-sunset/10">
-              <CardContent className="grid gap-4 p-6">
-                <div className="flex items-center gap-3">
-                  <Sparkles className="h-5 w-5 text-alpine-sunset" />
-                  <h2 className="font-display text-2xl font-semibold">RecomendaÃ§Ã£o da casa</h2>
-                </div>
-                {place.recommendedDish ? (
-                  <p className="text-lg font-semibold">{place.recommendedDish}</p>
-                ) : null}
-                {place.firstVisitTip ? (
-                  <p className="leading-7 text-muted-foreground">{place.firstVisitTip}</p>
-                ) : null}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card>
-            <CardContent className="grid gap-5 p-6">
+        <Card>
+          <CardContent className="grid gap-6 p-6 md:grid-cols-[1fr_auto] md:items-center md:p-8">
+            <div>
               <div className="flex items-center gap-3">
                 <MapPin className="h-5 w-5 text-alpine-wine" />
-                <h2 className="font-display text-2xl font-semibold">Mapa e cardÃ¡pio</h2>
+                <h2 className="font-display text-2xl font-semibold">{place.menuUrl ? "Mapa e cardápio" : "Mapa"}</h2>
               </div>
-              <p className="leading-7 text-muted-foreground">
-                Para manter a pÃ¡gina leve, o mapa abre direto no Google Maps em uma nova aba.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button asChild variant="outline">
-                  <a href={mapUrl} target="_blank" rel="noopener noreferrer">
-                    Abrir no Google Maps <ExternalLink className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button asChild variant="outline">
+                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                  Abrir no Google Maps <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+              {place.menuUrl ? (
+                <Button asChild variant="warm">
+                  <a href={place.menuUrl} target="_blank" rel="noopener noreferrer">
+                    Ver cardápio <ArrowRight className="h-4 w-4" />
                   </a>
                 </Button>
-                {place.menuUrl ? (
-                  <Button asChild variant="warm">
-                    <a href={place.menuUrl} target="_blank" rel="noopener noreferrer">
-                      Ver cardÃ¡pio <CalendarCheck2 className="h-4 w-4" />
-                    </a>
-                  </Button>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <section className="overflow-hidden rounded-xl border border-border bg-[#10201b] text-white shadow-premium">
+          <div className="grid gap-6 p-6 md:grid-cols-[1fr_auto] md:items-center md:p-8">
+            <div>
+              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.28em] text-alpine-sunset">
+                <Sparkles className="h-4 w-4" /> Gostou deste restaurante?
+              </span>
+              <h2 className="mt-3 font-display text-3xl font-semibold">Entre em contato com o restaurante.</h2>
+              <p className="mt-3 max-w-2xl leading-7 text-white/72">
+                Fale com o estabelecimento, veja a rota no mapa ou acompanhe as novidades pelo Instagram.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
+              <Button asChild variant="warm">
+                <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
+                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                </a>
+              </Button>
+              <Button asChild variant="glass">
+                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-4 w-4" /> Como chegar
+                </a>
+              </Button>
+              {instagramUrl ? (
+                <Button asChild variant="glass">
+                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                    <Instagram className="h-4 w-4" /> Instagram
+                  </a>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </section>
 
         {related.length ? (
-          <DetailSection title="Restaurantes relacionados" eyebrow="Veja tambÃ©m">
+          <SectionShell title="Conheça também" eyebrow="Restaurantes relacionados">
             <div className="grid items-stretch gap-6 md:grid-cols-2 lg:grid-cols-3">
               {related.map((relatedPlace) => (
                 <FoodCard key={restaurantSlug(relatedPlace)} place={relatedPlace} />
               ))}
             </div>
-          </DetailSection>
+          </SectionShell>
         ) : null}
 
         <div className="flex justify-center">

@@ -26,7 +26,7 @@ export default async function LodgingsPage() {
         eyebrow="Hospedagem"
         as="h1"
         title="Pousadas e chalés em Cerro Corá"
-        description="Cards com reserva por WhatsApp, galeria, localização e faixa de preço para você planejar sua estadia."
+        description="Hospedagens com fotos, WhatsApp, localização e faixa de preço para organizar sua estadia."
       />
 
       {error ? (

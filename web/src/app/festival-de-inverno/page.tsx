@@ -65,8 +65,8 @@ export default function FestivalPage() {
               XXII Festival de Inverno de Cerro Corá
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-white/78">
-              De 07 a 09 de agosto, a Praça Pública recebe grandes atrações, música regional,
-              gastronomia e o clima frio da Suíça do Seridó.
+              De 07 a 09 de agosto, a Praça Pública recebe shows, artistas regionais,
+              comidas e bebidas em uma das noites mais aguardadas da cidade.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-2 rounded-md border border-white/20 bg-white/12 px-4 py-2 text-sm font-semibold backdrop-blur">
@@ -108,7 +108,7 @@ export default function FestivalPage() {
           <SectionHeader
             eyebrow="Área gastronômica"
             title="Sabores para acompanhar as noites frias"
-            description="A Praça Pública também recebe opções de comida e bebida para quem quer curtir o festival com conforto."
+            description="Comidas, bebidas quentes e opções regionais para quem vai acompanhar os shows na Praça Pública."
           />
           <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {foodHighlights.map((item) => (
@@ -132,7 +132,7 @@ export default function FestivalPage() {
             className="mb-8 text-left"
             eyebrow="Mapa do evento"
             title="Chegue sem complicação"
-            description="Mapa preparado para localizar a Praça Pública e facilitar o acesso ao festival."
+            description="Localização da Praça Pública para abrir a rota no celular."
           />
           <MapEmbed title="Mapa do Festival de Inverno" />
         </div>
@@ -140,8 +140,8 @@ export default function FestivalPage() {
           <SectionHeader
             className="mb-8 text-left"
             eyebrow="Galeria"
-            title="Memórias do inverno"
-            description="Galeria visual para valorizar público, shows, gastronomia e o clima da cidade."
+            title="Fotos da cidade"
+            description="Registros de eventos, cafés, paisagens e pontos conhecidos de Cerro Corá."
           />
           <PhotoGallery />
         </div>
@@ -154,7 +154,7 @@ export default function FestivalPage() {
               <MapPinned className="h-4 w-4" /> Turismo e eventos
             </p>
             <h2 className="mt-3 font-display text-3xl font-semibold">
-              Quer participar ou tirar dúvidas?
+              Quer tirar dúvidas sobre o festival?
             </h2>
           </div>
           <Button asChild variant="warm" size="lg">

@@ -48,6 +48,7 @@ export type RestauranteRow = {
   categoria: RestauranteCategory;
   horario_funcionamento: string;
   endereco: string;
+  localizacao_resumida?: string | null;
   mapa_url: string | null;
   instagram: string | null;
   instagram_url: string | null;

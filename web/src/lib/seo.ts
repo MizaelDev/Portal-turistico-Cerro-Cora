@@ -10,7 +10,7 @@ type SeoInput = {
 };
 
 const defaultDescription =
-  "Portal turístico de Cerro Corá, RN: a Suiça do Seridó, com atrativos naturais, pousadas, gastronomia, festival de inverno e experiências serranas.";
+  "Portal turístico de Cerro Corá-RN, a Suíça do Seridó, com roteiros, pousadas, gastronomia e Festival de Inverno.";
 
 export function createMetadata({
   title,
@@ -20,7 +20,7 @@ export function createMetadata({
 }: SeoInput = {}): Metadata {
   const pageTitle = title
     ? `${title} | Cerro Corá Turismo`
-    : "Cerro Corá Turismo | Suiça do Seridó";
+    : "Cerro Corá Turismo | Suíça do Seridó";
 
   return {
     metadataBase: new URL(siteUrl("/")),
@@ -53,7 +53,7 @@ export function createMetadata({
     },
     keywords: [
       "Cerro Corá RN",
-      "Suiça do Seridó",
+      "Suíça do Seridó",
       "turismo no Rio Grande do Norte",
       "Festival de Inverno Cerro Corá",
       "Turismo em Cerro Corá",
@@ -70,7 +70,7 @@ export const tourismSchema = {
   "@context": "https://schema.org",
   "@type": "TouristDestination",
   name: "Cerro Corá",
-  alternateName: "Suiça do Seridó",
+  alternateName: "Suíça do Seridó",
   description: defaultDescription,
   address: {
     "@type": "PostalAddress",
@@ -172,7 +172,7 @@ export function restaurantDetailSchema(place: FoodPlace) {
     address: {
       "@type": "PostalAddress",
       streetAddress: place.address || place.location,
-      addressLocality: "Cerro CorÃ¡",
+      addressLocality: "Cerro Corá",
       addressRegion: "RN",
       addressCountry: "BR",
     },

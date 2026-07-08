@@ -124,7 +124,7 @@ export const attractions: Attraction[] = [
     image:
       "/images/nascente.jpg",
     description:
-      "Experiência de natureza e educação ambiental no ponto de origem de um dos rios mais importantes do RN.",
+      "Visita ao ponto de origem de um dos rios mais importantes do RN, com contato direto com a natureza.",
     location: "Zona rural de Cerro Corá",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Nascente%20do%20Rio%20Potengi%20Zona%20rural%20de%20Cerro%20Cor%C3%A1%20Cerro%20Cora%20RN",
     infoUrl: "https://pt.wikipedia.org/wiki/Rio_Potengi",
@@ -132,11 +132,11 @@ export const attractions: Attraction[] = [
   },
   {
     slug: "vale-vulcanico",
-    name: "Vale Vulcanico",
+    name: "Vale Vulcânico",
     image:
       "/images/vale-vulcanico.jpg",
     description:
-      "Formações rochosas, trilhas e paisagens dramáticas que revelam a personalidade geológica da serra.",
+      "Formações rochosas, trilhas e paisagens abertas que mostram a geologia da região serrana.",
     location: "Região serrana",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Vale%20Vulcanico%20Regi%C3%A3o%20serrana%20Cerro%20Cora%20RN",
     infoUrl: "https://www.google.com/search?q=Vale+Vulcanico+Cerro+Cora+RN",
@@ -184,7 +184,7 @@ export const attractions: Attraction[] = [
     image:
       "/images/pinturas.jpg",
     description:
-      "Patrimônio arqueologico com registros visuais antigos, indicado para visitas guiadas e educativas.",
+      "Patrimônio arqueológico com registros antigos, indicado para visitas guiadas e educativas.",
     location: "Sítios arqueológicos da região",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pinturas%20Rupestres%20Sítios%20arqueológicos%20da%20regi%C3%A3o%20Cerro%20Cora%20RN",
     infoUrl: "https://pt.wikipedia.org/wiki/Arte_rupestre",
@@ -196,7 +196,7 @@ export const attractions: Attraction[] = [
     image:
       "/images/casa-grande.jpg",
     description:
-      "Construção histórica que preserva a arquitetura e a memória cultural de Cerro Corá, sendo um marco tradicional da cidade.",
+      "Construção histórica ligada à arquitetura antiga e à memória cultural de Cerro Corá.",
     location: "Centro da cidade",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Casa%20Grande%20/%20Casar%C3%A3o%20Centen%C3%A1rio%20Centro%20da%20cidade%20Cerro%20Cora%20RN",
     infoUrl: "https://www.google.com/search?q=Casa+Grande+Casar%C3%A3o+Centen%C3%A1rio+Cerro+Cora+RN",
@@ -214,9 +214,9 @@ export const foodPlaces: FoodPlace[] = [
       "/images/logo-bistro.jpeg",
     logo: "/images/logo-bistro.jpeg",
     galleryImages: [
-      "/images/logo-bistro.jpeg",
-      "/images/encontro.webp",
       "https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=1200&q=85",
+      "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1200&q=85",
+      "/images/logo-bistro.jpeg",
     ],
     description: "Cozinha regional autoral, massas e pratos quentes para noites frias.",
     story:
@@ -239,12 +239,12 @@ export const foodPlaces: FoodPlace[] = [
     isFeatured: true,
   },
   {
-    name: "Suiça da Serra",
+    name: "Suíça da Serra",
     category: "Restaurante",
     tags: ["Hambúrguer", "Sobremesas", "Jantar", "Pratos completos","Pizza","Delivery"],
     image:
       "/banners/suica.jpg",
-    description: "Pratos completos, hambúrgueres, sobremesas e pizza",
+    description: "Pratos completos, hambúrgueres, pizzas e sobremesas.",
     hours: "Ter. a dom.: 18h às 22h",
     whatsapp: "5584999991002",
     instagram: "@restaurantesuicadaserra",
@@ -264,7 +264,7 @@ export const foodPlaces: FoodPlace[] = [
       "/pousadas/POUSADA-MIRANTE/mirante-4.jpg",
       "/pousadas/POUSADA-MIRANTE/mirante-2.jpg",
     ],
-    description: "Pratos completos, hambúrgueres, sobremesas.",
+    description: "Petiscos, almoço e pratos regionais com vista para a área rural.",
     story:
       "Restaurante com proposta de passeio gastronômico, combinando vista, área rural e clima de descanso para quem visita Cerro Corá.",
     hours: "Sab, Dom e feriados - 11h às 17h",
@@ -290,7 +290,7 @@ export const foodPlaces: FoodPlace[] = [
     tags: ["Petiscos", "Bar", "Jantar", "Pratos regionais"],
     image:
       "/banners/nordestino.jpg",
-    description: "Pratos completos, petiscos e bebidas.",
+    description: "Petiscos, pratos regionais e bebidas para o fim de tarde.",
     hours: "Seg. a dom.: 17h às 22h",
     whatsapp: "5584999991002",
     instagram: "@nordestinobarepetiscarias",
@@ -318,7 +318,7 @@ export const foodPlaces: FoodPlace[] = [
     tags: ["Almoço", "Galinha caipira", "Pratos regionais"],
     image:
       "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=85",
-    description: "Pratos completos, hambúrgueres, sobremesas.",
+    description: "Almoço regional com galinha caipira e acompanhamentos.",
     hours: "Seg. a sáb.: 10h30 às 22h",
     whatsapp: "5584999991002",
     instagram: "@brasadoserido",
@@ -339,10 +339,10 @@ export const foodPlaces: FoodPlace[] = [
       "/pousadas/aroeiras/aroeiras-2.jpg",
       "/pousadas/aroeiras/aroeiras-3.jpg",
     ],
-    description: "Pratos completos, jantar, eventos e almoço",
+    description: "Almoço regional, jantar e eventos em área verde.",
     story:
-      "Espaço com área verde e proposta de permanência, indicado para almoço, descanso e experiências gastronômicas em clima de serra.",
-    hours: "Qua á Sab: 11h30 14h00 - Dom: 11h30 ás 15h",
+      "Área verde com restaurante, indicada para almoço, encontros e descanso durante a visita.",
+    hours: "Qua. a sáb.: 11h30 às 14h | Dom.: 11h30 às 15h",
     whatsapp: "5584999991002",
     phone: "(84) 99999-1002",
     instagram: "@parquedasaroeirasrn",
@@ -356,17 +356,17 @@ export const foodPlaces: FoodPlace[] = [
     features: ["Área verde", "Estacionamento", "Hospedagem no local", "Eventos"],
     specialties: ["Almoço regional", "Pratos completos", "Jantar"],
     recommendedDish: "Almoço regional da casa",
-    firstVisitTip: "Boa opção para quem quer comer sem pressa e aproveitar uma área mais verde.",
+    firstVisitTip: "Boa opção para almoço em família e pausa entre os passeios.",
     isFeatured: true,
   },
   {
-    name: "Kiosque do magão",
+    name: "Kiosque do Magão",
     category: "Hamburgueria",
     tags: ["Hambúrguer", "Lanches", "Jantar", "Delivery"],
     image:
       "/banners/magao.jpg",
     description: "Hambúrgueres artesanais, molhos da casa e batatas rústicas.",
-    hours: "Qua á dom, 18h ás 00h",
+    hours: "Qua. a dom.: 18h às 00h",
     whatsapp: "5584999991003",
     instagram: "@kiosquedomagaooficial",
     instagramUrl: "https://www.instagram.com/kiosquedomagaooficial/",
@@ -379,8 +379,8 @@ export const foodPlaces: FoodPlace[] = [
     tags: ["Hambúrguer", "Lanches", "Jantar","Delivery","Açai","Pizza"],
     image:
       "/images/encontro.webp",
-    description: "Hambúrgueres artesanais, molhos da casa, pizzas, açai e sorvetes",
-    hours: "Ter á Dom, 15:00 ás 22h",
+    description: "Hambúrgueres, pizzas, açaí e sorvetes para lanche ou jantar.",
+    hours: "Ter. a dom.: 15h às 22h",
     whatsapp: "5584999991003",
     instagram: "@encontrodosamigoscc",
     instagramUrl: "https://www.instagram.com/encontrodosamigoscc/",
@@ -394,8 +394,8 @@ export const foodPlaces: FoodPlace[] = [
     tags: ["Café", "Sobremesas", "Chocolate quente", "Vista"],
     image:
       "/banners/cafe.jpg",
-    description: "Cafés especiais, chocolate quente, bolos e vista para o açude elói de Souza.",
-    hours: "Todos os dias, 7h ás 20h",
+    description: "Cafés, chocolate quente, bolos e vista para o açude Elói de Souza.",
+    hours: "Todos os dias: 7h às 20h",
     whatsapp: "5584999991004",
     instagram: "@cafebougainville_",
     instagramUrl: "https://www.instagram.com/cafebougainville_/",
@@ -408,8 +408,8 @@ export const foodPlaces: FoodPlace[] = [
     tags: ["Pizza", "Jantar", "Restaurante", "Pousada","Almoço"],
     image:
       "/banners/pousada.jpg",
-    description: "Pizzas, massas, jantar, almoço",
-    hours: "Qui á dom, 18h ás 23h30",
+    description: "Pizzas, massas, jantar e almoço em anexo à pousada.",
+    hours: "Qui. a dom.: 18h às 23h30",
     whatsapp: "5584999991005",
     instagram: "@seridopousadaerestaurante",
     instagramUrl: "https://www.instagram.com/seridopousadaerestaurante/",
@@ -428,7 +428,7 @@ export const lodgings: Lodging[] = [
   "/pousadas/POUSADA-SUICA-DO-SERIDO/serido-4.jpg",
 ],
     description:
-      "Tradição e praticidade no coração de Cerro Corá. Uma hospedagem completa com quartos confortáveis e um restaurante pronto para te servir ",
+      "Hospedagem no centro de Cerro Corá, com quartos confortáveis e restaurante no local.",
     whatsapp: "5584999992001",
     location: "Próximo ao centro",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pousada%20e%20Restaurante%20Serid%C3%B3%20Próximo%20ao%20centro%20Cerro%20Cora%20RN",
@@ -446,7 +446,7 @@ gallery: [
   "/pousadas/COLINA-DOS-Flamboyant/colina-flanboyants-4.jpg",
     ],
     description:
-      "Onde o charme serrano encontra a alta gastronomia. A Colina oferece uma experiência exclusiva em Cerro Corá, unindo hospedagem de alto padrão a um restaurante no próprio local. Desfrute de jardins amplos e pratos inesquecíveis em um cenário paradisíaco.",
+      "Hospedagem em área rural, com jardins amplos, quartos confortáveis e restaurante no próprio local.",
     whatsapp: "5584999992002",
     location: "Área Rural - 0,6km do centro",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Colina%20dos%20Flamboyants%20Area%20Rural%20-%200%2C6km%20do%20centro%20Cerro%20Cora%20RN",
@@ -463,7 +463,7 @@ gallery: [
       "/pousadas/POUSADA-TETE/tete-5.jpg",
     ],
     description:
-      "Hospedagem familiar no centro de Cerro Corá. Com serviço completo de restaurante e pizzaria, a escolha estratégica para quem busca conforto e praticidade durante o Festival de Inverno ou a passeio.",
+      "Hospedagem familiar próxima ao centro, com restaurante e pizzaria para quem visita a cidade a passeio ou em eventos.",
     whatsapp: "5584999992003",
     location: "Próximo ao centro",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pousada%20do%20Tet%C3%A9%20Pr%C3%B3ximo%20ao%20centro%20Cerro%20Cora%20RN",
@@ -480,7 +480,7 @@ gallery: [
       "/pousadas/aroeiras/aroeiras-4.jpg",
     ],
     description:
-      "Seu refúgio natural no centro de Cerro Corá. No Parque das Aroeiras, você desfruta de quartos aconchegantes e restaurante no local, unindo a praticidade da localização central ao charme de um espaço cercado de verde e tranquilidade.",
+      "Hospedagem com área verde e restaurante, próxima ao centro e adequada para quem busca praticidade.",
     whatsapp: "5584999992003",
     location: "Próximo ao centro",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Parque%20das%20Aroeiras%20Pr%C3%B3ximo%20ao%20centro%20Cerro%20Cora%20RN",
@@ -497,7 +497,7 @@ gallery: [
       "/pousadas/POUSADA-MIRANTE/mirante-1.jpg",
     ],
     description:
-      "Hospedagem com vista panorâmica para o mirante de Cerro Corá. Gastronomia regional, petiscos e o silêncio restaurador.",
+      "Hospedagem com vista para a região do mirante, gastronomia regional e ambiente tranquilo.",
     whatsapp: "5584999992003",
     location: "Rota da nascente",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pousada%20Mirante%20Rota%20da%20nascente%20Cerro%20Cora%20RN",
@@ -514,7 +514,7 @@ gallery: [
       "https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=900&q=85",
     ],
     description:
-      "Pousada no centro da cidade",
+      "Pousada simples no centro da cidade, próxima a serviços e pontos de apoio.",
     whatsapp: "5584999992003",
     location: "Rota da nascente",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pousada%20Central%20Rota%20da%20nascente%20Cerro%20Cora%20RN",
@@ -531,7 +531,7 @@ gallery: [
       "/pousadas/Plato/plato-4.jpg",
     ],
     description:
-      "Chalés confortáveis com vista panorâmica, ideal para relaxar e aproveitar o clima serrano.",
+      "Chalés com vista para a serra, indicados para descanso e contato com o clima serrano.",
     whatsapp: "5584999992003",
     location: "Rota da nascente",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Pousada%20Plat%C3%B4%20da%20Nascente%20Rota%20da%20nascente%20Cerro%20Cora%20RN",
@@ -612,7 +612,7 @@ export const homeHighlights = [
     title: "Eventos",
     href: "/festival-de-inverno",
     icon: CalendarDays,
-    description: "Festival de inverno, música, cultura e experiências sazonais.",
+    description: "Festival de Inverno, música, cultura e programação na Praça Pública.",
   },
 ];
 
@@ -667,16 +667,16 @@ export const climateMonths: ClimateMonth[] = [
 export const cityFacts = [
   {
     title: "Apelido turístico",
-    value: "Suiça do Seridó",
+    value: "Suíça do Seridó",
     description:
-      "A identidade turística destaca clima de serra, altitude, natureza e atmosfera acolhedora.",
+      "A identidade turística destaca clima de serra, altitude, natureza e acolhimento local.",
     icon: Mountain,
   },
   {
     title: "Temperatura média",
-    value: "18-32C",
+    value: "18-32°C",
     description:
-      "As médias mensais ficam mais baixas entre junho e agosto, periodo associado ao clima de inverno.",
+      "As médias mensais ficam mais baixas entre junho e agosto, período associado ao clima de inverno.",
     icon: ThermometerSun,
   },
   {

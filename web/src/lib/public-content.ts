@@ -31,7 +31,7 @@ const lodgingColumns =
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const extendedRestaurantColumns =
-  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
+  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
 
 function logPublicContentError(scope: string, error: unknown) {
   if (process.env.NODE_ENV !== "production") {
@@ -137,11 +137,11 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
     hours: row.horario_funcionamento,
     whatsapp: row.whatsapp,
     phone: row.telefone || undefined,
-    instagram: row.instagram || "@instagram",
+    instagram: row.instagram || "",
     instagramUrl: row.instagram_url || undefined,
     location: row.endereco,
     address: row.endereco,
-    locationLabel: row.endereco,
+    locationLabel: row.localizacao_resumida || row.endereco,
     mapUrl: row.mapa_url || undefined,
     menuUrl: row.cardapio_url || undefined,
     priceRange: row.faixa_preco || undefined,

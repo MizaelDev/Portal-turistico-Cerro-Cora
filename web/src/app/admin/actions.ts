@@ -53,6 +53,37 @@ const optionalPathOrUrl = z
     "Use uma URL completa ou um caminho iniciado com /.",
   );
 
+const slugSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .refine(
+    (value) => !value || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value),
+    "Use um slug amigável, apenas com letras minúsculas, números e hífens. Ex: acai-bistro.",
+  );
+
+const optionalInstagramUrl = optionalUrl.refine(
+  (value) => {
+    if (!value) return true;
+    try {
+      return new URL(value).hostname.replace(/^www\./, "") === "instagram.com";
+    } catch {
+      return false;
+    }
+  },
+  "Use um link válido do Instagram.",
+);
+
+const optionalGoogleMapsUrl = optionalUrl.refine((value) => {
+  if (!value) return true;
+  try {
+    const hostname = new URL(value).hostname.replace(/^www\./, "");
+    return hostname === "google.com" || hostname.endsWith(".google.com") || hostname === "maps.app.goo.gl";
+  } catch {
+    return false;
+  }
+}, "Use um link válido do Google Maps.");
+
 const whatsappSchema = z
   .string()
   .trim()
@@ -83,15 +114,16 @@ const pousadaSchema = z.object({
 
 const restauranteSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
-  slug: z.string().trim().nullable(),
+  slug: slugSchema,
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
   descricao_completa: z.string().trim().nullable(),
   categoria: z.enum(["restaurante", "almoço", "bar", "café", "lanchonete"]),
   horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
   endereco: z.string().trim().min(2, "Informe o endereço."),
-  mapa_url: optionalUrl,
+  localizacao_resumida: z.string().trim().nullable(),
+  mapa_url: optionalGoogleMapsUrl,
   instagram: z.string().trim().nullable(),
-  instagram_url: optionalUrl,
+  instagram_url: optionalInstagramUrl,
   whatsapp: whatsappSchema,
   telefone: z.string().trim().nullable(),
   imagem_url: pathOrUrl,
@@ -120,6 +152,26 @@ const removeAttractionImageSchema = z.object({
   imageUrl: pathOrUrl,
   coverUrl: pathOrUrl,
   imagens_urls: z.array(pathOrUrl).default([]),
+});
+
+const restaurantGallerySchema = z.object({
+  restaurantId: z.string().uuid("Restaurante inválido."),
+  coverUrl: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
+});
+
+const removeRestaurantImageSchema = z.object({
+  restaurantId: z.string().uuid("Restaurante inválido.").nullable().optional(),
+  imageUrl: pathOrUrl,
+  coverUrl: pathOrUrl,
+  imagens_urls: z.array(pathOrUrl).default([]),
+});
+
+const restaurantAssetSchema = z.object({
+  restaurantId: z.string().uuid("Restaurante inválido.").nullable().optional(),
+  field: z.enum(["logo_url", "imagem_url"]),
+  imageUrl: pathOrUrl.nullable(),
+  nextUrl: optionalPathOrUrl,
 });
 
 function optionalText(value: FormDataEntryValue | null) {
@@ -233,6 +285,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     categoria: formData.get("categoria"),
     horario_funcionamento: formData.get("horario_funcionamento"),
     endereco: formData.get("endereco"),
+    localizacao_resumida: optionalText(formData.get("localizacao_resumida")),
     mapa_url: optionalText(formData.get("mapa_url")),
     instagram: optionalText(formData.get("instagram")),
     instagram_url: optionalText(formData.get("instagram_url")),
@@ -243,7 +296,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     imagens_urls: imageList(formData.get("imagens_urls")),
     tags: formData.getAll("tags").map((tag) => String(tag).trim()).filter(Boolean),
     formas_pagamento: textList(formData.get("formas_pagamento")),
-    diferenciais: textList(formData.get("diferenciais")),
+    diferenciais: formData.getAll("diferenciais").map((item) => String(item).trim()).filter(Boolean),
     especialidades: textList(formData.get("especialidades")),
     prato_recomendado: optionalText(formData.get("prato_recomendado")),
     dica_turista: optionalText(formData.get("dica_turista")),
@@ -332,6 +385,26 @@ export async function saveAdminItem(
     await assertSameOrigin();
     const supabase = await requireAdmin();
     const payload = parsePayload(entity, formData);
+
+    if (entity === "restaurantes") {
+      const restaurantPayload = payload as z.infer<typeof restauranteSchema>;
+      if (restaurantPayload.slug) {
+        let slugQuery = supabase.from("restaurantes").select("id").eq("slug", restaurantPayload.slug);
+        if (id) {
+          slugQuery = slugQuery.neq("id", id);
+        }
+
+        const { data: existingSlug, error: slugError } = await slugQuery.maybeSingle();
+        if (slugError) {
+          logAdminError("slug-check", slugError);
+          return { ok: false, message: "Não foi possível validar o slug. Tente novamente." };
+        }
+
+        if (existingSlug) {
+          return { ok: false, message: "Este slug já está sendo usado por outro restaurante." };
+        }
+      }
+    }
 
     const query = id
       ? supabase.from(entity).update(payload as never).eq("id", id).select("id,nome,ativo").single()
@@ -524,6 +597,179 @@ export async function removeAttractionGalleryImage(input: unknown): Promise<Acti
   }
 }
 
+export async function updateRestaurantGallery(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = restaurantGallerySchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls).filter((image) => image !== payload.coverUrl);
+
+    const { data, error } = await supabase
+      .from("restaurantes")
+      .update({
+        imagem_url: payload.coverUrl,
+        imagens_urls: gallery,
+      })
+      .eq("id", payload.restaurantId)
+      .select("id,nome")
+      .single();
+
+    if (error) {
+      logAdminError("restaurant-gallery-update", error);
+      return { ok: false, message: "Não foi possível atualizar as fotos do restaurante." };
+    }
+
+    if (!data) {
+      return { ok: false, message: "Restaurante não encontrado para atualizar as fotos." };
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Fotos do restaurante atualizadas com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível atualizar as fotos do restaurante." };
+  }
+}
+
+export async function removeRestaurantGalleryImage(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = removeRestaurantImageSchema.parse(input);
+    const gallery = uniqueImageList(payload.imagens_urls).filter((image) => image !== payload.coverUrl);
+    const storagePath = storagePathFromPublicUrl(payload.imageUrl);
+    let previousRow: { imagem_url: string; imagens_urls: string[] | null } | null = null;
+
+    if (payload.restaurantId) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("restaurantes")
+        .select("imagem_url,imagens_urls")
+        .eq("id", payload.restaurantId)
+        .single();
+
+      if (currentError || !currentRow) {
+        logAdminError("restaurant-gallery-current", currentError);
+        return { ok: false, message: "Não foi possível localizar o restaurante antes de remover a foto." };
+      }
+
+      previousRow = currentRow as { imagem_url: string; imagens_urls: string[] | null };
+
+      const { error: updateError } = await supabase
+        .from("restaurantes")
+        .update({
+          imagem_url: payload.coverUrl,
+          imagens_urls: gallery,
+        })
+        .eq("id", payload.restaurantId);
+
+      if (updateError) {
+        logAdminError("restaurant-gallery-remove-update", updateError);
+        return { ok: false, message: "Não foi possível atualizar o restaurante antes de remover a foto." };
+      }
+    }
+
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("tourism").remove([storagePath]);
+
+      if (storageError) {
+        if (payload.restaurantId && previousRow) {
+          await supabase
+            .from("restaurantes")
+            .update({
+              imagem_url: previousRow.imagem_url,
+              imagens_urls: previousRow.imagens_urls || [],
+            })
+            .eq("id", payload.restaurantId);
+        }
+
+        logAdminError("restaurant-gallery-storage-remove", storageError);
+        return {
+          ok: false,
+          message:
+            "Não foi possível remover a foto do Supabase Storage. As fotos foram preservadas para não quebrar o site.",
+        };
+      }
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Foto removida do restaurante com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível remover a foto do restaurante." };
+  }
+}
+
+export async function updateRestaurantAssetImage(input: unknown): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const payload = restaurantAssetSchema.parse(input);
+    const storagePath = payload.imageUrl && payload.imageUrl !== payload.nextUrl
+      ? storagePathFromPublicUrl(payload.imageUrl)
+      : null;
+    let previousValue: string | null = null;
+
+    if (payload.restaurantId) {
+      const { data: currentRow, error: currentError } = await supabase
+        .from("restaurantes")
+        .select(payload.field)
+        .eq("id", payload.restaurantId)
+        .single();
+
+      if (currentError || !currentRow) {
+        logAdminError("restaurant-asset-current", currentError);
+        return { ok: false, message: "Não foi possível localizar o restaurante antes de atualizar a imagem." };
+      }
+
+      previousValue = String((currentRow as Record<string, unknown>)[payload.field] || "") || null;
+
+      const { error: updateError } = await supabase
+        .from("restaurantes")
+        .update({ [payload.field]: payload.nextUrl })
+        .eq("id", payload.restaurantId);
+
+      if (updateError) {
+        logAdminError("restaurant-asset-update", updateError);
+        return { ok: false, message: "Não foi possível atualizar a imagem do restaurante." };
+      }
+    }
+
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("tourism").remove([storagePath]);
+
+      if (storageError) {
+        if (payload.restaurantId) {
+          await supabase
+            .from("restaurantes")
+            .update({ [payload.field]: previousValue })
+            .eq("id", payload.restaurantId);
+        }
+
+        logAdminError("restaurant-asset-storage-remove", storageError);
+        return {
+          ok: false,
+          message: "Não foi possível remover a imagem antiga do Storage. A alteração foi desfeita.",
+        };
+      }
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Imagem do restaurante atualizada com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Dados inválidos." };
+    }
+
+    return { ok: false, message: "Não foi possível atualizar a imagem do restaurante." };
+  }
+}
+
 export async function seedDefaultContent(): Promise<ActionResult> {
   try {
     await assertSameOrigin();
@@ -578,6 +824,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         categoria: restaurantCategory(place.category),
         horario_funcionamento: place.hours,
         endereco: place.location,
+        localizacao_resumida: place.locationLabel || place.location,
         mapa_url: place.mapUrl || null,
         instagram: place.instagram,
         instagram_url: place.instagramUrl || null,

@@ -14,7 +14,7 @@ export const metadata: Metadata = createMetadata({
   title: "Sobre a Cidade",
   path: "/sobre-a-cidade",
   description:
-    "Conheça a história de Cerro Corá, a Suiça do Seridó, com linha do tempo, identidade local e médias de temperatura durante o ano.",
+    "Conheça a história de Cerro Corá, a Suíça do Seridó, com linha do tempo, identidade local e médias de temperatura durante o ano.",
 });
 
 const maxRain = Math.max(...climateMonths.map((month) => month.rain));
@@ -42,8 +42,8 @@ export default function AboutCityPage() {
               Sobre Cerro Corá
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-white/80">
-              A cidade serrana do Seridó une memória, natureza, altitude e um
-              clima agradável que sustenta o apelido de Suiça do Seridó.
+              A cidade serrana do Seridó reúne história, natureza, altitude e um
+              clima ameno que sustenta o apelido de Suíça do Seridó.
             </p>
           </div>
         </div>
@@ -147,9 +147,9 @@ export default function AboutCityPage() {
                     {climateMonths.map((month) => (
                       <tr key={month.month} className="border-b border-border last:border-0">
                         <td className="px-4 py-3 font-semibold">{month.month}</td>
-                        <td className="px-4 py-3">{month.high.toFixed(1)}C</td>
-                        <td className="px-4 py-3">{month.average.toFixed(1)}C</td>
-                        <td className="px-4 py-3">{month.low.toFixed(1)}C</td>
+                        <td className="px-4 py-3">{month.high.toFixed(1)}°C</td>
+                        <td className="px-4 py-3">{month.average.toFixed(1)}°C</td>
+                        <td className="px-4 py-3">{month.low.toFixed(1)}°C</td>
                         <td className="px-4 py-3">{month.rain} mm</td>
                       </tr>
                     ))}
@@ -169,7 +169,7 @@ export default function AboutCityPage() {
                 <p className="mt-3 text-sm leading-7 text-white/72">
                   Junho, julho e agosto concentram as menores médias da tabela,
                   com noites mais frias e clima ideal para cafés, pousadas e
-                  experiências de serra.
+                  roteiros de serra.
                 </p>
               </CardContent>
             </Card>

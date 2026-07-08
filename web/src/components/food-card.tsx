@@ -90,7 +90,7 @@ function FoodImage({ place }: { place: FoodPlace }) {
 }
 
 export function FoodCard({ place }: { place: FoodPlace }) {
-  const instagramHref = place.instagramUrl || instagramUrlFromHandle(place.instagram);
+  const instagramHref = place.instagram ? place.instagramUrl || instagramUrlFromHandle(place.instagram) : null;
   const mapHref = place.mapUrl || googleMapsSearchUrl(place.name, place.location);
   const detailHref = `/restaurantes/${place.slug || slugify(place.name)}`;
   const { visibleTags, hiddenCount } = getVisibleTags(place);
@@ -137,15 +137,17 @@ export function FoodCard({ place }: { place: FoodPlace }) {
             <MapPin className="h-4 w-4 shrink-0 text-alpine-wine" />
             <span className="line-clamp-1">{place.location}</span>
           </a>
-          <a
-            href={instagramHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 transition-colors hover:text-primary"
-          >
-            <Instagram className="h-4 w-4 shrink-0 text-alpine-wine" />
-            <span className="line-clamp-1">{place.instagram}</span>
-          </a>
+          {instagramHref ? (
+            <a
+              href={instagramHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 transition-colors hover:text-primary"
+            >
+              <Instagram className="h-4 w-4 shrink-0 text-alpine-wine" />
+              <span className="line-clamp-1">{place.instagram}</span>
+            </a>
+          ) : null}
         </div>
         <div className="mt-auto grid gap-2 sm:grid-cols-2">
           <Button asChild variant="outline">

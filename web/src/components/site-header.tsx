@@ -21,7 +21,7 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-background/78 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/78 backdrop-blur-xl">
       <div className="container flex h-20 items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
@@ -32,7 +32,7 @@ export function SiteHeader() {
               Cerro Corá
             </span>
             <span className="block text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Suiça do Seridó
+              Suíça do Seridó
             </span>
           </span>
         </Link>

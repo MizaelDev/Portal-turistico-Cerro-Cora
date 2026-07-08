@@ -117,8 +117,7 @@ export function FestivalProgram({ schedule }: { schedule: FestivalScheduleItem[]
           Três noites de shows na Praça Pública
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-muted-foreground md:text-lg">
-          A agenda reúne atrações nacionais, artistas regionais e momentos especiais em uma
-          leitura organizada por dia.
+          A programação está separada por dia para facilitar a consulta antes e durante o evento.
         </p>
       </div>
 

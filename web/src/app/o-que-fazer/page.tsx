@@ -38,10 +38,11 @@ export default async function RoutesPage() {
         <div className="container">
           <SectionHeader
             className="text-white"
+            inverted
             eyebrow="Roteiros"
             as="h1"
             title="Roteiros em Cerro Corá"
-            description="Atrativos para montar uma viagem de fim de semana com natureza, história, fotos e experiências de serra."
+            description="Mirantes, nascentes, trilhas e pontos históricos para organizar sua visita."
           />
         </div>
       </section>
@@ -78,9 +79,10 @@ export default async function RoutesPage() {
         <div className="container">
           <SectionHeader
             className="text-white"
+            inverted
             eyebrow="Acompanhamento local"
             title="Guias de turismo local"
-            description="Contatos para quem quer conhecer trilhas, mirantes e histórias da cidade com apoio local."
+            description="Contatos para quem prefere conhecer trilhas, mirantes e histórias da cidade com apoio de quem mora na região."
           />
           <div className="mt-10 grid gap-5 md:grid-cols-2">
             {tourGuides.map((guide) => (
@@ -117,7 +119,7 @@ export default async function RoutesPage() {
           className="mb-10"
           eyebrow="Mapa"
           title="Localize os roteiros"
-          description="Mapa com os pontos turísticos"
+          description="Mapa com os principais pontos turísticos cadastrados."
         />
         <MapEmbed title="Mapa de atrativos turísticos em Cerro Corá" />
       </section>

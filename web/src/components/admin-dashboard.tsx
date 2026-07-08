@@ -7,6 +7,7 @@ import {
   ArrowUp,
   DatabaseBackup,
   Edit3,
+  ExternalLink,
   ImagePlus,
   Loader2,
   LogOut,
@@ -21,9 +22,12 @@ import {
   deleteAdminItem,
   logoutAction,
   removeAttractionGalleryImage,
+  removeRestaurantGalleryImage,
   saveAdminItem,
   seedDefaultContent,
   updateAttractionGallery,
+  updateRestaurantAssetImage,
+  updateRestaurantGallery,
   uploadAdminImages,
 } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
@@ -90,6 +94,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     categoria: "restaurante",
     horario_funcionamento: "",
     endereco: "",
+    localizacao_resumida: "",
     mapa_url: "",
     instagram: "",
     instagram_url: "",
@@ -143,11 +148,41 @@ const restaurantTags = [
   "Sobremesas",
 ] as const;
 
+const restaurantOfferings = [
+  "Wi-Fi",
+  "Delivery",
+  "Bebidas",
+  "Sorvetes/açaí",
+  "Sobremesas",
+  "Drinks",
+  "Pizza",
+  "Hambúrgueres",
+  "Música ao vivo",
+  "Ambiente externo",
+  "Ambiente climatizado",
+  "Pratos",
+  "Petiscos",
+  "Estacionamento",
+  "Pet Friendly",
+  "Espaço Kids",
+  "Acessibilidade",
+  "Vista panorâmica",
+] as const;
+
 function selectedTags(value: string | boolean | undefined) {
   return String(value || "")
     .split("|")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function selectedOfferings(value: string | boolean | undefined) {
+  const selected = selectedTags(value);
+  const defaultOptions = new Set<string>(restaurantOfferings);
+  return [
+    ...restaurantOfferings,
+    ...selected.filter((offering) => !defaultOptions.has(offering)),
+  ];
 }
 
 function splitImageLines(value: string | boolean | undefined) {
@@ -162,6 +197,10 @@ function uniqueImages(images: string[]) {
 }
 
 function attractionImagesFromForm(form: FormState) {
+  return uniqueImages([String(form.imagem_url || ""), ...splitImageLines(form.imagens_urls)]);
+}
+
+function restaurantImagesFromForm(form: FormState) {
   return uniqueImages([String(form.imagem_url || ""), ...splitImageLines(form.imagens_urls)]);
 }
 
@@ -201,6 +240,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       categoria: restaurant.categoria,
       horario_funcionamento: restaurant.horario_funcionamento,
       endereco: restaurant.endereco,
+      localizacao_resumida: restaurant.localizacao_resumida || "",
       mapa_url: restaurant.mapa_url || "",
       instagram: restaurant.instagram || "",
       instagram_url: restaurant.instagram_url || "",
@@ -211,7 +251,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       imagens_urls: (restaurant.imagens_urls || []).join("\n"),
       tags: (restaurant.tags || []).join("|"),
       formas_pagamento: (restaurant.formas_pagamento || []).join("\n"),
-      diferenciais: (restaurant.diferenciais || []).join("\n"),
+      diferenciais: (restaurant.diferenciais || []).join("|"),
       especialidades: (restaurant.especialidades || []).join("\n"),
       prato_recomendado: restaurant.prato_recomendado || "",
       dica_turista: restaurant.dica_turista || "",
@@ -266,6 +306,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   const rows = useMemo(() => initialData[entity] as AdminRow[], [entity, initialData]);
   const attractionImages = useMemo(
     () => (entity === "pontos_turisticos" ? attractionImagesFromForm(form) : []),
+    [entity, form],
+  );
+  const restaurantImages = useMemo(
+    () => (entity === "restaurantes" ? restaurantImagesFromForm(form) : []),
     [entity, form],
   );
 
@@ -499,6 +543,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
 
     const formData = new FormData();
     formData.append("files", file);
+    const previousImage = String(form.imagem_url || "").trim();
 
     startUploadTransition(async () => {
       try {
@@ -506,13 +551,188 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         setStatus({ type: result.ok ? "success" : "error", text: result.message });
 
         if (result.ok && result.urls[0]) {
-          setForm((current) => ({ ...current, imagem_url: result.urls[0] }));
+          const nextUrl = result.urls[0];
+
+          if (editingId) {
+            const updateResult = await updateRestaurantAssetImage({
+              restaurantId: editingId,
+              field: "imagem_url",
+              imageUrl: previousImage || null,
+              nextUrl,
+            });
+            setStatus({ type: updateResult.ok ? "success" : "error", text: updateResult.message });
+            if (!updateResult.ok) return;
+            router.refresh();
+          }
+
+          setForm((current) => ({ ...current, imagem_url: nextUrl }));
         }
       } catch {
         setStatus({
           type: "error",
           text: "Não foi possível enviar a imagem. Tente uma foto menor ou verifique o Supabase Storage.",
         });
+      }
+    });
+  }
+
+  function uploadRestaurantLogoImage(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("files", file);
+    const previousLogo = String(form.logo_url || "").trim();
+
+    startUploadTransition(async () => {
+      try {
+        const result = await uploadAdminImages("restaurantes", formData);
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+
+        if (result.ok && result.urls[0]) {
+          const nextUrl = result.urls[0];
+
+          if (editingId) {
+            const updateResult = await updateRestaurantAssetImage({
+              restaurantId: editingId,
+              field: "logo_url",
+              imageUrl: previousLogo || null,
+              nextUrl,
+            });
+            setStatus({ type: updateResult.ok ? "success" : "error", text: updateResult.message });
+            if (!updateResult.ok) return;
+            router.refresh();
+          }
+
+          setForm((current) => ({ ...current, logo_url: nextUrl }));
+        }
+      } catch {
+        setStatus({
+          type: "error",
+          text: "Não foi possível enviar a logo. Tente uma imagem menor ou verifique o Supabase Storage.",
+        });
+      }
+    });
+  }
+
+  function removeRestaurantLogo() {
+    const currentLogo = String(form.logo_url || "").trim();
+    if (!currentLogo || isGalleryPending) return;
+
+    const confirmed = window.confirm("Tem certeza que deseja remover a logo deste restaurante?");
+    if (!confirmed) return;
+
+    setGalleryAction("restaurant-logo");
+    startGalleryTransition(async () => {
+      if (editingId) {
+        const result = await updateRestaurantAssetImage({
+          restaurantId: editingId,
+          field: "logo_url",
+          imageUrl: currentLogo,
+          nextUrl: null,
+        });
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        setGalleryAction(null);
+        if (!result.ok) return;
+        router.refresh();
+      }
+
+      setForm((current) => ({ ...current, logo_url: "" }));
+      setStatus({ type: "success", text: "Logo removida do restaurante." });
+      setGalleryAction(null);
+    });
+  }
+
+  function applyRestaurantGallery(nextImages: string[], successMessage: string) {
+    const normalizedImages = uniqueImages(nextImages);
+    const nextCover = normalizedImages[0] || String(form.imagem_url || "").trim();
+    const nextGallery = serializeAdditionalImages(normalizedImages, nextCover);
+    const previousForm = form;
+
+    setForm((current) => ({
+      ...current,
+      imagem_url: nextCover,
+      imagens_urls: nextGallery,
+    }));
+
+    if (!editingId || !nextCover) {
+      setStatus({ type: "success", text: successMessage });
+      return;
+    }
+
+    setGalleryAction("restaurant-gallery");
+    startGalleryTransition(async () => {
+      const result = await updateRestaurantGallery({
+        restaurantId: editingId,
+        coverUrl: nextCover,
+        imagens_urls: splitImageLines(nextGallery),
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.ok ? successMessage : result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        router.refresh();
+      } else {
+        setForm(previousForm);
+      }
+    });
+  }
+
+  function moveRestaurantImage(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= restaurantImages.length || isGalleryPending) return;
+
+    const nextImages = [...restaurantImages];
+    [nextImages[index], nextImages[nextIndex]] = [nextImages[nextIndex], nextImages[index]];
+    applyRestaurantGallery(nextImages, "Ordem das fotos do restaurante atualizada.");
+  }
+
+  function setRestaurantCover(image: string) {
+    if (image === String(form.imagem_url || "").trim() || isGalleryPending) return;
+    applyRestaurantGallery(
+      [image, ...restaurantImages.filter((item) => item !== image)],
+      "Foto definida como capa do restaurante.",
+    );
+  }
+
+  function removeRestaurantImage(image: string) {
+    if (isGalleryPending) return;
+
+    if (restaurantImages.length <= 1) {
+      setStatus({
+        type: "error",
+        text: "Mantenha pelo menos uma foto no restaurante para não quebrar o card público.",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm("Tem certeza que deseja remover esta foto?");
+    if (!confirmed) return;
+
+    const nextImages = restaurantImages.filter((item) => item !== image);
+    const nextCover = nextImages[0] || String(form.imagem_url || "").trim();
+    const nextGallery = serializeAdditionalImages(nextImages, nextCover);
+
+    setGalleryAction(image);
+    startGalleryTransition(async () => {
+      const result = await removeRestaurantGalleryImage({
+        restaurantId: editingId,
+        imageUrl: image,
+        coverUrl: nextCover,
+        imagens_urls: splitImageLines(nextGallery),
+      });
+
+      setStatus({ type: result.ok ? "success" : "error", text: result.message });
+      setGalleryAction(null);
+
+      if (result.ok) {
+        setForm((current) => ({
+          ...current,
+          imagem_url: nextCover,
+          imagens_urls: nextGallery,
+        }));
+        router.refresh();
       }
     });
   }
@@ -529,11 +749,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         setStatus({ type: result.ok ? "success" : "error", text: result.message });
 
         if (result.ok && result.urls.length) {
-          setForm((current) => {
-            const currentImages = String(current.imagens_urls || "").trim();
-            const nextImages = [...(currentImages ? [currentImages] : []), ...result.urls].join("\n");
-            return { ...current, imagens_urls: nextImages };
-          });
+          applyRestaurantGallery(
+            [...restaurantImages, ...result.urls],
+            "Fotos adicionadas ao restaurante com sucesso.",
+          );
         }
       } catch {
         setStatus({
@@ -553,6 +772,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         tags.delete(tag);
       }
       return { ...current, tags: Array.from(tags).join("|") };
+    });
+  }
+
+  function toggleRestaurantOffering(offering: string, checked: boolean) {
+    setForm((current) => {
+      const offerings = new Set(selectedTags(current.diferenciais));
+      if (checked) {
+        offerings.add(offering);
+      } else {
+        offerings.delete(offering);
+      }
+      return { ...current, diferenciais: Array.from(offerings).join("|") };
     });
   }
 
@@ -919,6 +1150,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Esses campos alimentam a página /restaurantes/slug. Se deixar o slug vazio, ele será gerado pelo nome.
                     </p>
+                    {editingId && String(form.slug || "").trim() ? (
+                      <Button asChild type="button" variant="outline" size="sm" className="mt-3">
+                        <a
+                          href={`/restaurantes/${String(form.slug).trim()}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Ver página publicada
+                        </a>
+                      </Button>
+                    ) : null}
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
@@ -942,6 +1185,16 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      name="destaque"
+                      checked={Boolean(form.destaque)}
+                      onChange={(event) => updateField("destaque", event.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    Destacar este restaurante nas listas e páginas relacionadas
+                  </label>
                   <div className="grid gap-2">
                     <Label htmlFor="descricao_completa">Descrição completa</Label>
                     <Textarea
@@ -974,14 +1227,36 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="localizacao_resumida">Localização resumida</Label>
+                      <Input
+                        id="localizacao_resumida"
+                        name="localizacao_resumida"
+                        value={String(form.localizacao_resumida || "")}
+                        onChange={(event) => updateField("localizacao_resumida", event.target.value)}
+                        placeholder="Centro, área rural, avenida principal..."
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="mapa_url">Link do Google Maps</Label>
+                      <Input
+                        id="mapa_url"
+                        name="mapa_url"
+                        value={String(form.mapa_url || "")}
+                        onChange={(event) => updateField("mapa_url", event.target.value)}
+                        placeholder="https://maps.google.com/..."
+                      />
+                    </div>
+                  </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="mapa_url">Link do Google Maps</Label>
+                    <Label htmlFor="cardapio_url">Link do cardápio</Label>
                     <Input
-                      id="mapa_url"
-                      name="mapa_url"
-                      value={String(form.mapa_url || "")}
-                      onChange={(event) => updateField("mapa_url", event.target.value)}
-                      placeholder="https://maps.google.com/..."
+                      id="cardapio_url"
+                      name="cardapio_url"
+                      value={String(form.cardapio_url || "")}
+                      onChange={(event) => updateField("cardapio_url", event.target.value)}
+                      placeholder="https://... (opcional)"
                     />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1085,17 +1360,73 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="logo_url">Logo ou imagem alternativa</Label>
-                    <Input
-                      id="logo_url"
-                      name="logo_url"
-                      value={String(form.logo_url || "")}
-                      onChange={(event) => updateField("logo_url", event.target.value)}
-                      placeholder="/images/logo-restaurante.png ou https://..."
-                    />
+                    <Label htmlFor="logo_url">Logo do estabelecimento</Label>
+                    <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 sm:grid-cols-[96px_1fr] sm:items-center">
+                      <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white p-2">
+                        {String(form.logo_url || "").trim() ? (
+                          <NextImage
+                            src={String(form.logo_url || "")}
+                            alt={`Logo de ${String(form.nome || "restaurante")}`}
+                            fill
+                            sizes="96px"
+                            className="object-contain p-2"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs font-semibold text-muted-foreground">
+                            Sem logo
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid gap-3">
+                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-4 text-center transition-colors hover:bg-accent/70">
+                          {isUploading ? (
+                            <Loader2 className="mb-2 h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <ImagePlus className="mb-2 h-5 w-5 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {isUploading ? "Enviando logo..." : "Selecionar logo"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="sr-only"
+                            disabled={isUploading}
+                            onChange={(event) => {
+                              uploadRestaurantLogoImage(event.target.files);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            id="logo_url"
+                            name="logo_url"
+                            value={String(form.logo_url || "")}
+                            onChange={(event) => updateField("logo_url", event.target.value)}
+                            placeholder="/images/logo.png ou https://..."
+                          />
+                          {String(form.logo_url || "").trim() ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={isGalleryPending}
+                              onClick={removeRestaurantLogo}
+                            >
+                              {galleryAction === "restaurant-logo" && isGalleryPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                              Remover
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="imagens_urls">Galeria da página individual</Label>
+                    <Label htmlFor="imagens_urls">Fotos adicionais</Label>
                     <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-5 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
                         <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground" />
@@ -1103,10 +1434,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <ImagePlus className="mb-3 h-6 w-6 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">
-                        {isUploading ? "Enviando imagens..." : "Selecionar fotos da galeria"}
+                        {isUploading ? "Enviando imagens..." : "Selecionar fotos adicionais"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        Use fotos do ambiente, pratos e fachada. Elas aparecem na página individual do restaurante.
+                        Use fotos de pratos, ambiente ou fachada. Elas podem aparecer em áreas de destaque da página.
                       </span>
                       <input
                         type="file"
@@ -1127,6 +1458,105 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       onChange={(event) => updateField("imagens_urls", event.target.value)}
                       placeholder="Uma URL de imagem por linha."
                     />
+                    {restaurantImages.length ? (
+                      <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold">Fotos do carrossel</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              A primeira foto é a capa principal. As demais entram como fotos adicionais.
+                            </p>
+                          </div>
+                          {isGalleryPending ? (
+                            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Atualizando...
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="grid gap-3">
+                          {restaurantImages.map((image, index) => {
+                            const isCover = image === String(form.imagem_url || "").trim();
+                            const isRemoving = galleryAction === image && isGalleryPending;
+
+                            return (
+                              <div
+                                key={image}
+                                className="grid gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-[96px_1fr] sm:items-center"
+                              >
+                                <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-accent">
+                                  <NextImage
+                                    src={image}
+                                    alt={`Foto ${index + 1} de ${String(form.nome || "restaurante")}`}
+                                    fill
+                                    sizes="96px"
+                                    className="object-cover"
+                                  />
+                                  {isCover ? (
+                                    <span className="absolute left-2 top-2 rounded-md bg-alpine-sunset px-2 py-0.5 text-[10px] font-semibold text-[#17251f]">
+                                      Capa
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold">Foto {index + 1}</p>
+                                      <p className="mt-1 text-xs text-muted-foreground">{imageSourceLabel(image)}</p>
+                                      <p className="mt-1 truncate text-xs text-muted-foreground">{image}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === 0 || isGalleryPending}
+                                        onClick={() => moveRestaurantImage(index, -1)}
+                                      >
+                                        <ArrowUp className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={index === restaurantImages.length - 1 || isGalleryPending}
+                                        onClick={() => moveRestaurantImage(index, 1)}
+                                      >
+                                        <ArrowDown className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant={isCover ? "secondary" : "outline"}
+                                        size="sm"
+                                        disabled={isCover || isGalleryPending}
+                                        onClick={() => setRestaurantCover(image)}
+                                      >
+                                        <Star className="h-4 w-4" />
+                                        Capa
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={restaurantImages.length <= 1 || isGalleryPending}
+                                        onClick={() => removeRestaurantImage(image)}
+                                      >
+                                        {isRemoving ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                        Remover
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
@@ -1140,14 +1570,28 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="diferenciais">Diferenciais</Label>
-                      <Textarea
-                        id="diferenciais"
-                        name="diferenciais"
-                        value={String(form.diferenciais || "")}
-                        onChange={(event) => updateField("diferenciais", event.target.value)}
-                        placeholder="Delivery&#10;Reservas&#10;Estacionamento"
-                      />
+                      <Label>O que a casa oferece</Label>
+                      <div className="grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-border bg-accent/25 p-4 sm:grid-cols-2">
+                        {selectedOfferings(form.diferenciais).map((offering) => {
+                          const checked = selectedTags(form.diferenciais).includes(offering);
+                          return (
+                            <label key={offering} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                name="diferenciais"
+                                value={offering}
+                                checked={checked}
+                                onChange={(event) => toggleRestaurantOffering(offering, event.target.checked)}
+                                className="h-4 w-4 rounded border-border"
+                              />
+                              {offering}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        Marque tudo que o estabelecimento oferece. Essas opções aparecem no card A casa oferece.
+                      </p>
                     </div>
                   </div>
                   <div className="grid gap-2">
@@ -1160,27 +1604,15 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Almoço regional&#10;Pizza&#10;Petiscos"
                     />
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="prato_recomendado">Recomendação da casa</Label>
-                      <Input
-                        id="prato_recomendado"
-                        name="prato_recomendado"
-                        value={String(form.prato_recomendado || "")}
-                        onChange={(event) => updateField("prato_recomendado", event.target.value)}
-                        placeholder="Prato mais famoso"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="cardapio_url">Link do cardápio</Label>
-                      <Input
-                        id="cardapio_url"
-                        name="cardapio_url"
-                        value={String(form.cardapio_url || "")}
-                        onChange={(event) => updateField("cardapio_url", event.target.value)}
-                        placeholder="https://..."
-                      />
-                    </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="prato_recomendado">Recomendação da casa</Label>
+                    <Input
+                      id="prato_recomendado"
+                      name="prato_recomendado"
+                      value={String(form.prato_recomendado || "")}
+                      onChange={(event) => updateField("prato_recomendado", event.target.value)}
+                      placeholder="Prato mais famoso"
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="dica_turista">Dica para quem visita pela primeira vez</Label>
@@ -1192,16 +1624,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Sugestão curta para turistas."
                     />
                   </div>
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      name="destaque"
-                      checked={Boolean(form.destaque)}
-                      onChange={(event) => updateField("destaque", event.target.checked)}
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    Destaque na página individual
-                  </label>
                 </>
               ) : null}
 

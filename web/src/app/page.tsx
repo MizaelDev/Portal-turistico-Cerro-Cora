@@ -35,8 +35,8 @@ export default async function HomePage() {
       <section className="container py-20">
         <SectionHeader
           eyebrow="Planeje sua viagem"
-          title="Experiências para viver Cerro Corá em todos os sentidos."
-          description="Roteiros naturais, noites frias, cafés, pousadas e eventos pensados para transformar a visita em memória."
+          title="Cerro Corá para visitar com calma."
+          description="Roteiros, hospedagens, gastronomia e eventos reunidos para ajudar no planejamento da viagem."
         />
         <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {homeHighlights.map((item, index) => {
@@ -66,8 +66,8 @@ export default async function HomePage() {
         <div className="container">
           <SectionHeader
             eyebrow="Roteiros"
-            title="Atrativos naturais e culturais."
-            description="Um recorte dos pontos que conectam altitude, história, natureza e paisagem cinematográfica."
+            title="Atrativos naturais e culturais"
+            description="Mirantes, nascentes, trilhas e pontos de história para conhecer durante a estadia."
           />
           {attractionsError ? (
             <Card className="mt-10 border-destructive/30 bg-destructive/10">
@@ -105,8 +105,8 @@ export default async function HomePage() {
           <SectionHeader
             className="text-left"
             eyebrow="Clima da cidade"
-            title="Frio, neblina e noites para desacelerar."
-            description=" integração com OpenWeather"
+            title="Clima de serra no Seridó."
+            description="Temperatura, umidade e vento para ajudar no planejamento do passeio."
           />
         </MotionReveal>
         <MotionReveal delay={0.08}>
@@ -118,7 +118,7 @@ export default async function HomePage() {
         <SectionHeader
           eyebrow="Onde ficar"
           title="Pousadas e chalés para respirar a serra."
-          description="Hospedagens demonstrativas com galeria, reserva por WhatsApp e faixa de preço."
+          description="Opções cadastradas com fotos, WhatsApp, localização e faixa de preço."
         />
         {lodgingsError ? (
           <Card className="mt-10 border-destructive/30 bg-destructive/10">
@@ -153,9 +153,10 @@ export default async function HomePage() {
         <div className="container grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <SectionHeader
             className="text-left text-white"
+            inverted
             eyebrow="Gastronomia"
-            title="Cafés, massas, e sabores regionais."
-            description="A cidade ganha outro ritmo quando a temperatura cai. Descubra paradas gastronômicas para aproveitar o frio serrano."
+            title="Cafés, massas e sabores regionais."
+            description="Locais para almoço, lanches, cafés e noites frias em Cerro Corá."
           />
           {foodPlacesError ? (
             <div className="rounded-lg border border-white/12 bg-white/8 p-5 text-sm text-white/70 backdrop-blur">
@@ -181,8 +182,8 @@ export default async function HomePage() {
       <section className="container py-20">
         <SectionHeader
           eyebrow="Galeria"
-          title="Um visual de inverno no coração do RN."
-          description="Imagens grandes e cinematográficas para valorizar pôr do sol, cafés e natureza."
+          title="Cerro Corá em imagens."
+          description="Registros de pontos turísticos, cafés, eventos e paisagens da cidade."
         />
         <div className="mt-12">
           <PhotoGallery />

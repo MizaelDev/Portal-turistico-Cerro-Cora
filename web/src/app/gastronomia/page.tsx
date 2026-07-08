@@ -30,14 +30,14 @@ const foodFilters = [
   },
   {
     title: "Cafés e sobremesas",
-    description: "Cafeterias, açaí, doces, chocolate quente e paradas leves.",
+    description: "Cafeterias, açaí, doces, chocolate quente e paradas rápidas.",
     matches: (place: FoodPlace) =>
       place.category === "Cafeteria" ||
       place.tags.some((tag) => ["Café", "Sobremesas", "Açai", "Açaí", "Chocolate quente"].includes(tag)),
   },
   {
     title: "Bares e petiscos",
-    description: "Opções para petiscar, beber algo e aproveitar a noite.",
+    description: "Opções para petiscos, bebidas e encontros à noite.",
     matches: (place: FoodPlace) =>
       place.category === "Bar" || place.tags.some((tag) => ["Bar", "Petiscos", "Espetinho"].includes(tag)),
   },
@@ -66,7 +66,7 @@ export default async function GastronomyPage() {
         eyebrow="Gastronomia"
         as="h1"
         title="Onde comer em Cerro Corá"
-        description="Estabelecimentos com categoria principal, horário, WhatsApp, Instagram e localização clicável."
+        description="Restaurantes, cafés, bares e lanchonetes com horário, contato e localização."
       />
 
       <div className="mt-8 flex flex-wrap justify-center gap-2">

@@ -10,7 +10,7 @@ export function Hero() {
     <section className="relative min-h-[calc(100vh-5rem)] overflow-hidden">
       <Image
         src={heroImage}
-        alt="Paisagem serrana com neblina representando Cerro Corá"
+        alt="Paisagem serrana de Cerro Corá"
         fill
         priority
         sizes="100vw"
@@ -23,14 +23,14 @@ export function Hero() {
       <div className="container relative flex min-h-[calc(100vh-5rem)] items-center pb-20 pt-16">
         <div className="max-w-[700px] text-white">
           <Badge className="border-white/45 bg-[#10201b]/60 text-white shadow-glass backdrop-blur-md">
-            <Sparkles className="mr-2 h-3.5 w-3.5" /> Suiça do Seridó
+            <Sparkles className="mr-2 h-3.5 w-3.5" /> Suíça do Seridó
           </Badge>
           <h1 className="mt-6 max-w-[680px] font-display text-5xl font-semibold leading-[1.02] tracking-normal [text-shadow:0_4px_24px_rgba(0,0,0,0.45)] md:text-7xl">
             Cerro Corá, onde o frio da serra encontra o calor do Seridó.
           </h1>
           <p className="mt-6 max-w-[620px] text-lg leading-8 text-white/88 [text-shadow:0_4px_24px_rgba(0,0,0,0.45)] md:text-xl">
-            Um portal para planejar roteiros, hospedagens, gastronomia e
-            experiências de inverno em uma das cidades mais charmosas do RN.
+            Planeje roteiros, hospedagens e onde comer em Cerro Corá-RN,
+            com informações úteis para aproveitar o clima serrano.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg" variant="warm">

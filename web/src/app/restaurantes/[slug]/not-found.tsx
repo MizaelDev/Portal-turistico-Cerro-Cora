@@ -13,11 +13,11 @@ export default function RestaurantNotFound() {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-              Restaurante nÃ£o encontrado
+              Restaurante não encontrado
             </p>
-            <h1 className="mt-3 font-display text-4xl font-semibold">Esse estabelecimento nÃ£o estÃ¡ disponÃ­vel.</h1>
+            <h1 className="mt-3 font-display text-4xl font-semibold">Esse estabelecimento não está disponível.</h1>
             <p className="mt-4 leading-7 text-muted-foreground">
-              O link pode ter mudado ou o restaurante pode nÃ£o estar ativo no guia gastronÃ´mico.
+              O link pode ter mudado ou o restaurante pode não estar ativo no guia gastronômico.
             </p>
           </div>
           <Button asChild variant="warm" className="mx-auto">

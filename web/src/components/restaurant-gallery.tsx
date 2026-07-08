@@ -59,7 +59,7 @@ export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
               type="button"
               variant="glass"
               size="icon"
-              aria-label="PrÃ³xima foto"
+              aria-label="Próxima foto"
               className="absolute right-3 top-1/2 -translate-y-1/2"
               onClick={goToNext}
             >
