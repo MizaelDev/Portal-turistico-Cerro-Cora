@@ -13,6 +13,7 @@ const loginSchema = z.object({
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const loginWindowMs = 15 * 60 * 1000;
 const maxLoginAttempts = 8;
+const genericLoginError = "Email ou senha inválidos.";
 
 async function getClientIp() {
   const headersList = await headers();
@@ -39,18 +40,27 @@ async function clearLoginAttempts() {
   loginAttempts.delete(ip);
 }
 
-function authErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
+async function assertSameOrigin() {
+  const headersList = await headers();
+  const origin = headersList.get("origin");
+  const referer = headersList.get("referer");
+  const host = headersList.get("host");
+  const source = origin || referer;
 
-  if (normalized.includes("email not confirmed")) {
-    return "Esse email ainda não foi confirmado no Supabase Auth.";
+  if (!host || !source) {
+    throw new Error("Invalid login origin.");
   }
 
-  if (normalized.includes("invalid login credentials")) {
-    return "Email ou senha inválidos.";
-  }
+  const allowedOrigins = new Set(
+    [`https://${host}`, `http://${host}`, process.env.NEXT_PUBLIC_SITE_URL]
+      .filter(Boolean)
+      .map((value) => String(value).replace(/\/$/, "")),
+  );
 
-  return "Não foi possível entrar. Verifique o usuário no Supabase Auth.";
+  const sourceOrigin = new URL(source).origin;
+  if (!allowedOrigins.has(sourceOrigin)) {
+    throw new Error("Invalid login origin.");
+  }
 }
 
 export async function loginAction(_: { error: string }, formData: FormData) {
@@ -64,6 +74,8 @@ export async function loginAction(_: { error: string }, formData: FormData) {
   }
 
   try {
+    await assertSameOrigin();
+
     if (await isRateLimited()) {
       return { error: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente." };
     }
@@ -72,12 +84,12 @@ export async function loginAction(_: { error: string }, formData: FormData) {
     const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
     if (error) {
-      return { error: authErrorMessage(error.message) };
+      return { error: genericLoginError };
     }
 
     await clearLoginAttempts();
   } catch {
-    return { error: "Configure as variáveis do Supabase antes de acessar o painel." };
+    return { error: "Não foi possível processar o login agora." };
   }
 
   redirect("/admin");

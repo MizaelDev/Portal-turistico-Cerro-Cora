@@ -170,6 +170,13 @@ insert into storage.buckets (id, name, public)
 values ('tourism', 'tourism', true)
 on conflict (id) do nothing;
 
+update storage.buckets
+set
+  public = true,
+  file_size_limit = 6291456,
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+where id = 'tourism';
+
 alter table public.pontos_turisticos enable row level security;
 alter table public.pousadas enable row level security;
 alter table public.restaurantes enable row level security;

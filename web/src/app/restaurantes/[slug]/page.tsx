@@ -425,7 +425,6 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
                 icon={Clock}
                 label="Horário"
                 value={place.hours}
-                helper={openingStatus?.label || "Confirme o horário com o estabelecimento antes de sair."}
               />
               <InfoCard icon={WalletCards} label="Faixa de preço" value={priceRange} />
               <InfoCard icon={MapPin} label="Endereço" value={place.address || place.location} href={mapUrl} />

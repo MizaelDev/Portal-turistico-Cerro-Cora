@@ -46,6 +46,17 @@ const securityHeaders = [
   },
 ];
 
+const adminHeaders = [
+  {
+    key: "Cache-Control",
+    value: "no-store, max-age=0",
+  },
+  {
+    key: "X-Robots-Tag",
+    value: "noindex, nofollow, noarchive",
+  },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: appDir,
@@ -74,6 +85,10 @@ const nextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/admin/:path*",
+        headers: adminHeaders,
+      },
       {
         source: "/(.*)",
         headers: securityHeaders,

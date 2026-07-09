@@ -25,14 +25,39 @@ type UploadResult = ActionResult & {
 
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxImageSize = 6 * 1024 * 1024;
+const maxUploadFiles = 10;
+const allowedExternalImageHosts = ["images.unsplash.com", "images.pexels.com"];
+
+function isHttpsUrl(value: string) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isSafeImagePathOrUrl(value: string) {
+  if (value.startsWith("/")) {
+    return !value.startsWith("//") && !value.includes("\\") && !value.includes("\0");
+  }
+
+  if (!isHttpsUrl(value)) return false;
+
+  try {
+    const hostname = new URL(value).hostname;
+    return allowedExternalImageHosts.includes(hostname) || hostname.endsWith(".supabase.co");
+  } catch {
+    return false;
+  }
+}
 
 const pathOrUrl = z
   .string()
   .trim()
   .min(1, "Informe uma imagem.")
   .refine(
-    (value) => value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://"),
-    "Use uma URL completa ou um caminho iniciado com /.",
+    isSafeImagePathOrUrl,
+    "Use uma imagem local iniciada com / ou uma URL HTTPS permitida.",
   );
 
 const optionalUrl = z
@@ -40,8 +65,8 @@ const optionalUrl = z
   .trim()
   .nullable()
   .refine(
-    (value) => !value || value.startsWith("http://") || value.startsWith("https://"),
-    "Use uma URL iniciada com http:// ou https://.",
+    (value) => !value || isHttpsUrl(value),
+    "Use uma URL HTTPS válida.",
   );
 
 const optionalPathOrUrl = z
@@ -49,8 +74,8 @@ const optionalPathOrUrl = z
   .trim()
   .nullable()
   .refine(
-    (value) => !value || value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://"),
-    "Use uma URL completa ou um caminho iniciado com /.",
+    (value) => !value || isSafeImagePathOrUrl(value),
+    "Use uma imagem local iniciada com / ou uma URL HTTPS permitida.",
   );
 
 const slugSchema = z
@@ -275,15 +300,22 @@ async function requireAdmin() {
 async function assertSameOrigin() {
   const headersList = await headers();
   const origin = headersList.get("origin");
+  const referer = headersList.get("referer");
   const host = headersList.get("host");
+  const source = origin || referer;
 
-  if (!origin || !host) return;
+  if (!host || !source) {
+    throw new Error("Invalid server action origin.");
+  }
 
   const allowedOrigins = new Set(
-    [`https://${host}`, `http://${host}`, process.env.NEXT_PUBLIC_SITE_URL].filter(Boolean),
+    [`https://${host}`, `http://${host}`, process.env.NEXT_PUBLIC_SITE_URL]
+      .filter(Boolean)
+      .map((value) => String(value).replace(/\/$/, "")),
   );
 
-  if (!allowedOrigins.has(origin)) {
+  const sourceOrigin = new URL(source).origin;
+  if (!allowedOrigins.has(sourceOrigin)) {
     throw new Error("Invalid server action origin.");
   }
 }
@@ -1164,6 +1196,10 @@ export async function uploadAdminImages(
 
     if (!files.length) {
       return { ok: false, message: "Selecione ao menos uma imagem.", urls: [] };
+    }
+
+    if (files.length > maxUploadFiles) {
+      return { ok: false, message: `Envie no máximo ${maxUploadFiles} imagens por vez.`, urls: [] };
     }
 
     const urls: string[] = [];

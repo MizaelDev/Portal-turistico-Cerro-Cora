@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,15 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [imageSizes, setImageSizes] = useState<Record<string, ImageSize>>({});
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const hasMultipleImages = uniqueImages.length > 1;
+  const activeImage = uniqueImages[activeIndex] || "";
+
+  useEffect(() => {
+    if (activeImage) {
+      setIsImageLoading(true);
+    }
+  }, [activeImage]);
 
   const registerImageSize = useCallback((src: string, image: HTMLImageElement) => {
     if (!image.naturalWidth || !image.naturalHeight) return;
@@ -65,7 +73,6 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
 
   if (!uniqueImages.length) return null;
 
-  const activeImage = uniqueImages[activeIndex];
   const activeCategory = galleryCategories[activeIndex % galleryCategories.length];
   const activeSize = imageSizes[activeImage];
   const activeRatio = activeSize ? activeSize.width / activeSize.height : 16 / 10;
@@ -87,11 +94,17 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
           alt={`${activeCategory} de ${name}`}
           fill
           sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
-          quality={95}
-          priority={activeIndex === 0}
-          onLoad={(event) => registerImageSize(activeImage, event.currentTarget)}
+          quality={82}
+          loading="lazy"
+          onLoad={(event) => {
+            registerImageSize(activeImage, event.currentTarget);
+            setIsImageLoading(false);
+          }}
           className="object-contain"
         />
+        {isImageLoading ? (
+          <div className="absolute inset-0 animate-pulse bg-[linear-gradient(110deg,rgba(255,255,255,0.05),rgba(255,255,255,0.12),rgba(255,255,255,0.05))]" />
+        ) : null}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
 
         <div className="absolute left-4 top-4 rounded-md border border-white/20 bg-black/35 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
@@ -159,7 +172,8 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
                 alt={`Miniatura ${index + 1} de ${name}`}
                 fill
                 sizes="120px"
-                quality={75}
+                quality={52}
+                loading="lazy"
                 className="object-cover"
               />
             </button>
@@ -185,7 +199,7 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
               alt={`${activeCategory} de ${name}`}
               fill
               sizes="100vw"
-              quality={95}
+              quality={90}
               className="object-contain"
             />
           </div>

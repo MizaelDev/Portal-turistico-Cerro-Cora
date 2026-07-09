@@ -63,6 +63,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (user) {
+    const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin", {
+      user_id: user.id,
+    });
+
+    if (adminError || isAdmin !== true) {
+      await supabase.auth.signOut();
+
+      if (isLoginRoute) {
+        return response;
+      }
+
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/login";
+      url.searchParams.set("unauthorized", "1");
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && isLoginRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";

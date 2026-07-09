@@ -287,7 +287,6 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             <h1 className="mt-5 max-w-3xl font-display text-5xl font-semibold leading-[0.95] md:text-7xl">
               {lodging.name}
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-white/82 md:text-lg">{lodging.description}</p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button asChild variant="warm">
