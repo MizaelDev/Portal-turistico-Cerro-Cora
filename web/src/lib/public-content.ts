@@ -34,6 +34,32 @@ const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const extendedRestaurantColumns =
   "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
+const publicContentTimeoutMs = 8000;
+
+const fetchWithTimeout: typeof fetch = async (input, init) => {
+  const controller = new AbortController();
+  const upstreamSignal = init?.signal;
+  const abortRequest = () => controller.abort();
+  const timeout = setTimeout(abortRequest, publicContentTimeoutMs);
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      controller.abort();
+    } else {
+      upstreamSignal.addEventListener("abort", abortRequest, { once: true });
+    }
+  }
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+    upstreamSignal?.removeEventListener("abort", abortRequest);
+  }
+};
 
 function logPublicContentError(scope: string, error: unknown) {
   if (process.env.NODE_ENV !== "production") {
@@ -76,7 +102,7 @@ function formatPriceRange(min: number | null, max: number | null) {
 }
 
 function mapPousada(row: PousadaRow): Lodging {
-  const images = row.imagens_urls.filter(Boolean);
+  const images = (row.imagens_urls || []).filter(Boolean);
   const location = row.distancia_centro ? `${row.localizacao} - ${row.distancia_centro}` : row.localizacao;
 
   return {
@@ -188,6 +214,9 @@ function createSupabasePublicClient() {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    global: {
+      fetch: fetchWithTimeout,
     },
   });
 }

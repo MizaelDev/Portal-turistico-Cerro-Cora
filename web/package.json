@@ -7,7 +7,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "k6:smoke": "k6 run tests/k6/load-test.js",
+    "k6:load": "k6 run -e PROFILE=load tests/k6/load-test.js",
+    "k6:stress": "k6 run -e PROFILE=stress tests/k6/load-test.js",
+    "k6:cloud": "k6 cloud -e PROFILE=load tests/k6/load-test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

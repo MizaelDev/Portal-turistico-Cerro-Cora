@@ -300,7 +300,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       instagram_url: lodging.instagram_url || "",
       logo_url: lodging.logo_url || "",
       hero_image_url: lodging.hero_image_url || "",
-      imagens_urls: lodging.imagens_urls.join("\n"),
+      imagens_urls: (lodging.imagens_urls || []).join("\n"),
       check_in: lodging.check_in || "",
       check_out: lodging.check_out || "",
       capacidade: lodging.capacidade || "",

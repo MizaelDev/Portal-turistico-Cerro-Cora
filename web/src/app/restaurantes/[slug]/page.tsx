@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -41,7 +40,7 @@ import type { ReactNode } from "react";
 import { FoodCard } from "@/components/food-card";
 import { JsonLd } from "@/components/json-ld";
 import { RestaurantGallery } from "@/components/restaurant-gallery";
-import { Badge } from "@/components/ui/badge";
+import { SafeImage } from "@/components/safe-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { FoodPlace } from "@/lib/data";
@@ -112,10 +111,6 @@ function detailDescription(place: FoodPlace) {
 
 function formatPriceRange(priceRange?: FoodPlace["priceRange"]) {
   return priceRange || "R$ - R$$$";
-}
-
-function getOpeningStatus() {
-  return null as { label: string; tone: "open" | "closed" | "neutral" } | null;
 }
 
 type HouseOffering = {
@@ -306,7 +301,6 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
   const features = place.features || [];
   const houseOfferings = getHouseOfferings(place, specialties, features);
   const paymentMethods = place.paymentMethods || [];
-  const openingStatus = getOpeningStatus();
   const priceRange = formatPriceRange(place.priceRange);
 
   return (
@@ -319,7 +313,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           <div className="mx-auto grid max-w-4xl justify-items-center gap-4 text-center md:gap-5">
             {logoImage ? (
               <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2.5 shadow-glass ring-1 ring-black/5 md:h-28 md:w-28 md:p-3">
-                <Image
+                <SafeImage
                   src={logoImage}
                   alt={`Logo de ${place.name}`}
                   fill
@@ -329,28 +323,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
               </div>
             ) : null}
 
-            <div className="flex flex-wrap justify-center gap-2">
-              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">{place.category}</Badge>
-              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">{priceRange}</Badge>
-              <Badge className="border-white/20 bg-white/12 text-white backdrop-blur-md">
-                <MapPin className="h-3.5 w-3.5" /> {place.locationLabel || place.location}
-              </Badge>
-              {openingStatus ? (
-                <Badge className="border-primary/30 bg-primary/20 text-white backdrop-blur-md">
-                  {openingStatus.label}
-                </Badge>
-              ) : null}
-            </div>
-
             <h1 className="font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{place.name}</h1>
-
-            <div className="flex flex-wrap justify-center gap-2">
-              {specialties.slice(0, 3).map((specialty) => (
-                <Badge key={specialty} className="border-white/15 bg-black/20 text-white/88 backdrop-blur-md">
-                  <Utensils className="h-3.5 w-3.5" /> {specialty}
-                </Badge>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -360,7 +333,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           <Card className="overflow-hidden border-alpine-sunset/30 bg-card shadow-premium">
             <CardContent className="grid gap-0 p-0 md:grid-cols-[220px_1fr_auto] md:items-center">
               <div className="relative aspect-[4/3] min-h-44 bg-muted md:aspect-auto md:h-full">
-                <Image
+                <SafeImage
                   src={recommendedImage}
                   alt={`Sugestão da casa em ${place.name}`}
                   fill

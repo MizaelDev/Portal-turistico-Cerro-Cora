@@ -32,16 +32,17 @@ export default function AboutCityPage() {
           quality={82}
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/35 to-background" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,17,14,0.58)_0%,rgba(8,17,14,0.34)_45%,rgba(8,17,14,0.18)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background/92 via-background/34 to-transparent" />
         <div className="container relative flex min-h-[68vh] items-end pb-16 pt-24 text-white">
           <div className="max-w-4xl">
-            <Badge className="border-white/25 bg-white/15 text-white backdrop-blur-xl">
+            <Badge className="border-white/35 bg-[#10201b]/55 text-white shadow-glass backdrop-blur-md">
               História, clima e identidade
             </Badge>
-            <h1 className="mt-6 font-display text-5xl font-semibold leading-tight md:text-7xl">
+            <h1 className="mt-6 font-display text-5xl font-semibold leading-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.45)] md:text-7xl">
               Sobre Cerro Corá
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/80">
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/86 drop-shadow-[0_3px_18px_rgba(0,0,0,0.42)]">
               A cidade serrana do Seridó reúne história, natureza, altitude e um
               clima ameno que sustenta o apelido de Suíça do Seridó.
             </p>

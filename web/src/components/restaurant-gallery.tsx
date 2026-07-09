@@ -11,13 +11,28 @@ type RestaurantGalleryProps = {
   name: string;
 };
 
+const fallbackImage = "/images/cerro-cora.jpg";
+
 export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
   const uniqueImages = useMemo(
     () => Array.from(new Set(images.map((image) => image.trim()).filter(Boolean))),
     [images],
   );
   const [activeIndex, setActiveIndex] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const hasMultipleImages = uniqueImages.length > 1;
+  const activeImage = uniqueImages[activeIndex] || "";
+  const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
+
+  const markImageAsFailed = useCallback((src: string) => {
+    setFailedImages((current) => {
+      if (!src || current.has(src)) return current;
+
+      const next = new Set(current);
+      next.add(src);
+      return next;
+    });
+  }, []);
 
   const goToPrevious = useCallback(() => {
     setActiveIndex((current) => (current === 0 ? uniqueImages.length - 1 : current - 1));
@@ -33,12 +48,14 @@ export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
     <div className="grid gap-4">
       <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-border bg-muted">
         <Image
-          key={uniqueImages[activeIndex]}
-          src={uniqueImages[activeIndex]}
+          key={activeSrc}
+          src={activeSrc}
           alt={`Foto ${activeIndex + 1} de ${name}`}
           fill
           sizes="(min-width: 1024px) 960px, 100vw"
           priority={activeIndex === 0}
+          quality={78}
+          onError={() => markImageAsFailed(activeImage)}
           className="object-cover transition-transform duration-500 hover:scale-[1.02]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -89,10 +106,13 @@ export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
               )}
             >
               <Image
-                src={image}
+                src={failedImages.has(image) ? fallbackImage : image}
                 alt={`Miniatura ${index + 1} de ${name}`}
                 fill
                 sizes="120px"
+                quality={52}
+                loading="lazy"
+                onError={() => markImageAsFailed(image)}
                 className="object-cover"
               />
             </button>

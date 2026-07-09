@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -34,6 +33,7 @@ import type { ReactNode } from "react";
 import { JsonLd } from "@/components/json-ld";
 import { LodgingCard } from "@/components/lodging-card";
 import { LodgingGallery } from "@/components/lodging-gallery";
+import { SafeImage } from "@/components/safe-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -244,7 +244,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
 
       <section className="relative min-h-[520px] overflow-hidden border-b border-border bg-[#10201b] text-white md:min-h-[560px]">
         {heroImage ? (
-          <Image
+          <SafeImage
             src={heroImage}
             alt={`Foto principal de ${lodging.name}`}
             fill
@@ -252,18 +252,13 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             sizes="100vw"
             className="object-cover"
           />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_20%,rgba(239,173,91,0.28),transparent_26%),radial-gradient(circle_at_82%_18%,rgba(84,117,70,0.32),transparent_28%),linear-gradient(135deg,#0b1713_0%,#132a22_52%,#1f1518_100%)]" />
-        )}
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,23,18,0.86)_0%,rgba(8,23,18,0.62)_48%,rgba(8,23,18,0.34)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,23,18,0.18)_0%,transparent_40%,rgba(8,23,18,0.62)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
+        ) : null}
 
         <div className="container relative z-10 grid min-h-[520px] content-end py-12 md:min-h-[560px] md:py-14">
           <div className="max-w-4xl">
             {lodging.logo ? (
               <div className="relative mb-5 h-16 w-16 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2 shadow-glass sm:h-20 sm:w-20 md:h-24 md:w-24">
-                <Image src={lodging.logo} alt={`Logo de ${lodging.name}`} fill sizes="96px" className="object-contain p-2" />
+                <SafeImage src={lodging.logo} alt={`Logo de ${lodging.name}`} fill sizes="96px" className="object-contain p-2" />
               </div>
             ) : null}
 
@@ -350,16 +345,6 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           </SectionShell>
         </div>
 
-        {images.length ? (
-          <SectionShell
-            title="Galeria"
-            eyebrow="Ambientes e detalhes"
-            description="Veja quartos, áreas comuns e detalhes da hospedagem antes de planejar sua estadia."
-          >
-            <LodgingGallery images={images} name={lodging.name} />
-          </SectionShell>
-        ) : null}
-
         {amenities.length ? (
           <SectionShell title="O que você encontrará" eyebrow="Comodidades">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -367,6 +352,29 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
                 <AmenityCard key={amenity.label} amenity={amenity} />
               ))}
             </div>
+          </SectionShell>
+        ) : null}
+
+        {highlights.length ? (
+          <SectionShell title="Por que escolher esta hospedagem?" eyebrow="Diferenciais">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {highlights.map((highlight) => (
+                <div key={highlight} className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 shadow-sm">
+                  <Sparkles className="h-5 w-5 shrink-0 text-alpine-sunset" />
+                  <p className="text-sm font-semibold">{highlight}</p>
+                </div>
+              ))}
+            </div>
+          </SectionShell>
+        ) : null}
+
+        {images.length ? (
+          <SectionShell
+            title="Galeria"
+            eyebrow="Ambientes e detalhes"
+            description="Veja quartos, áreas comuns e detalhes da hospedagem antes de planejar sua estadia."
+          >
+            <LodgingGallery images={images} name={lodging.name} />
           </SectionShell>
         ) : null}
 
@@ -385,19 +393,6 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
                     </p>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          </SectionShell>
-        ) : null}
-
-        {highlights.length ? (
-          <SectionShell title="Por que escolher esta hospedagem?" eyebrow="Diferenciais">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {highlights.map((highlight) => (
-                <div key={highlight} className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 shadow-sm">
-                  <Sparkles className="h-5 w-5 shrink-0 text-alpine-sunset" />
-                  <p className="text-sm font-semibold">{highlight}</p>
-                </div>
               ))}
             </div>
           </SectionShell>

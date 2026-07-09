@@ -44,7 +44,7 @@ export type PousadaRow = {
   instagram_url?: string | null;
   logo_url?: string | null;
   hero_image_url?: string | null;
-  imagens_urls: string[];
+  imagens_urls: string[] | null;
   check_in?: string | null;
   check_out?: string | null;
   capacidade?: string | null;

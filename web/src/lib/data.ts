@@ -2,11 +2,13 @@ import {
   CalendarDays,
   Compass,
   Hotel,
+  MapPinned,
   Mountain,
   ScrollText,
   ThermometerSun,
   Utensils,
 } from "lucide-react";
+import { enableCityServicesPage } from "@/lib/feature-flags";
 
 export type Attraction = {
   slug: string;
@@ -635,6 +637,16 @@ export const homeHighlights = [
     icon: CalendarDays,
     description: "Festival de Inverno, música, cultura e programação na Praça Pública.",
   },
+  ...(enableCityServicesPage
+    ? [
+        {
+          title: "Serviços da cidade",
+          href: "/servicos",
+          icon: MapPinned,
+          description: "Farmácias, saúde, combustível e contatos úteis.",
+        },
+      ]
+    : []),
 ];
 
 export const cityHistory: HistoryMilestone[] = [

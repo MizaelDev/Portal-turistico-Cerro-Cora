@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Clock, Instagram, MapPin, MessageCircle, Utensils } from "lucide-react";
+import { SafeImage } from "@/components/safe-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { FoodPlace } from "@/lib/data";
@@ -65,7 +65,7 @@ function getVisibleTags(place: FoodPlace) {
 function FoodImage({ place }: { place: FoodPlace }) {
   if (shouldShowPhoto(place.image)) {
     return (
-      <Image
+      <SafeImage
         src={place.image}
         alt={`Foto de ${place.name}`}
         fill

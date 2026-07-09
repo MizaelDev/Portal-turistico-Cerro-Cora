@@ -26,6 +26,7 @@ const galleryCategories = [
   "Vista",
   "Recepção",
 ];
+const fallbackImage = "/images/cerro-cora.jpg";
 
 export function LodgingGallery({ images, name }: LodgingGalleryProps) {
   const uniqueImages = useMemo(
@@ -36,8 +37,10 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [imageSizes, setImageSizes] = useState<Record<string, ImageSize>>({});
   const [isImageLoading, setIsImageLoading] = useState(true);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const hasMultipleImages = uniqueImages.length > 1;
   const activeImage = uniqueImages[activeIndex] || "";
+  const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
 
   useEffect(() => {
     if (activeImage) {
@@ -63,6 +66,17 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
     });
   }, []);
 
+  const markImageAsFailed = useCallback((src: string) => {
+    setIsImageLoading(false);
+    setFailedImages((current) => {
+      if (!src || current.has(src)) return current;
+
+      const next = new Set(current);
+      next.add(src);
+      return next;
+    });
+  }, []);
+
   const goToPrevious = useCallback(() => {
     setActiveIndex((current) => (current === 0 ? uniqueImages.length - 1 : current - 1));
   }, [uniqueImages.length]);
@@ -74,7 +88,7 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
   if (!uniqueImages.length) return null;
 
   const activeCategory = galleryCategories[activeIndex % galleryCategories.length];
-  const activeSize = imageSizes[activeImage];
+  const activeSize = imageSizes[activeSrc] || imageSizes[activeImage];
   const activeRatio = activeSize ? activeSize.width / activeSize.height : 16 / 10;
   const maxGalleryHeight = 680;
   const maxGalleryWidth = activeSize ? Math.min(1024, Math.round(maxGalleryHeight * activeRatio)) : 1024;
@@ -89,17 +103,18 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
         }}
       >
         <Image
-          key={activeImage}
-          src={activeImage}
+          key={activeSrc}
+          src={activeSrc}
           alt={`${activeCategory} de ${name}`}
           fill
           sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
           quality={82}
           loading="lazy"
           onLoad={(event) => {
-            registerImageSize(activeImage, event.currentTarget);
+            registerImageSize(activeSrc, event.currentTarget);
             setIsImageLoading(false);
           }}
+          onError={() => markImageAsFailed(activeImage)}
           className="object-contain"
         />
         {isImageLoading ? (
@@ -168,12 +183,13 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
               )}
             >
               <Image
-                src={image}
+                src={failedImages.has(image) ? fallbackImage : image}
                 alt={`Miniatura ${index + 1} de ${name}`}
                 fill
                 sizes="120px"
                 quality={52}
                 loading="lazy"
+                onError={() => markImageAsFailed(image)}
                 className="object-cover"
               />
             </button>
@@ -195,11 +211,12 @@ export function LodgingGallery({ images, name }: LodgingGalleryProps) {
           </Button>
           <div className="relative h-[78vh] w-full max-w-6xl overflow-hidden rounded-lg border border-white/15 bg-black">
             <Image
-              src={activeImage}
+              src={activeSrc}
               alt={`${activeCategory} de ${name}`}
               fill
               sizes="100vw"
               quality={90}
+              onError={() => markImageAsFailed(activeImage)}
               className="object-contain"
             />
           </div>

@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BedDouble, Info, MapPin, MessageCircle, WalletCards } from "lucide-react";
+import { SafeImage } from "@/components/safe-image";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -19,7 +19,7 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
   return (
     <article className="grid overflow-hidden rounded-lg border border-border bg-card shadow-sm md:grid-cols-[1.05fr_0.95fr]">
       <div className="relative min-h-80">
-        <Image
+        <SafeImage
           src={lodging.image}
           alt={`Foto principal de ${lodging.name}`}
           fill
