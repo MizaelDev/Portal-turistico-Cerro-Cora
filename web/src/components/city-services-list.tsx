@@ -17,6 +17,7 @@ import {
   ShoppingBasket,
   type LucideIcon,
 } from "lucide-react";
+import { BusinessStatusBadge } from "@/components/business-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -162,6 +163,11 @@ function ServiceRow({ service }: { service: CityService }) {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <ServiceBadge>{service.subcategory}</ServiceBadge>
                   <ServiceBadge>{getCityServiceCategoryLabel(service.category)}</ServiceBadge>
+                  <BusinessStatusBadge
+                    businessHours={service.businessHours}
+                    fallbackHours={service.openingHours}
+                    compact
+                  />
                   {hasImportantBadge ? (
                     <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                       {service.isEmergency ? "Emergência" : "Atendimento 24h"}

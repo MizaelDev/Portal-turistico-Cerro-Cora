@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { BusinessStatusBadge } from "@/components/business-status-badge";
 import { JsonLd } from "@/components/json-ld";
 import { LodgingCard } from "@/components/lodging-card";
 import { LodgingGallery } from "@/components/lodging-gallery";
@@ -332,6 +333,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           </SectionShell>
 
           <SectionShell title="Informações úteis" eyebrow="Planeje sua reserva">
+            <BusinessStatusBadge businessHours={lodging.businessHours} className="w-fit" />
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoCard icon={Clock} label="Check-in" value={lodging.checkIn || "A combinar"} />
               <InfoCard icon={Clock} label="Check-out" value={lodging.checkOut || "A combinar"} />

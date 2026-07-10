@@ -45,27 +45,40 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  parseBusinessHours,
+  serializeBusinessHours,
+  weekdayLabels,
+  weekdays,
+  type BusinessHours,
+  type BusinessHoursMode,
+  type WeekdayKey,
+} from "@/lib/business-hours";
+import { cityServiceCategories } from "@/lib/city-services";
 import type {
   AdminData,
   AdminEntity,
+  CityServiceRow,
   PontoTuristicoRow,
   PousadaRow,
   RestauranteRow,
 } from "@/lib/supabase";
 
 type FormState = Record<string, string | boolean>;
-type AdminRow = PontoTuristicoRow | PousadaRow | RestauranteRow;
+type AdminRow = PontoTuristicoRow | PousadaRow | RestauranteRow | CityServiceRow;
 
 const entityLabels: Record<AdminEntity, string> = {
   pontos_turisticos: "Pontos Turísticos",
   pousadas: "Pousadas",
   restaurantes: "Restaurantes",
+  city_services: "Serviços da Cidade",
 };
 
 const entityDescriptions: Record<AdminEntity, string> = {
   pontos_turisticos: "Cadastre mirantes, trilhas, áreas naturais e pontos de visitação.",
   pousadas: "Gerencie hospedagens, faixas de preço, WhatsApp e galerias.",
   restaurantes: "Gerencie restaurantes, bares, cafés e lanchonetes.",
+  city_services: "Prepare contatos úteis, emergências e serviços essenciais da cidade.",
 };
 
 const emptyForms: Record<AdminEntity, FormState> = {
@@ -99,6 +112,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     imagens_urls: "",
     check_in: "",
     check_out: "",
+    business_hours: "",
     capacidade: "",
     tipos_acomodacao: "",
     formas_pagamento: "",
@@ -116,6 +130,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     descricao_completa: "",
     categoria: "restaurante",
     horario_funcionamento: "",
+    business_hours: "",
     endereco: "",
     localizacao_resumida: "",
     mapa_url: "",
@@ -137,6 +152,24 @@ const emptyForms: Record<AdminEntity, FormState> = {
     destaque: false,
     ativo: true,
   },
+  city_services: {
+    nome: "",
+    slug: "",
+    descricao: "",
+    categoria: "saude",
+    subcategory: "",
+    address: "",
+    neighborhood: "",
+    phone: "",
+    whatsapp: "",
+    google_maps_url: "",
+    opening_hours: "",
+    business_hours: "",
+    is_emergency: false,
+    is_featured: false,
+    notes: "",
+    ativo: true,
+  },
 };
 
 const attractionCategories = [
@@ -155,6 +188,17 @@ const restaurantCategories = [
   ["café", "Café"],
   ["lanchonete", "Lanchonete"],
 ] as const;
+
+const cityServiceCategoryOptions = cityServiceCategories.map((category) => [
+  category.value,
+  category.label,
+] as const);
+
+function categoryOptionsForEntity(entity: AdminEntity) {
+  if (entity === "pontos_turisticos") return attractionCategories;
+  if (entity === "city_services") return cityServiceCategoryOptions;
+  return restaurantCategories;
+}
 
 const restaurantTags = [
   "Açaí",
@@ -246,6 +290,167 @@ function selectedLodgingOptions(
   return [...options, ...selected.filter((item) => !defaultOptions.has(item))];
 }
 
+function defaultBusinessHours(): BusinessHours {
+  return {
+    mode: "regular",
+    days: Object.fromEntries(
+      weekdays.map((day) => [day, { closed: true, open: "08:00", close: "18:00" }]),
+    ) as Record<WeekdayKey, { closed: boolean; open: string; close: string }>,
+  };
+}
+
+function businessHoursFromForm(value: string | boolean | undefined): BusinessHours {
+  const parsed = parseBusinessHours(typeof value === "string" ? value : "");
+  const fallback = defaultBusinessHours();
+
+  if (!parsed) return fallback;
+  if (parsed.mode === "24h" || parsed.mode === "appointment") return parsed;
+
+  return {
+    mode: "regular",
+    days: Object.fromEntries(
+      weekdays.map((day) => [
+        day,
+        {
+          closed: parsed.days?.[day]?.closed ?? true,
+          open: parsed.days?.[day]?.open || fallback.days?.[day]?.open || "08:00",
+          close: parsed.days?.[day]?.close || fallback.days?.[day]?.close || "18:00",
+        },
+      ]),
+    ) as Record<WeekdayKey, { closed: boolean; open: string; close: string }>,
+  };
+}
+
+function BusinessHoursEditor({
+  value,
+  onChange,
+}: {
+  value: string | boolean | undefined;
+  onChange: (value: string) => void;
+}) {
+  const hours = businessHoursFromForm(value);
+  const mode = hours.mode || "regular";
+
+  function updateHours(next: BusinessHours) {
+    onChange(serializeBusinessHours(next));
+  }
+
+  function updateMode(nextMode: BusinessHoursMode) {
+    if (nextMode === "24h" || nextMode === "appointment") {
+      updateHours({ mode: nextMode, days: {} });
+      return;
+    }
+
+    updateHours({ ...businessHoursFromForm(value), mode: "regular" });
+  }
+
+  function updateDay(day: WeekdayKey, nextValue: Partial<{ closed: boolean; open: string; close: string }>) {
+    const regularHours = businessHoursFromForm(value);
+    const currentDay = regularHours.days?.[day] || { closed: true, open: "08:00", close: "18:00" };
+
+    updateHours({
+      mode: "regular",
+      days: {
+        ...regularHours.days,
+        [day]: {
+          ...currentDay,
+          ...nextValue,
+        },
+      },
+    });
+  }
+
+  return (
+    <Card className="border-border/70 bg-background/45">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Status de funcionamento</CardTitle>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Configure os horários uma vez. O site calcula automaticamente se está aberto, fechado ou perto de fechar.
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <input type="hidden" name="business_hours" value={String(value || "")} />
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            ["regular", "Horários por dia"],
+            ["24h", "Atendimento 24 horas"],
+            ["appointment", "Somente agendamento"],
+          ].map(([option, label]) => (
+            <label
+              key={option}
+              className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium"
+            >
+              <input
+                type="radio"
+                name="business_hours_mode"
+                value={option}
+                checked={mode === option}
+                onChange={() => updateMode(option as BusinessHoursMode)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        {mode === "appointment" ? (
+          <p className="rounded-md border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-muted-foreground">
+            O site exibirá: Atendimento mediante agendamento.
+          </p>
+        ) : null}
+
+        {mode === "24h" ? (
+          <p className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-muted-foreground">
+            O site exibirá: Atendimento 24 horas.
+          </p>
+        ) : null}
+
+        {mode === "regular" ? (
+          <div className="grid gap-3">
+            {weekdays.map((day) => {
+              const dayHours = hours.days?.[day] || { closed: true, open: "08:00", close: "18:00" };
+
+              return (
+                <div
+                  key={day}
+                  className="grid gap-3 rounded-md border border-border bg-card p-3 md:grid-cols-[130px_1fr_1fr_120px] md:items-center"
+                >
+                  <p className="text-sm font-semibold">{weekdayLabels[day]}</p>
+                  <Label className="grid gap-1 text-xs text-muted-foreground">
+                    Abre
+                    <Input
+                      type="time"
+                      value={dayHours.open || "08:00"}
+                      disabled={Boolean(dayHours.closed)}
+                      onChange={(event) => updateDay(day, { open: event.target.value })}
+                    />
+                  </Label>
+                  <Label className="grid gap-1 text-xs text-muted-foreground">
+                    Fecha
+                    <Input
+                      type="time"
+                      value={dayHours.close || "18:00"}
+                      disabled={Boolean(dayHours.closed)}
+                      onChange={(event) => updateDay(day, { close: event.target.value })}
+                    />
+                  </Label>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(dayHours.closed)}
+                      onChange={(event) => updateDay(day, { closed: event.target.checked })}
+                    />
+                    Fechado
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 function splitImageLines(value: string | boolean | undefined) {
   return String(value || "")
     .split(/\n+/)
@@ -280,6 +485,28 @@ function imageSourceLabel(url: string) {
 }
 
 function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
+  if (entity === "city_services") {
+    const service = row as CityServiceRow;
+    return {
+      nome: service.name,
+      slug: service.slug || "",
+      descricao: service.description || "",
+      categoria: service.category,
+      subcategory: service.subcategory || "",
+      address: service.address || "",
+      neighborhood: service.neighborhood || "",
+      phone: service.phone || "",
+      whatsapp: service.whatsapp || "",
+      google_maps_url: service.google_maps_url || "",
+      opening_hours: service.opening_hours || "",
+      business_hours: service.business_hours ? serializeBusinessHours(service.business_hours) : "",
+      is_emergency: Boolean(service.is_emergency),
+      is_featured: Boolean(service.is_featured),
+      notes: service.notes || "",
+      ativo: service.is_active,
+    };
+  }
+
   if (entity === "pousadas") {
     const lodging = row as PousadaRow;
     return {
@@ -303,6 +530,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       imagens_urls: (lodging.imagens_urls || []).join("\n"),
       check_in: lodging.check_in || "",
       check_out: lodging.check_out || "",
+      business_hours: lodging.business_hours ? serializeBusinessHours(lodging.business_hours) : "",
       capacidade: lodging.capacidade || "",
       tipos_acomodacao: (lodging.tipos_acomodacao || []).join("\n"),
       formas_pagamento: (lodging.formas_pagamento || []).join("\n"),
@@ -324,6 +552,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       descricao_completa: restaurant.descricao_completa || "",
       categoria: restaurant.categoria,
       horario_funcionamento: restaurant.horario_funcionamento,
+      business_hours: restaurant.business_hours ? serializeBusinessHours(restaurant.business_hours) : "",
       endereco: restaurant.endereco,
       localizacao_resumida: restaurant.localizacao_resumida || "",
       mapa_url: restaurant.mapa_url || "",
@@ -360,6 +589,11 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
 }
 
 function rowSummary(entity: AdminEntity, row: AdminRow) {
+  if (entity === "city_services") {
+    const service = row as CityServiceRow;
+    return `${service.subcategory} · ${service.address || "Endereço a confirmar"}`;
+  }
+
   if (entity === "pousadas") {
     const lodging = row as PousadaRow;
     return lodging.localizacao;
@@ -372,6 +606,14 @@ function rowSummary(entity: AdminEntity, row: AdminRow) {
 
   const attraction = row as PontoTuristicoRow;
   return `${attraction.categoria} · ${attraction.localizacao}`;
+}
+
+function rowName(row: AdminRow) {
+  return "nome" in row ? row.nome : row.name;
+}
+
+function rowIsActive(row: AdminRow) {
+  return "ativo" in row ? row.ativo : row.is_active;
 }
 
 export function AdminDashboard({ initialData }: { initialData: AdminData }) {
@@ -427,7 +669,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     setForm(rowToForm(entity, row));
     setEditingId(row.id);
     setGalleryAction(null);
-    setStatus({ type: "idle", text: `Editando: ${row.nome}` });
+    setStatus({ type: "idle", text: `Editando: ${rowName(row)}` });
   }
 
   function submitForm(event: React.FormEvent<HTMLFormElement>) {
@@ -446,7 +688,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   }
 
   function removeRow(row: AdminRow) {
-    const confirmed = window.confirm(`Excluir "${row.nome}"? Essa ação não pode ser desfeita.`);
+    const confirmed = window.confirm(`Excluir "${rowName(row)}"? Essa ação não pode ser desfeita.`);
     if (!confirmed) return;
 
     startTransition(async () => {
@@ -1181,10 +1423,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(entity === "pontos_turisticos"
-                        ? attractionCategories
-                        : restaurantCategories
-                      ).map(([value, label]) => (
+                      {categoryOptionsForEntity(entity).map(([value, label]) => (
                         <SelectItem key={value} value={value}>
                           {label}
                         </SelectItem>
@@ -1193,6 +1432,150 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                   </Select>
                   <input type="hidden" name="categoria" value={String(form.categoria || "")} />
                 </div>
+              ) : null}
+
+              {entity === "city_services" ? (
+                <>
+                  <div className="rounded-lg border border-border bg-accent/20 p-4">
+                    <p className="text-sm font-semibold">Recurso futuro</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Estes dados alimentam a página /servicos. A página continua fora do menu enquanto a flag
+                      enableCityServicesPage estiver desativada.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="slug">Slug</Label>
+                      <Input
+                        id="slug"
+                        name="slug"
+                        value={String(form.slug || "")}
+                        onChange={(event) => updateField("slug", event.target.value)}
+                        placeholder="hospital-maternidade"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="subcategory">Tipo de serviço</Label>
+                      <Input
+                        id="subcategory"
+                        name="subcategory"
+                        value={String(form.subcategory || "")}
+                        onChange={(event) => updateField("subcategory", event.target.value)}
+                        placeholder="Hospital, farmácia, posto..."
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="address">Endereço</Label>
+                      <Input
+                        id="address"
+                        name="address"
+                        value={String(form.address || "")}
+                        onChange={(event) => updateField("address", event.target.value)}
+                        placeholder="Rua, avenida ou referência"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="neighborhood">Bairro / região</Label>
+                      <Input
+                        id="neighborhood"
+                        name="neighborhood"
+                        value={String(form.neighborhood || "")}
+                        onChange={(event) => updateField("neighborhood", event.target.value)}
+                        placeholder="Centro, zona rural..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="phone">Telefone</Label>
+                      <Input
+                        id="phone"
+                        name="phone"
+                        value={String(form.phone || "")}
+                        onChange={(event) => updateField("phone", event.target.value)}
+                        placeholder="(84) 0000-0000"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="whatsapp">WhatsApp</Label>
+                      <Input
+                        id="whatsapp"
+                        name="whatsapp"
+                        value={String(form.whatsapp || "")}
+                        onChange={(event) => updateField("whatsapp", event.target.value)}
+                        placeholder="5584999999999"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="google_maps_url">Link do Google Maps</Label>
+                      <Input
+                        id="google_maps_url"
+                        name="google_maps_url"
+                        value={String(form.google_maps_url || "")}
+                        onChange={(event) => updateField("google_maps_url", event.target.value)}
+                        placeholder="https://maps.google.com/..."
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="opening_hours">Horário resumido</Label>
+                      <Input
+                        id="opening_hours"
+                        name="opening_hours"
+                        value={String(form.opening_hours || "")}
+                        onChange={(event) => updateField("opening_hours", event.target.value)}
+                        placeholder="Seg. a sáb.: 8h às 18h"
+                      />
+                    </div>
+                  </div>
+
+                  <BusinessHoursEditor
+                    value={form.business_hours}
+                    onChange={(value) => updateField("business_hours", value)}
+                  />
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        name="is_emergency"
+                        checked={Boolean(form.is_emergency)}
+                        onChange={(event) => updateField("is_emergency", event.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Marcar como emergência
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        name="is_featured"
+                        checked={Boolean(form.is_featured)}
+                        onChange={(event) => updateField("is_featured", event.target.checked)}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Destacar na página
+                    </label>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="notes">Observações</Label>
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      value={String(form.notes || "")}
+                      onChange={(event) => updateField("notes", event.target.value)}
+                      placeholder="Ex: confirme o atendimento antes do deslocamento."
+                    />
+                  </div>
+                </>
               ) : null}
 
               {entity === "pontos_turisticos" ? (
@@ -1516,6 +1899,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  <BusinessHoursEditor
+                    value={form.business_hours}
+                    onChange={(value) => updateField("business_hours", value)}
+                  />
                   <div className="grid gap-2">
                     <Label htmlFor="capacidade">Capacidade</Label>
                     <Input
@@ -2008,6 +2395,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  <BusinessHoursEditor
+                    value={form.business_hours}
+                    onChange={(value) => updateField("business_hours", value)}
+                  />
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="localizacao_resumida">Localização resumida</Label>
@@ -2463,9 +2854,9 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{row.nome}</h3>
+                      <h3 className="font-semibold">{rowName(row)}</h3>
                       <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-muted-foreground">
-                        {row.ativo ? "Ativo" : "Inativo"}
+                        {rowIsActive(row) ? "Ativo" : "Inativo"}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{rowSummary(entity, row)}</p>

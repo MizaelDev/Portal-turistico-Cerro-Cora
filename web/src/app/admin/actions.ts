@@ -10,6 +10,7 @@ import {
   lodgings as defaultLodgings,
 } from "@/lib/data";
 import { requireAdminSession } from "@/lib/admin-auth";
+import { parseBusinessHours, parseLegacyBusinessHours, type BusinessHours } from "@/lib/business-hours";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseUrl, type AdminEntity } from "@/lib/supabase";
@@ -114,6 +115,7 @@ const whatsappSchema = z
   .trim()
   .min(10, "Informe um WhatsApp com DDD.")
   .regex(/^\d+$/, "Use apenas números no WhatsApp.");
+const businessHoursSchema = z.custom<BusinessHours | null>().nullable();
 
 const pontoTuristicoSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
@@ -146,6 +148,7 @@ const pousadaSchema = z.object({
   imagens_urls: z.array(pathOrUrl).min(1, "Informe ao menos uma imagem."),
   check_in: z.string().trim().nullable(),
   check_out: z.string().trim().nullable(),
+  business_hours: businessHoursSchema,
   capacidade: z.string().trim().nullable(),
   tipos_acomodacao: z.array(z.string().trim().min(1)).default([]),
   formas_pagamento: z.array(z.string().trim().min(1)).default([]),
@@ -164,6 +167,7 @@ const restauranteSchema = z.object({
   descricao_completa: z.string().trim().nullable(),
   categoria: z.enum(["restaurante", "almoço", "bar", "café", "lanchonete"]),
   horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
+  business_hours: businessHoursSchema,
   endereco: z.string().trim().min(2, "Informe o endereço."),
   localizacao_resumida: z.string().trim().nullable(),
   mapa_url: optionalGoogleMapsUrl,
@@ -184,6 +188,29 @@ const restauranteSchema = z.object({
   faixa_preco: z.enum(["R$", "R$$", "R$$$"]).nullable(),
   destaque: z.boolean(),
   ativo: z.boolean(),
+});
+
+const cityServiceSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome do serviço."),
+  slug: slugSchema,
+  category: z.enum(["saude", "seguranca", "transporte_apoio", "comercio_essencial", "emergencia"]),
+  subcategory: z.string().trim().min(2, "Informe o tipo de serviço."),
+  description: z.string().trim().nullable(),
+  address: z.string().trim().nullable(),
+  neighborhood: z.string().trim().nullable(),
+  phone: z.string().trim().nullable(),
+  whatsapp: z
+    .string()
+    .trim()
+    .nullable()
+    .refine((value) => !value || /^\d{10,15}$/.test(value), "Use apenas números no WhatsApp, com DDD."),
+  google_maps_url: optionalGoogleMapsUrl,
+  opening_hours: z.string().trim().nullable(),
+  business_hours: businessHoursSchema,
+  is_emergency: z.boolean(),
+  is_featured: z.boolean(),
+  is_active: z.boolean(),
+  notes: z.string().trim().nullable(),
 });
 
 const attractionGallerySchema = z.object({
@@ -333,6 +360,29 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     });
   }
 
+  if (entity === "city_services") {
+    const name = String(formData.get("nome") || "");
+
+    return cityServiceSchema.parse({
+      name,
+      slug: optionalText(formData.get("slug")) || slugify(name),
+      category: formData.get("categoria"),
+      subcategory: formData.get("subcategory"),
+      description: optionalText(formData.get("descricao")),
+      address: optionalText(formData.get("address")),
+      neighborhood: optionalText(formData.get("neighborhood")),
+      phone: optionalText(formData.get("phone")),
+      whatsapp: optionalText(formData.get("whatsapp")),
+      google_maps_url: optionalText(formData.get("google_maps_url")),
+      opening_hours: optionalText(formData.get("opening_hours")),
+      business_hours: parseBusinessHours(optionalText(formData.get("business_hours"))),
+      is_emergency: formData.get("is_emergency") === "on",
+      is_featured: formData.get("is_featured") === "on",
+      is_active: formData.get("ativo") === "on",
+      notes: optionalText(formData.get("notes")),
+    });
+  }
+
   if (entity === "pousadas") {
     return pousadaSchema.parse({
       nome: formData.get("nome"),
@@ -355,6 +405,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
       imagens_urls: imageList(formData.get("imagens_urls")),
       check_in: optionalText(formData.get("check_in")),
       check_out: optionalText(formData.get("check_out")),
+      business_hours: parseBusinessHours(optionalText(formData.get("business_hours"))),
       capacidade: optionalText(formData.get("capacidade")),
       tipos_acomodacao: textList(formData.get("tipos_acomodacao")),
       formas_pagamento: textList(formData.get("formas_pagamento")),
@@ -374,6 +425,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     descricao_completa: optionalText(formData.get("descricao_completa")),
     categoria: formData.get("categoria"),
     horario_funcionamento: formData.get("horario_funcionamento"),
+    business_hours: parseBusinessHours(optionalText(formData.get("business_hours"))),
     endereco: formData.get("endereco"),
     localizacao_resumida: optionalText(formData.get("localizacao_resumida")),
     mapa_url: optionalText(formData.get("mapa_url")),
@@ -404,6 +456,7 @@ function revalidatePublicPages() {
   revalidatePath("/pousadas/[slug]", "page");
   revalidatePath("/gastronomia");
   revalidatePath("/restaurantes/[slug]", "page");
+  revalidatePath("/servicos");
   revalidatePath("/");
 }
 
@@ -477,8 +530,11 @@ export async function saveAdminItem(
     const supabase = await requireAdmin();
     const payload = parsePayload(entity, formData);
 
-    if (entity === "restaurantes" || entity === "pousadas") {
-      const slugPayload = payload as z.infer<typeof restauranteSchema> | z.infer<typeof pousadaSchema>;
+    if (entity === "restaurantes" || entity === "pousadas" || entity === "city_services") {
+      const slugPayload = payload as
+        | z.infer<typeof restauranteSchema>
+        | z.infer<typeof pousadaSchema>
+        | z.infer<typeof cityServiceSchema>;
       if (slugPayload.slug) {
         let slugQuery = supabase.from(entity).select("id").eq("slug", slugPayload.slug);
         if (id) {
@@ -497,9 +553,10 @@ export async function saveAdminItem(
       }
     }
 
+    const selectColumns = entity === "city_services" ? "id,name,is_active" : "id,nome,ativo";
     const query = id
-      ? supabase.from(entity).update(payload as never).eq("id", id).select("id,nome,ativo").single()
-      : supabase.from(entity).insert(payload as never).select("id,nome,ativo").single();
+      ? supabase.from(entity).update(payload as never).eq("id", id).select(selectColumns).single()
+      : supabase.from(entity).insert(payload as never).select(selectColumns).single();
 
     const { data, error } = await query;
 
@@ -544,11 +601,13 @@ export async function saveAdminItem(
     }
 
     revalidatePublicPages();
+    const savedName = "nome" in data ? data.nome : data.name;
+
     return {
       ok: true,
       message: id
-        ? `Item atualizado com sucesso: ${data.nome}.`
-        : `Item cadastrado com sucesso: ${data.nome}.`,
+        ? `Item atualizado com sucesso: ${savedName}.`
+        : `Item cadastrado com sucesso: ${savedName}.`,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -1071,6 +1130,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         imagens_urls: [lodging.image, ...lodging.gallery],
         check_in: lodging.checkIn || null,
         check_out: lodging.checkOut || null,
+        business_hours: lodging.businessHours || null,
         capacidade: lodging.capacity || null,
         tipos_acomodacao: lodging.accommodationTypes || [],
         formas_pagamento: lodging.paymentMethods || [],
@@ -1097,6 +1157,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         descricao_completa: place.story || null,
         categoria: restaurantCategory(place.category),
         horario_funcionamento: place.hours,
+        business_hours: place.businessHours || parseLegacyBusinessHours(place.hours),
         endereco: place.location,
         localizacao_resumida: place.locationLabel || place.location,
         mapa_url: place.mapUrl || null,

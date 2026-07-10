@@ -26,7 +26,7 @@ const securityHeaders = [
   },
   {
     key: "X-Frame-Options",
-    value: "SAMEORIGIN",
+    value: "DENY",
   },
   {
     key: "X-Content-Type-Options",
@@ -62,7 +62,7 @@ const nextConfig = {
   outputFileTracingRoot: appDir,
   experimental: {
     serverActions: {
-      bodySizeLimit: "32mb",
+      bodySizeLimit: "64mb",
     },
   },
   images: {

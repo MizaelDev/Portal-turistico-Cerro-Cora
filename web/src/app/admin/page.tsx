@@ -33,10 +33,11 @@ async function getAdminData(): Promise<AdminLoadResult> {
   const supabase = await createSupabaseServerClient();
   await requireAdminSession(supabase);
 
-  const [pontos, pousadas, restaurantes, bucket] = await Promise.all([
+  const [pontos, pousadas, restaurantes, cityServices, bucket] = await Promise.all([
     supabase.from("pontos_turisticos").select("*").order("created_at", { ascending: false }),
     supabase.from("pousadas").select("*").order("created_at", { ascending: false }),
     supabase.from("restaurantes").select("*").order("created_at", { ascending: false }),
+    supabase.from("city_services").select("*").order("created_at", { ascending: false }),
     supabase.storage.getBucket("tourism"),
   ]);
 
@@ -44,6 +45,7 @@ async function getAdminData(): Promise<AdminLoadResult> {
     pontos.error ? "Não foi possível carregar os pontos turísticos." : null,
     pousadas.error ? "Não foi possível carregar as pousadas." : null,
     restaurantes.error ? "Não foi possível carregar os restaurantes." : null,
+    cityServices.error ? "Não foi possível carregar os serviços da cidade. Rode web/supabase/city-services.sql." : null,
     bucket.error ? "Não foi possível verificar o bucket de imagens." : null,
   ].filter(Boolean) as string[];
 
@@ -52,6 +54,7 @@ async function getAdminData(): Promise<AdminLoadResult> {
       pontos_turisticos: pontos.data || [],
       pousadas: pousadas.data || [],
       restaurantes: restaurantes.data || [],
+      city_services: cityServices.data || [],
     } as AdminData,
     errors,
   };

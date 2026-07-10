@@ -32,8 +32,8 @@ export default function AboutCityPage() {
           quality={82}
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,17,14,0.58)_0%,rgba(8,17,14,0.34)_45%,rgba(8,17,14,0.18)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background/92 via-background/34 to-transparent" />
+        <div className="absolute inset-0 hidden bg-[linear-gradient(180deg,rgba(8,17,14,0.58)_0%,rgba(8,17,14,0.34)_45%,rgba(8,17,14,0.18)_100%)] dark:block" />
+        <div className="absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-background/92 via-background/34 to-transparent dark:block" />
         <div className="container relative flex min-h-[68vh] items-end pb-16 pt-24 text-white">
           <div className="max-w-4xl">
             <Badge className="border-white/35 bg-[#10201b]/55 text-white shadow-glass backdrop-blur-md">

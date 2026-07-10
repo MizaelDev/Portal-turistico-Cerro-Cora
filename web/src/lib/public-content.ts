@@ -29,11 +29,11 @@ const attractionColumns =
 const lodgingColumns =
   "id,nome,descricao,localizacao,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,imagens_urls,ativo,created_at";
 const extendedLodgingColumns =
-  "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,ativo,created_at,updated_at";
+  "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,business_hours,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,ativo,created_at,updated_at";
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const extendedRestaurantColumns =
-  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
+  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,business_hours,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,ativo,created_at,updated_at";
 const publicContentTimeoutMs = 8000;
 
 const fetchWithTimeout: typeof fetch = async (input, init) => {
@@ -127,6 +127,7 @@ function mapPousada(row: PousadaRow): Lodging {
     priceRange: formatPriceRange(row.faixa_preco_min, row.faixa_preco_max),
     checkIn: row.check_in || undefined,
     checkOut: row.check_out || undefined,
+    businessHours: row.business_hours || undefined,
     capacity: row.capacidade || undefined,
     accommodationTypes: row.tipos_acomodacao || undefined,
     paymentMethods: row.formas_pagamento || undefined,
@@ -184,6 +185,7 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
     description: row.descricao,
     story: row.descricao_completa || row.descricao,
     hours: row.horario_funcionamento,
+    businessHours: row.business_hours || undefined,
     whatsapp: row.whatsapp,
     phone: row.telefone || undefined,
     instagram: row.instagram || "",
@@ -322,20 +324,97 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
 export async function getPublicLodgingPage(
   slug: string,
 ): Promise<PublicContent<Lodging> & { item: Lodging | null; related: Lodging[] }> {
-  const { items, error, source } = await getPublicLodgings();
-  const item = items.find((lodging) => (lodging.slug || slugify(lodging.name)) === slug) || null;
+  const supabase = createSupabasePublicClient();
+
+  if (!supabase) {
+    const item = fallbackLodgings.find((lodging) => (lodging.slug || slugify(lodging.name)) === slug) || null;
+
+    return {
+      items: fallbackLodgings,
+      item,
+      related: item
+        ? fallbackLodgings
+            .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
+            .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+            .slice(0, 3)
+        : [],
+      error: null,
+      source: "mock",
+    };
+  }
+
+  const itemResult = await supabase
+    .from("pousadas")
+    .select(extendedLodgingColumns)
+    .eq("ativo", true)
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (isSchemaCacheError(itemResult.error)) {
+    const { items, error, source } = await getPublicLodgings();
+    const item = items.find((lodging) => (lodging.slug || slugify(lodging.name)) === slug) || null;
+
+    return {
+      items,
+      item,
+      related: item
+        ? items
+            .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
+            .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+            .slice(0, 3)
+        : [],
+      error,
+      source,
+    };
+  }
+
+  if (itemResult.error) {
+    logPublicContentError("lodging-page", itemResult.error);
+    return { items: [], item: null, related: [], error: "Não foi possível carregar a pousada.", source: "supabase" };
+  }
+
+  if (!itemResult.data) {
+    const { items, error, source } = await getPublicLodgings();
+    const item = items.find((lodging) => (lodging.slug || slugify(lodging.name)) === slug) || null;
+
+    return {
+      items,
+      item,
+      related: item
+        ? items
+            .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
+            .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+            .slice(0, 3)
+        : [],
+      error,
+      source,
+    };
+  }
+
+  const item = mapPousada(itemResult.data as PousadaRow);
+  const relatedResult = await supabase
+    .from("pousadas")
+    .select(extendedLodgingColumns)
+    .eq("ativo", true)
+    .neq("id", item.id)
+    .order("destaque", { ascending: false })
+    .order("nome")
+    .limit(3);
+
+  const related = relatedResult.error
+    ? []
+    : ((relatedResult.data || []) as PousadaRow[]).map(mapPousada);
+
+  if (relatedResult.error) {
+    logPublicContentError("lodging-related", relatedResult.error);
+  }
 
   return {
-    items,
+    items: [item, ...related],
     item,
-    related: item
-      ? items
-          .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
-          .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
-          .slice(0, 3)
-      : [],
-    error,
-    source,
+    related,
+    error: null,
+    source: "supabase",
   };
 }
 
@@ -345,20 +424,107 @@ export async function getPublicRestaurantPage(slug: string): Promise<
     related: FoodPlace[];
   }
 > {
-  const { items, error, source } = await getPublicFoodPlaces();
-  const item = items.find((place) => (place.slug || slugify(place.name)) === slug) || null;
-  const related = item
-    ? items
-        .filter((place) => (place.slug || slugify(place.name)) !== slug)
-        .filter((place) => place.category === item.category || place.tags.some((tag) => item.tags.includes(tag)))
-        .slice(0, 3)
-    : [];
+  const supabase = createSupabasePublicClient();
+
+  if (!supabase) {
+    const item = fallbackFoodPlaces.find((place) => (place.slug || slugify(place.name)) === slug) || null;
+    const related = item
+      ? fallbackFoodPlaces
+          .filter((place) => (place.slug || slugify(place.name)) !== slug)
+          .filter((place) => place.category === item.category || place.tags.some((tag) => item.tags.includes(tag)))
+          .slice(0, 3)
+      : [];
+
+    return {
+      items: fallbackFoodPlaces,
+      item,
+      related,
+      error: null,
+      source: "mock",
+    };
+  }
+
+  const itemResult = await supabase
+    .from("restaurantes")
+    .select(extendedRestaurantColumns)
+    .eq("ativo", true)
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (isSchemaCacheError(itemResult.error)) {
+    const { items, error, source } = await getPublicFoodPlaces();
+    const item = items.find((place) => (place.slug || slugify(place.name)) === slug) || null;
+    const related = item
+      ? items
+          .filter((place) => (place.slug || slugify(place.name)) !== slug)
+          .filter((place) => place.category === item.category || place.tags.some((tag) => item.tags.includes(tag)))
+          .slice(0, 3)
+      : [];
+
+    return {
+      items,
+      item,
+      related,
+      error,
+      source,
+    };
+  }
+
+  if (itemResult.error) {
+    logPublicContentError("restaurant-page", itemResult.error);
+    return {
+      items: [],
+      item: null,
+      related: [],
+      error: "Não foi possível carregar o restaurante.",
+      source: "supabase",
+    };
+  }
+
+  if (!itemResult.data) {
+    const { items, error, source } = await getPublicFoodPlaces();
+    const item = items.find((place) => (place.slug || slugify(place.name)) === slug) || null;
+    const related = item
+      ? items
+          .filter((place) => (place.slug || slugify(place.name)) !== slug)
+          .filter((place) => place.category === item.category || place.tags.some((tag) => item.tags.includes(tag)))
+          .slice(0, 3)
+      : [];
+
+    return {
+      items,
+      item,
+      related,
+      error,
+      source,
+    };
+  }
+
+  const row = itemResult.data as RestauranteRow;
+  const item = mapRestaurante(row);
+  const relatedResult = await supabase
+    .from("restaurantes")
+    .select(extendedRestaurantColumns)
+    .eq("ativo", true)
+    .eq("categoria", row.categoria)
+    .neq("id", row.id)
+    .order("destaque", { ascending: false })
+    .order("nome")
+    .limit(3);
+
+  const related = relatedResult.error
+    ? []
+    : ((relatedResult.data || []) as RestauranteRow[]).map(mapRestaurante);
+
+  if (relatedResult.error) {
+    logPublicContentError("restaurant-related", relatedResult.error);
+  }
 
   return {
-    items,
+    items: [item, ...related],
     item,
     related,
-    error,
-    source,
+    error: null,
+    source: "supabase",
   };
 }

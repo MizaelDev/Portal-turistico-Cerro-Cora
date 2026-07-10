@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
 import { navItems } from "@/lib/navigation";
-import { getPublicFoodPlaces } from "@/lib/public-content";
+import { getPublicFoodPlaces, getPublicLodgings } from "@/lib/public-content";
 import { slugify } from "@/lib/slug";
 import { siteUrl } from "@/lib/utils";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { items: restaurants } = await getPublicFoodPlaces();
+  const [{ items: restaurants }, { items: lodgings }] = await Promise.all([
+    getPublicFoodPlaces(),
+    getPublicLodgings(),
+  ]);
   const baseRoutes = navItems.map((item) => ({
     url: siteUrl(item.href),
     lastModified: new Date(),
@@ -20,5 +23,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.65,
   }));
 
-  return [...baseRoutes, ...restaurantRoutes];
+  const lodgingRoutes = lodgings.map((lodging) => ({
+    url: siteUrl(`/pousadas/${lodging.slug || slugify(lodging.name)}`),
+    lastModified: lodging.updatedAt ? new Date(lodging.updatedAt) : new Date(),
+    changeFrequency: "monthly" as const,
+    priority: 0.65,
+  }));
+
+  return [...baseRoutes, ...restaurantRoutes, ...lodgingRoutes];
 }

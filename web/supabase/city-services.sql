@@ -13,6 +13,7 @@ create table if not exists public.city_services (
   whatsapp text,
   google_maps_url text,
   opening_hours text,
+  business_hours jsonb,
   is_emergency boolean not null default false,
   is_featured boolean not null default false,
   is_active boolean not null default true,
@@ -21,7 +22,13 @@ create table if not exists public.city_services (
   updated_at timestamptz not null default now()
 );
 
+alter table public.city_services
+  add column if not exists business_hours jsonb;
+
 alter table public.city_services enable row level security;
+
+grant select on public.city_services to anon, authenticated;
+grant insert, update, delete on public.city_services to authenticated;
 
 drop policy if exists "city_services public read active" on public.city_services;
 create policy "city_services public read active"

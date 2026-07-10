@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BedDouble, Info, MapPin, MessageCircle, WalletCards } from "lucide-react";
+import { BusinessStatusBadge } from "@/components/business-status-badge";
 import { SafeImage } from "@/components/safe-image";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +63,7 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
         ) : null}
 
         <div className="mt-5 grid gap-2 text-sm text-muted-foreground">
+          <BusinessStatusBadge businessHours={lodging.businessHours} compact className="mb-1 w-fit" />
           <a
             href={mapHref}
             target="_blank"

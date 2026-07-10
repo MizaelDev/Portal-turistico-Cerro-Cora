@@ -1,3 +1,12 @@
+import type { BusinessHours } from "@/lib/business-hours";
+import { createClient } from "@supabase/supabase-js";
+import {
+  isSupabaseConfigured,
+  type CityServiceRow,
+  supabaseAnonKey,
+  supabaseUrl,
+} from "@/lib/supabase";
+
 export type CityServiceCategory =
   | "saude"
   | "seguranca"
@@ -18,6 +27,7 @@ export type CityService = {
   whatsapp?: string;
   googleMapsUrl?: string;
   openingHours?: string;
+  businessHours?: BusinessHours;
   isEmergency: boolean;
   isFeatured: boolean;
   isActive: boolean;
@@ -109,8 +119,62 @@ export const cityServiceAdminFields = [
   "notes",
 ] as const;
 
-export function getActiveCityServices() {
-  return cityServices.filter((service) => service.isActive);
+const cityServiceColumns =
+  "id,name,slug,category,subcategory,description,address,neighborhood,phone,whatsapp,google_maps_url,opening_hours,business_hours,is_emergency,is_featured,is_active,notes,created_at,updated_at";
+
+function mapCityService(row: CityServiceRow): CityService {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    category: row.category,
+    subcategory: row.subcategory,
+    description: row.description || "",
+    address: row.address || "",
+    neighborhood: row.neighborhood || "",
+    phone: row.phone || undefined,
+    whatsapp: row.whatsapp || undefined,
+    googleMapsUrl: row.google_maps_url || undefined,
+    openingHours: row.opening_hours || undefined,
+    businessHours: row.business_hours || undefined,
+    isEmergency: row.is_emergency,
+    isFeatured: row.is_featured,
+    isActive: row.is_active,
+    notes: row.notes || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || undefined,
+  };
+}
+
+export async function getActiveCityServices() {
+  if (!isSupabaseConfigured || !supabaseUrl || !supabaseAnonKey) {
+    return cityServices.filter((service) => service.isActive);
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const { data, error } = await supabase
+    .from("city_services")
+    .select(cityServiceColumns)
+    .eq("is_active", true)
+    .order("is_emergency", { ascending: false })
+    .order("is_featured", { ascending: false })
+    .order("name");
+
+  if (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[city-services]", error);
+    }
+
+    return cityServices.filter((service) => service.isActive);
+  }
+
+  return ((data || []) as CityServiceRow[]).map(mapCityService);
 }
 
 export function getCityServiceCategoryLabel(category: CityServiceCategory) {

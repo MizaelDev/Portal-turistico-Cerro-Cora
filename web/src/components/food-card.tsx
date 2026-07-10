@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Clock, Instagram, MapPin, MessageCircle, Utensils } from "lucide-react";
+import { BusinessStatusBadge } from "@/components/business-status-badge";
 import { SafeImage } from "@/components/safe-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,6 +125,12 @@ export function FoodCard({ place }: { place: FoodPlace }) {
           <h3 className="mt-5 font-display text-2xl font-semibold leading-tight">{place.name}</h3>
         </div>
         <div className="grid gap-2 rounded-md border border-border/70 bg-background/45 p-3 text-sm text-muted-foreground">
+          <BusinessStatusBadge
+            businessHours={place.businessHours}
+            fallbackHours={place.hours}
+            compact
+            className="mb-1 w-fit"
+          />
           <span className="flex items-center gap-2">
             <Clock className="h-4 w-4 shrink-0 text-alpine-wine" />
             <span>{place.hours}</span>

@@ -55,7 +55,7 @@ export default function FestivalPage() {
           quality={45}
           className="object-cover opacity-25 blur-sm"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#08110e]/86 via-[#10201b]/82 to-[#10201b]" />
+        <div className="absolute inset-0 hidden bg-gradient-to-b from-[#08110e]/86 via-[#10201b]/82 to-[#10201b] dark:block" />
         <div className="container relative grid min-h-[78vh] gap-10 py-20 lg:grid-cols-[minmax(0,0.9fr)_minmax(24rem,34rem)] lg:items-center">
           <div>
             <Badge className="border-white/25 bg-white/15 text-white backdrop-blur-xl">

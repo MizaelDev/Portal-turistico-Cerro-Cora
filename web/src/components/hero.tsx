@@ -17,8 +17,8 @@ export function Hero() {
         quality={82}
         className="object-cover"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.56)_0%,rgba(0,0,0,0.38)_58%,rgba(0,0,0,0.12)_100%)] md:bg-[linear-gradient(90deg,rgba(0,0,0,0.48)_0%,rgba(0,0,0,0.28)_42%,rgba(0,0,0,0.08)_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-background/85 via-background/25 to-transparent" />
+      <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,rgba(0,0,0,0.56)_0%,rgba(0,0,0,0.38)_58%,rgba(0,0,0,0.12)_100%)] dark:block md:bg-[linear-gradient(90deg,rgba(0,0,0,0.48)_0%,rgba(0,0,0,0.28)_42%,rgba(0,0,0,0.08)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 hidden h-28 bg-gradient-to-t from-background/85 via-background/25 to-transparent dark:block" />
 
       <div className="container relative flex min-h-[calc(100vh-5rem)] items-center pb-20 pt-16">
         <div className="max-w-[700px] text-white">

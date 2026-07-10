@@ -37,6 +37,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { BusinessStatusBadge } from "@/components/business-status-badge";
 import { FoodCard } from "@/components/food-card";
 import { JsonLd } from "@/components/json-ld";
 import { RestaurantGallery } from "@/components/restaurant-gallery";
@@ -308,7 +309,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
       <JsonLd data={restaurantDetailSchema({ ...place, slug: restaurantSlug(place) })} />
 
       <section className="relative overflow-hidden border-b border-border bg-[#10201b] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(234,169,90,0.10),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_55%)]" />
+        <div className="absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_0%,rgba(234,169,90,0.10),transparent_38%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_55%)] dark:block" />
         <div className="container relative z-10 grid min-h-[280px] content-center py-14 md:min-h-[340px] md:py-16">
           <div className="mx-auto grid max-w-4xl justify-items-center gap-4 text-center md:gap-5">
             {logoImage ? (
@@ -393,6 +394,11 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           </SectionShell>
 
           <SectionShell title="Informações úteis" eyebrow="Planeje a visita">
+            <BusinessStatusBadge
+              businessHours={place.businessHours}
+              fallbackHours={place.hours}
+              className="w-fit"
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoCard
                 icon={Clock}

@@ -8,6 +8,7 @@ import {
   ThermometerSun,
   Utensils,
 } from "lucide-react";
+import type { BusinessHours } from "@/lib/business-hours";
 import { enableCityServicesPage } from "@/lib/feature-flags";
 
 export type Attraction = {
@@ -34,6 +35,7 @@ export type FoodPlace = {
   description: string;
   story?: string;
   hours: string;
+  businessHours?: BusinessHours;
   whatsapp: string;
   phone?: string;
   instagram: string;
@@ -77,6 +79,7 @@ export type Lodging = {
   priceDisclaimer?: string;
   checkIn?: string;
   checkOut?: string;
+  businessHours?: BusinessHours;
   capacity?: string;
   accommodationTypes?: string[];
   paymentMethods?: string[];

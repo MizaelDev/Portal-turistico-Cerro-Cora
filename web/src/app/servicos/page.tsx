@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 export const revalidate = 300;
 
-export default function CityServicesPage() {
-  const services = getActiveCityServices();
+export default async function CityServicesPage() {
+  const services = await getActiveCityServices();
 
   return (
     <section className="container py-20">
