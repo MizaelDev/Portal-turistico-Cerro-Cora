@@ -4,16 +4,21 @@ import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { analyticsService } from "@/lib/analytics";
+import { useCarouselSwipe } from "@/hooks/use-carousel-swipe";
 import { cn } from "@/lib/utils";
 
 type RestaurantGalleryProps = {
   images: string[];
   name: string;
+  entityId?: string;
+  category?: string;
+  planType?: string;
 };
 
 const fallbackImage = "/images/cerro-cora.jpg";
 
-export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
+export function RestaurantGallery({ images, name, entityId, category, planType }: RestaurantGalleryProps) {
   const uniqueImages = useMemo(
     () => Array.from(new Set(images.map((image) => image.trim()).filter(Boolean))),
     [images],
@@ -34,27 +39,48 @@ export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
     });
   }, []);
 
+  const trackGalleryInteraction = useCallback((eventType: "gallery_click" | "carousel_click") => {
+    analyticsService.track({
+      entityType: "restaurant",
+      entityId,
+      eventType,
+      establishmentName: name,
+      category,
+      planType,
+    });
+  }, [category, entityId, name, planType]);
+
   const goToPrevious = useCallback(() => {
+    trackGalleryInteraction("carousel_click");
     setActiveIndex((current) => (current === 0 ? uniqueImages.length - 1 : current - 1));
-  }, [uniqueImages.length]);
+  }, [trackGalleryInteraction, uniqueImages.length]);
 
   const goToNext = useCallback(() => {
+    trackGalleryInteraction("carousel_click");
     setActiveIndex((current) => (current === uniqueImages.length - 1 ? 0 : current + 1));
-  }, [uniqueImages.length]);
+  }, [trackGalleryInteraction, uniqueImages.length]);
+  const swipeHandlers = useCarouselSwipe({
+    enabled: hasMultipleImages,
+    onPrevious: goToPrevious,
+    onNext: goToNext,
+  });
 
   if (!uniqueImages.length) return null;
 
   return (
     <div className="grid gap-4">
-      <div className="relative aspect-[16/10] overflow-hidden rounded-lg border border-border bg-muted">
+      <div
+        className="relative aspect-[16/10] touch-pan-y overflow-hidden rounded-lg border border-border bg-muted"
+        {...swipeHandlers}
+      >
         <Image
           key={activeSrc}
           src={activeSrc}
           alt={`Foto ${activeIndex + 1} de ${name}`}
           fill
           sizes="(min-width: 1024px) 960px, 100vw"
-          priority={activeIndex === 0}
           quality={78}
+          loading="lazy"
           onError={() => markImageAsFailed(activeImage)}
           className="object-cover transition-transform duration-500 hover:scale-[1.02]"
         />
@@ -97,7 +123,10 @@ export function RestaurantGallery({ images, name }: RestaurantGalleryProps) {
               key={image}
               type="button"
               aria-label={`Abrir foto ${index + 1}`}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => {
+                trackGalleryInteraction("gallery_click");
+                setActiveIndex(index);
+              }}
               className={cn(
                 "relative aspect-[4/3] overflow-hidden rounded-md border bg-muted transition-all",
                 activeIndex === index

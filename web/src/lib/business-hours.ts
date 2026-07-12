@@ -11,6 +11,8 @@ export type BusinessDayHours = {
   closed?: boolean;
   open?: string;
   close?: string;
+  secondOpen?: string;
+  secondClose?: string;
 };
 
 export type BusinessHoursMode = "regular" | "24h" | "appointment";
@@ -33,6 +35,13 @@ export type BusinessStatus = {
   isOpen: boolean;
   nextOpening?: string;
   closingTime?: string;
+  message: string;
+};
+
+export type BusinessStatusContext = "food" | "lodging" | "service";
+
+export type BusinessStatusPresentation = {
+  label: string;
   message: string;
 };
 
@@ -159,6 +168,8 @@ function normalizeBusinessHours(hours?: BusinessHours | null): BusinessHours | n
       closed: Boolean(value?.closed) || !open || !close,
       open,
       close,
+      secondOpen: value?.secondOpen?.trim() || undefined,
+      secondClose: value?.secondClose?.trim() || undefined,
     };
   }
 
@@ -168,13 +179,9 @@ function normalizeBusinessHours(hours?: BusinessHours | null): BusinessHours | n
   };
 }
 
-function dayIsOpen(day?: BusinessDayHours): day is BusinessDayHours & { open: string; close: string } {
-  return Boolean(day && !day.closed && day.open && day.close);
-}
-
-function dayScheduleWindow(day: BusinessDayHours, offsetDays: number) {
-  const open = parseTimeToMinutes(day.open);
-  const close = parseTimeToMinutes(day.close);
+function scheduleWindow(openValue: string | undefined, closeValue: string | undefined, offsetDays: number) {
+  const open = parseTimeToMinutes(openValue);
+  const close = parseTimeToMinutes(closeValue);
 
   if (open === null || close === null) return null;
 
@@ -187,6 +194,17 @@ function dayScheduleWindow(day: BusinessDayHours, offsetDays: number) {
   };
 }
 
+function dayScheduleWindows(day: BusinessDayHours | undefined, offsetDays: number) {
+  if (!day || day.closed) return [];
+
+  return [
+    scheduleWindow(day.open, day.close, offsetDays),
+    scheduleWindow(day.secondOpen, day.secondClose, offsetDays),
+  ]
+    .filter((window): window is { open: number; close: number } => Boolean(window))
+    .sort((first, second) => first.open - second.open);
+}
+
 function relativeOpeningLabel(offsetDays: number, day: WeekdayKey, openingTime: string) {
   if (offsetDays === 0) return `Abre hoje às ${openingTime}`;
   if (offsetDays === 1) return `Abre amanhã às ${openingTime}`;
@@ -197,16 +215,13 @@ function findNextOpening(hours: BusinessHours, todayIndex: number, currentMinute
   for (let offset = 0; offset <= 7; offset += 1) {
     const dayKey = weekdays[(todayIndex + offset) % 7];
     const day = hours.days?.[dayKey];
-    if (!dayIsOpen(day)) continue;
-
-    const window = dayScheduleWindow(day, offset);
-    if (!window) continue;
-
-    if (window.open > currentMinutes) {
-      return {
-        label: relativeOpeningLabel(offset, dayKey, formatMinutes(window.open)),
-        time: formatMinutes(window.open),
-      };
+    for (const window of dayScheduleWindows(day, offset)) {
+      if (window.open > currentMinutes) {
+        return {
+          label: relativeOpeningLabel(offset, dayKey, formatMinutes(window.open)),
+          time: formatMinutes(window.open),
+        };
+      }
     }
   }
 
@@ -255,12 +270,8 @@ export function getBusinessStatus(
   for (const offset of [-1, 0]) {
     const dayKey = weekdays[(weekdayIndex + offset + 7) % 7];
     const day = hours.days?.[dayKey];
-    if (!dayIsOpen(day)) continue;
-
-    const window = dayScheduleWindow(day, offset);
-    if (!window) continue;
-
-    if (currentAbsoluteMinutes >= window.open && currentAbsoluteMinutes < window.close) {
+    for (const window of dayScheduleWindows(day, offset)) {
+      if (currentAbsoluteMinutes < window.open || currentAbsoluteMinutes >= window.close) continue;
       const minutesToClose = window.close - currentAbsoluteMinutes;
       const closingTime = formatMinutes(window.close);
 
@@ -289,6 +300,69 @@ export function getBusinessStatus(
     isOpen: false,
     nextOpening: nextOpening?.time,
     message: nextOpening?.label || "Horário a confirmar",
+  };
+}
+
+function compactTime(value?: string) {
+  if (!value) return null;
+  const [hour, minute] = value.split(":");
+  return minute === "00" ? `${Number(hour)}h` : `${Number(hour)}h${minute}`;
+}
+
+function contextualNextOpening(message: string, context: BusinessStatusContext) {
+  const contextual = context === "lodging" ? message.replace(/^Abre/, "Retorna") : message;
+  return contextual.replace(/(\d{2}):(\d{2})/g, (_, hour: string, minute: string) =>
+    minute === "00" ? `${Number(hour)}h` : `${Number(hour)}h${minute}`,
+  );
+}
+
+export function getBusinessStatusPresentation(
+  status: BusinessStatus,
+  context: BusinessStatusContext = "food",
+): BusinessStatusPresentation {
+  if (context === "lodging") {
+    const closingTime = compactTime(status.closingTime);
+    const labels: Record<BusinessStatusKind, string> = {
+      open: "Recepção disponível",
+      closing_soon: "Recepção encerra em breve",
+      closed: "Recepção fechada",
+      always_open: "Atendimento 24 horas",
+      appointment: "Atendimento mediante reserva",
+      unknown: "Horário da recepção a confirmar",
+    };
+
+    return {
+      label: labels[status.status],
+      message:
+        (status.status === "open" || status.status === "closing_soon") && closingTime
+          ? `Atendimento até ${closingTime}`
+          : status.status === "closed"
+            ? contextualNextOpening(status.message, context)
+            : labels[status.status],
+    };
+  }
+
+  const labels: Record<BusinessStatusKind, string> = context === "service"
+    ? {
+        open: "Atendimento disponível",
+        closing_soon: "Atendimento encerra em breve",
+        closed: "Atendimento encerrado",
+        always_open: "Atendimento 24 horas",
+        appointment: "Atendimento mediante agendamento",
+        unknown: "Horário a confirmar",
+      }
+    : {
+        open: "Aberto agora",
+        closing_soon: "Fecha em breve",
+        closed: "Fechado",
+        always_open: "Atendimento 24 horas",
+        appointment: "Somente agendamento",
+        unknown: "Horário a confirmar",
+      };
+
+  return {
+    label: labels[status.status],
+    message: status.message,
   };
 }
 

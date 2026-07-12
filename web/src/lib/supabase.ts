@@ -1,4 +1,11 @@
 import type { BusinessHours } from "@/lib/business-hours";
+import type {
+  CommercialPlan,
+  CustomCommercialFeatures,
+  LegacyCommercialPlan,
+  ListingType,
+  PlanStatus,
+} from "@/lib/commercial";
 
 export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -14,12 +21,7 @@ export type PontoTuristicoCategory =
   | "aventura";
 
 export type RestauranteCategory = "restaurante" | "almoço" | "bar" | "café" | "lanchonete";
-export type CityServiceCategory =
-  | "saude"
-  | "seguranca"
-  | "transporte_apoio"
-  | "comercio_essencial"
-  | "emergencia";
+export type CityServiceCategory = string;
 
 export type PontoTuristicoRow = {
   id: string;
@@ -64,6 +66,29 @@ export type PousadaRow = {
   diferencial_principal?: string | null;
   aceita_reservas?: boolean | null;
   destaque?: boolean | null;
+  plano?: CommercialPlan | LegacyCommercialPlan | null;
+  plan_type?: CommercialPlan | null;
+  plan_status?: PlanStatus | null;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  custom_features?: CustomCommercialFeatures | null;
+  carousel_photo_limit?: number | null;
+  gallery_photo_limit?: number | null;
+  featured_order?: number | null;
+  category_priority?: number | null;
+  professional_photography_included?: boolean | null;
+  photography_completed_at?: string | null;
+  social_media_promotion_included?: boolean | null;
+  social_media_publication_url?: string | null;
+  advanced_report_enabled?: boolean | null;
+  priority_support_enabled?: boolean | null;
+  seasonal_campaign_enabled?: boolean | null;
+  establishment_story_enabled?: boolean | null;
+  commercial_notes?: string | null;
+  plan_change_reason?: string | null;
+  whatsapp_message?: string | null;
+  site_url?: string | null;
+  pagina_ativa?: boolean | null;
   ativo: boolean;
   created_at: string;
   updated_at?: string | null;
@@ -97,6 +122,29 @@ export type RestauranteRow = {
   cardapio_url?: string | null;
   faixa_preco?: "R$" | "R$$" | "R$$$" | null;
   destaque?: boolean | null;
+  plano?: CommercialPlan | LegacyCommercialPlan | null;
+  plan_type?: CommercialPlan | null;
+  plan_status?: PlanStatus | null;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  custom_features?: CustomCommercialFeatures | null;
+  carousel_photo_limit?: number | null;
+  gallery_photo_limit?: number | null;
+  featured_order?: number | null;
+  category_priority?: number | null;
+  professional_photography_included?: boolean | null;
+  photography_completed_at?: string | null;
+  social_media_promotion_included?: boolean | null;
+  social_media_publication_url?: string | null;
+  advanced_report_enabled?: boolean | null;
+  priority_support_enabled?: boolean | null;
+  seasonal_campaign_enabled?: boolean | null;
+  establishment_story_enabled?: boolean | null;
+  commercial_notes?: string | null;
+  plan_change_reason?: string | null;
+  whatsapp_message?: string | null;
+  site_url?: string | null;
+  pagina_ativa?: boolean | null;
   ativo: boolean;
   created_at: string;
   updated_at?: string | null;
@@ -116,6 +164,39 @@ export type CityServiceRow = {
   google_maps_url: string | null;
   opening_hours: string | null;
   business_hours?: BusinessHours | null;
+  instagram?: string | null;
+  instagram_url?: string | null;
+  site_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  image_url?: string | null;
+  logo_url?: string | null;
+  plan?: CommercialPlan | LegacyCommercialPlan | null;
+  listing_type?: ListingType | null;
+  plan_type?: CommercialPlan | null;
+  plan_status?: PlanStatus | null;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  custom_features?: CustomCommercialFeatures | null;
+  carousel_photo_limit?: number | null;
+  gallery_photo_limit?: number | null;
+  featured_order?: number | null;
+  category_priority?: number | null;
+  professional_photography_included?: boolean | null;
+  photography_completed_at?: string | null;
+  social_media_promotion_included?: boolean | null;
+  social_media_publication_url?: string | null;
+  advanced_report_enabled?: boolean | null;
+  priority_support_enabled?: boolean | null;
+  seasonal_campaign_enabled?: boolean | null;
+  establishment_story_enabled?: boolean | null;
+  commercial_notes?: string | null;
+  plan_change_reason?: string | null;
+  tags?: string[] | null;
+  enabled_buttons?: string[] | null;
+  important_message?: string | null;
+  is_24h?: boolean | null;
+  whatsapp_message?: string | null;
   is_emergency: boolean;
   is_featured: boolean;
   is_active: boolean;

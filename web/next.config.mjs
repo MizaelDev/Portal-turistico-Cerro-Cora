@@ -10,15 +10,15 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "base-uri 'self'",
-      "frame-ancestors 'self'",
+      "frame-ancestors 'none'",
       "object-src 'none'",
       "form-action 'self'",
-      `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline' https://www.googletagmanager.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://images.unsplash.com https://images.pexels.com https://*.supabase.co",
+      "img-src 'self' data: blob: https://images.unsplash.com https://images.pexels.com https://*.supabase.co https://www.google-analytics.com https://*.google-analytics.com",
       "font-src 'self' data:",
       "frame-src 'self' https://www.google.com https://maps.google.com",
-      `connect-src 'self' https://api.openweathermap.org https://*.supabase.co https://vitals.vercel-insights.com${
+      `connect-src 'self' https://api.openweathermap.org https://*.supabase.co https://vitals.vercel-insights.com https://www.google-analytics.com https://*.google-analytics.com${
         isDevelopment ? " ws://localhost:* http://localhost:*" : ""
       }`,
       "upgrade-insecure-requests",
@@ -67,6 +67,7 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [45, 52, 75, 76, 78, 82, 84, 90],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {

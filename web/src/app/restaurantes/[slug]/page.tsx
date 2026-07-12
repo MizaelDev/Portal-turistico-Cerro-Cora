@@ -42,9 +42,12 @@ import { FoodCard } from "@/components/food-card";
 import { JsonLd } from "@/components/json-ld";
 import { RestaurantGallery } from "@/components/restaurant-gallery";
 import { SafeImage } from "@/components/safe-image";
+import { TrackedLink } from "@/components/tracked-link";
+import { TrackView } from "@/components/track-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { FoodPlace } from "@/lib/data";
+import { getCommercialFeatures, whatsappUrl } from "@/lib/commercial";
 import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
 import { getPublicFoodPlaces, getPublicRestaurantPage } from "@/lib/public-content";
 import { createMetadata, restaurantDetailSchema } from "@/lib/seo";
@@ -181,7 +184,13 @@ function getHouseOfferings(place: FoodPlace, specialties: string[], features: st
 
 export async function generateStaticParams() {
   const { items } = await getPublicFoodPlaces();
-  return items.map((place) => ({ slug: restaurantSlug(place) }));
+  return items
+    .filter((place) => getCommercialFeatures(place.plan, {
+      status: place.planStatus,
+      customFeatures: place.customFeatures,
+      pageEnabled: place.pageEnabled,
+    }).individualPage)
+    .map((place) => ({ slug: restaurantSlug(place) }));
 }
 
 export async function generateMetadata({ params }: RestaurantPageProps): Promise<Metadata> {
@@ -189,11 +198,7 @@ export async function generateMetadata({ params }: RestaurantPageProps): Promise
   const { item } = await getPublicRestaurantPage(slug);
 
   if (!item) {
-    return createMetadata({
-      title: "Restaurante não encontrado",
-      path: `/restaurantes/${slug}`,
-      description: "Restaurante não encontrado no guia gastronômico de Cerro Corá-RN.",
-    });
+    notFound();
   }
 
   return createMetadata({
@@ -303,9 +308,19 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
   const houseOfferings = getHouseOfferings(place, specialties, features);
   const paymentMethods = place.paymentMethods || [];
   const priceRange = formatPriceRange(place.priceRange);
+  const commercialFeatures = place.commercialFeatures || getCommercialFeatures(place.plan, {
+    status: place.planStatus,
+    customFeatures: place.customFeatures,
+    pageEnabled: place.pageEnabled,
+  });
+  const analyticsMeta = {
+    establishmentName: place.name,
+    category: place.category,
+    planType: place.plan || "bronze",
+  };
 
   return (
-    <>
+    <TrackView entityType="restaurant" entityId={place.id} eventType="page_view" {...analyticsMeta}>
       <JsonLd data={restaurantDetailSchema({ ...place, slug: restaurantSlug(place) })} />
 
       <section className="relative overflow-hidden border-b border-border bg-[#10201b] text-white">
@@ -318,6 +333,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
                   src={logoImage}
                   alt={`Logo de ${place.name}`}
                   fill
+                  priority
                   sizes="(min-width: 768px) 112px, 80px"
                   className="object-contain p-2"
                 />
@@ -355,9 +371,17 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
               </div>
               <div className="px-5 pb-5 md:px-6 md:pb-0">
                 <Button asChild variant="warm">
-                  <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
+                  <TrackedLink
+                    href={whatsappUrl(place.whatsapp, place.whatsappMessage)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    entityType="restaurant"
+                    entityId={place.id}
+                    eventType="whatsapp_click"
+                    {...analyticsMeta}
+                  >
                     Chamar no WhatsApp <MessageCircle className="h-4 w-4" />
-                  </a>
+                  </TrackedLink>
                 </Button>
               </div>
             </CardContent>
@@ -369,7 +393,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
             <Card>
               <CardContent className="grid gap-5 p-5 md:p-6">
                 <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-                  {place.story || place.description}
+                  {commercialFeatures.establishmentStory ? place.description : place.story || place.description}
                 </p>
 
                 {houseOfferings.length ? (
@@ -421,13 +445,29 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           </SectionShell>
         </div>
 
+        {commercialFeatures.establishmentStory && place.story && place.story !== place.description ? (
+          <SectionShell title="Nossa história" eyebrow="Identidade e tradição">
+            <Card>
+              <CardContent className="p-5 md:p-6">
+                <p className="max-w-4xl text-base leading-8 text-muted-foreground">{place.story}</p>
+              </CardContent>
+            </Card>
+          </SectionShell>
+        ) : null}
+
         {galleryImages.length ? (
           <SectionShell
             title="Fotos do restaurante"
             eyebrow="Ambiente e pratos"
             description="Imagens cadastradas pelo estabelecimento para ajudar na escolha da visita."
           >
-            <RestaurantGallery images={galleryImages} name={place.name} />
+            <RestaurantGallery
+              images={galleryImages}
+              name={place.name}
+              entityId={place.id}
+              category={place.category}
+              planType={analyticsMeta.planType}
+            />
           </SectionShell>
         ) : null}
 
@@ -441,15 +481,31 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button asChild variant="outline">
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="restaurant"
+                  entityId={place.id}
+                  eventType="map_click"
+                  {...analyticsMeta}
+                >
                   Abrir no Google Maps <ExternalLink className="h-4 w-4" />
-                </a>
+                </TrackedLink>
               </Button>
               {place.menuUrl ? (
                 <Button asChild variant="warm">
-                  <a href={place.menuUrl} target="_blank" rel="noopener noreferrer">
+                  <TrackedLink
+                    href={place.menuUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    entityType="restaurant"
+                    entityId={place.id}
+                    eventType="site_click"
+                    {...analyticsMeta}
+                  >
                     Ver cardápio <ArrowRight className="h-4 w-4" />
-                  </a>
+                  </TrackedLink>
                 </Button>
               ) : null}
             </div>
@@ -469,20 +525,44 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
               <Button asChild variant="warm">
-                <a href={`https://wa.me/${place.whatsapp}`} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={whatsappUrl(place.whatsapp, place.whatsappMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="restaurant"
+                  entityId={place.id}
+                  eventType="whatsapp_click"
+                  {...analyticsMeta}
+                >
                   <MessageCircle className="h-4 w-4" /> WhatsApp
-                </a>
+                </TrackedLink>
               </Button>
               <Button asChild variant="glass">
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="restaurant"
+                  entityId={place.id}
+                  eventType="map_click"
+                  {...analyticsMeta}
+                >
                   <MapPin className="h-4 w-4" /> Como chegar
-                </a>
+                </TrackedLink>
               </Button>
               {instagramUrl ? (
                 <Button asChild variant="glass">
-                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <TrackedLink
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    entityType="restaurant"
+                    entityId={place.id}
+                    eventType="instagram_click"
+                    {...analyticsMeta}
+                  >
                     <Instagram className="h-4 w-4" /> Instagram
-                  </a>
+                  </TrackedLink>
                 </Button>
               ) : null}
             </div>
@@ -507,6 +587,6 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           </Button>
         </div>
       </main>
-    </>
+    </TrackView>
   );
 }

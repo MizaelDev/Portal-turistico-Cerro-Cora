@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
+    "test": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "k6:smoke": "k6 run tests/k6/load-test.js",
     "k6:load": "k6 run -e PROFILE=load tests/k6/load-test.js",
     "k6:stress": "k6 run -e PROFILE=stress tests/k6/load-test.js",

@@ -10,6 +10,7 @@ import "@/app/globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
+import { GoogleAnalyticsPageView } from "@/components/google-analytics-page-view";
 
 // Configuração das fontes
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
@@ -23,6 +24,8 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
   display: "swap",
 });
+const gaMeasurementId =
+  process.env.NODE_ENV === "production" ? process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID : undefined;
 
 export const metadata: Metadata = createMetadata();
 
@@ -67,6 +70,27 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
         />
+        {gaMeasurementId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+              strategy="afterInteractive"
+            />
+            <Script
+              id="google-analytics"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${gaMeasurementId}', { anonymize_ip: true, send_page_view: false });
+                `,
+              }}
+            />
+            <GoogleAnalyticsPageView measurementId={gaMeasurementId} />
+          </>
+        ) : null}
       </body>
     </html>
   );

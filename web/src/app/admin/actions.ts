@@ -11,6 +11,13 @@ import {
 } from "@/lib/data";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { parseBusinessHours, parseLegacyBusinessHours, type BusinessHours } from "@/lib/business-hours";
+import {
+  getEffectiveFeatures,
+  getPhotoLimits,
+  normalizeCommercialPlan,
+  type CommercialFeatureKey,
+  type CustomCommercialFeatures,
+} from "@/lib/commercial";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseUrl, type AdminEntity } from "@/lib/supabase";
@@ -28,6 +35,8 @@ const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxImageSize = 6 * 1024 * 1024;
 const maxUploadFiles = 10;
 const allowedExternalImageHosts = ["images.unsplash.com", "images.pexels.com"];
+const adminEntitySchema = z.enum(["pontos_turisticos", "pousadas", "restaurantes", "city_services"]);
+const uuidSchema = z.string().uuid("Identificador invÃ¡lido.");
 
 function isHttpsUrl(value: string) {
   try {
@@ -39,7 +48,14 @@ function isHttpsUrl(value: string) {
 
 function isSafeImagePathOrUrl(value: string) {
   if (value.startsWith("/")) {
-    return !value.startsWith("//") && !value.includes("\\") && !value.includes("\0");
+    const segments = value.split("/");
+    return (
+      !value.startsWith("//") &&
+      !value.includes("\\") &&
+      !value.includes("\0") &&
+      !segments.includes("..") &&
+      !segments.includes(".")
+    );
   }
 
   if (!isHttpsUrl(value)) return false;
@@ -115,7 +131,50 @@ const whatsappSchema = z
   .trim()
   .min(10, "Informe um WhatsApp com DDD.")
   .regex(/^\d+$/, "Use apenas números no WhatsApp.");
-const businessHoursSchema = z.custom<BusinessHours | null>().nullable();
+const timeSchema = z
+  .string()
+  .regex(/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/, "Use horÃ¡rios entre 00:00 e 24:00.");
+const businessDaySchema = z
+  .object({
+    closed: z.boolean().optional(),
+    open: timeSchema.optional(),
+    close: timeSchema.optional(),
+    secondOpen: timeSchema.optional(),
+    secondClose: timeSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.closed && (!value.open || !value.close)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Informe abertura e fechamento do dia." });
+    }
+    if (Boolean(value.secondOpen) !== Boolean(value.secondClose)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Complete o segundo perÃ­odo de atendimento." });
+    }
+  });
+const businessHoursSchema: z.ZodType<BusinessHours | null> = z
+  .object({
+    mode: z.enum(["regular", "24h", "appointment"]).optional(),
+    days: z.record(businessDaySchema).optional(),
+  })
+  .nullable();
+const commercialPlanSchema = z.enum(["bronze", "silver", "gold"]);
+const planStatusSchema = z.enum(["active", "inactive", "trial", "expired", "suspended"]);
+const customFeaturesSchema = z.record(z.boolean()).default({});
+
+const customizableFeatureKeys: CommercialFeatureKey[] = [
+  "instagram",
+  "individualPage",
+  "carousel",
+  "gallery",
+  "highlighted",
+  "professionalPhotography",
+  "socialMediaPromotion",
+  "advancedReport",
+  "monthlyComparison",
+  "prioritySupport",
+  "seasonalCampaign",
+  "establishmentStory",
+  "bookingButton",
+];
 
 const pontoTuristicoSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome."),
@@ -133,6 +192,26 @@ const pousadaSchema = z.object({
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
   historia: z.string().trim().nullable(),
   categoria: z.string().trim().nullable(),
+  plano: z.enum(["basic", "pro"]).default("basic"),
+  plan_type: commercialPlanSchema.default("bronze"),
+  plan_status: planStatusSchema.default("active"),
+  plan_started_at: z.string().trim().nullable(),
+  plan_expires_at: z.string().trim().nullable(),
+  custom_features: customFeaturesSchema,
+  carousel_photo_limit: z.number().int().min(1).max(30).nullable(),
+  gallery_photo_limit: z.number().int().min(0).max(60).nullable(),
+  featured_order: z.number().int().min(0).nullable(),
+  category_priority: z.number().int().min(0).default(0),
+  professional_photography_included: z.boolean(),
+  photography_completed_at: z.string().trim().nullable(),
+  social_media_promotion_included: z.boolean(),
+  social_media_publication_url: optionalUrl,
+  advanced_report_enabled: z.boolean(),
+  priority_support_enabled: z.boolean(),
+  seasonal_campaign_enabled: z.boolean(),
+  establishment_story_enabled: z.boolean(),
+  commercial_notes: z.string().trim().nullable(),
+  plan_change_reason: z.string().trim().nullable(),
   localizacao: z.string().trim().min(2, "Informe a localização."),
   endereco: z.string().trim().nullable(),
   mapa_url: optionalGoogleMapsUrl,
@@ -156,6 +235,9 @@ const pousadaSchema = z.object({
   diferenciais: z.array(z.string().trim().min(1)).default([]),
   diferencial_principal: z.string().trim().nullable(),
   aceita_reservas: z.boolean(),
+  whatsapp_message: z.string().trim().nullable(),
+  site_url: optionalUrl,
+  pagina_ativa: z.boolean(),
   destaque: z.boolean(),
   ativo: z.boolean(),
 });
@@ -166,6 +248,26 @@ const restauranteSchema = z.object({
   descricao: z.string().trim().min(10, "Informe uma descrição mais completa."),
   descricao_completa: z.string().trim().nullable(),
   categoria: z.enum(["restaurante", "almoço", "bar", "café", "lanchonete"]),
+  plano: z.enum(["basic", "pro"]).default("basic"),
+  plan_type: commercialPlanSchema.default("bronze"),
+  plan_status: planStatusSchema.default("active"),
+  plan_started_at: z.string().trim().nullable(),
+  plan_expires_at: z.string().trim().nullable(),
+  custom_features: customFeaturesSchema,
+  carousel_photo_limit: z.number().int().min(1).max(30).nullable(),
+  gallery_photo_limit: z.number().int().min(0).max(60).nullable(),
+  featured_order: z.number().int().min(0).nullable(),
+  category_priority: z.number().int().min(0).default(0),
+  professional_photography_included: z.boolean(),
+  photography_completed_at: z.string().trim().nullable(),
+  social_media_promotion_included: z.boolean(),
+  social_media_publication_url: optionalUrl,
+  advanced_report_enabled: z.boolean(),
+  priority_support_enabled: z.boolean(),
+  seasonal_campaign_enabled: z.boolean(),
+  establishment_story_enabled: z.boolean(),
+  commercial_notes: z.string().trim().nullable(),
+  plan_change_reason: z.string().trim().nullable(),
   horario_funcionamento: z.string().trim().min(2, "Informe o horário."),
   business_hours: businessHoursSchema,
   endereco: z.string().trim().min(2, "Informe o endereço."),
@@ -186,6 +288,9 @@ const restauranteSchema = z.object({
   dica_turista: z.string().trim().nullable(),
   cardapio_url: optionalUrl,
   faixa_preco: z.enum(["R$", "R$$", "R$$$"]).nullable(),
+  whatsapp_message: z.string().trim().nullable(),
+  site_url: optionalUrl,
+  pagina_ativa: z.boolean(),
   destaque: z.boolean(),
   ativo: z.boolean(),
 });
@@ -193,7 +298,28 @@ const restauranteSchema = z.object({
 const cityServiceSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome do serviço."),
   slug: slugSchema,
-  category: z.enum(["saude", "seguranca", "transporte_apoio", "comercio_essencial", "emergencia"]),
+  category: z.string().trim().min(2, "Informe a categoria."),
+  listing_type: z.enum(["public_service", "commercial"]).default("commercial"),
+  plan: z.enum(["basic", "pro"]).default("basic"),
+  plan_type: commercialPlanSchema.default("bronze"),
+  plan_status: planStatusSchema.default("active"),
+  plan_started_at: z.string().trim().nullable(),
+  plan_expires_at: z.string().trim().nullable(),
+  custom_features: customFeaturesSchema,
+  carousel_photo_limit: z.number().int().min(1).max(30).nullable(),
+  gallery_photo_limit: z.number().int().min(0).max(60).nullable(),
+  featured_order: z.number().int().min(0).nullable(),
+  category_priority: z.number().int().min(0).default(0),
+  professional_photography_included: z.boolean(),
+  photography_completed_at: z.string().trim().nullable(),
+  social_media_promotion_included: z.boolean(),
+  social_media_publication_url: optionalUrl,
+  advanced_report_enabled: z.boolean(),
+  priority_support_enabled: z.boolean(),
+  seasonal_campaign_enabled: z.boolean(),
+  establishment_story_enabled: z.boolean(),
+  commercial_notes: z.string().trim().nullable(),
+  plan_change_reason: z.string().trim().nullable(),
   subcategory: z.string().trim().min(2, "Informe o tipo de serviço."),
   description: z.string().trim().nullable(),
   address: z.string().trim().nullable(),
@@ -205,10 +331,22 @@ const cityServiceSchema = z.object({
     .nullable()
     .refine((value) => !value || /^\d{10,15}$/.test(value), "Use apenas números no WhatsApp, com DDD."),
   google_maps_url: optionalGoogleMapsUrl,
+  instagram: z.string().trim().nullable(),
+  instagram_url: optionalInstagramUrl,
+  site_url: optionalUrl,
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  image_url: optionalPathOrUrl,
+  logo_url: optionalPathOrUrl,
+  tags: z.array(z.string().trim().min(1)).default([]),
+  enabled_buttons: z.array(z.string().trim().min(1)).default([]),
+  important_message: z.string().trim().nullable(),
+  whatsapp_message: z.string().trim().nullable(),
   opening_hours: z.string().trim().nullable(),
   business_hours: businessHoursSchema,
   is_emergency: z.boolean(),
   is_featured: z.boolean(),
+  is_24h: z.boolean(),
   is_active: z.boolean(),
   notes: z.string().trim().nullable(),
 });
@@ -283,6 +421,13 @@ function imageList(value: FormDataEntryValue | null) {
     .filter(Boolean);
 }
 
+function optionalDateTime(value: FormDataEntryValue | null) {
+  const text = optionalText(value);
+  if (!text) return null;
+  const date = new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(text) ? text : `${text}:00-03:00`);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
 function textList(value: FormDataEntryValue | null) {
   return String(value || "")
     .split(/[\n,]+/)
@@ -347,6 +492,64 @@ async function assertSameOrigin() {
   }
 }
 
+async function getMediaPolicy(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: "restaurantes" | "pousadas",
+  id: string,
+) {
+  const { data, error } = await supabase
+    .from(table)
+    .select(
+      "plan_type,plano,plan_status,plan_expires_at,custom_features,pagina_ativa,carousel_photo_limit,gallery_photo_limit",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const plan = normalizeCommercialPlan(data.plan_type || data.plano);
+  return {
+    features: getEffectiveFeatures(plan, {
+      status: data.plan_status,
+      customFeatures: data.custom_features || undefined,
+      pageEnabled: data.pagina_ativa,
+    }),
+    limits: getPhotoLimits(plan, data.carousel_photo_limit, data.gallery_photo_limit),
+  };
+}
+
+function commercialPayloadFromForm(formData: FormData) {
+  const planType = normalizeCommercialPlan(String(formData.get("plan_type") || "bronze"));
+  const customFeatures: CustomCommercialFeatures = {};
+
+  if (formData.get("custom_features_enabled") === "on") {
+    for (const feature of customizableFeatureKeys) {
+      customFeatures[feature] = formData.get(`feature_${feature}`) === "on";
+    }
+  }
+
+  return {
+    plan_type: planType,
+    plan_status: formData.get("plan_status") || "active",
+    plan_started_at: optionalDateTime(formData.get("plan_started_at")),
+    plan_expires_at: optionalDateTime(formData.get("plan_expires_at")),
+    custom_features: customFeatures,
+    carousel_photo_limit: optionalNumber(formData.get("carousel_photo_limit")),
+    gallery_photo_limit: optionalNumber(formData.get("gallery_photo_limit")),
+    featured_order: optionalNumber(formData.get("featured_order")),
+    category_priority: optionalNumber(formData.get("category_priority")) || 0,
+    professional_photography_included: formData.get("professional_photography_included") === "on",
+    photography_completed_at: optionalDateTime(formData.get("photography_completed_at")),
+    social_media_promotion_included: formData.get("social_media_promotion_included") === "on",
+    social_media_publication_url: optionalText(formData.get("social_media_publication_url")),
+    advanced_report_enabled: formData.get("advanced_report_enabled") === "on",
+    priority_support_enabled: formData.get("priority_support_enabled") === "on",
+    seasonal_campaign_enabled: formData.get("seasonal_campaign_enabled") === "on",
+    establishment_story_enabled: formData.get("establishment_story_enabled") === "on",
+    commercial_notes: optionalText(formData.get("commercial_notes")),
+    plan_change_reason: optionalText(formData.get("plan_change_reason")),
+  };
+}
+
 function parsePayload(entity: AdminEntity, formData: FormData) {
   if (entity === "pontos_turisticos") {
     return pontoTuristicoSchema.parse({
@@ -362,34 +565,53 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
 
   if (entity === "city_services") {
     const name = String(formData.get("nome") || "");
+    const commercial = commercialPayloadFromForm(formData);
 
     return cityServiceSchema.parse({
       name,
       slug: optionalText(formData.get("slug")) || slugify(name),
       category: formData.get("categoria"),
+      listing_type: formData.get("listing_type") || "commercial",
+      plan: commercial.plan_type === "bronze" ? "basic" : "pro",
+      ...commercial,
       subcategory: formData.get("subcategory"),
       description: optionalText(formData.get("descricao")),
       address: optionalText(formData.get("address")),
       neighborhood: optionalText(formData.get("neighborhood")),
       phone: optionalText(formData.get("phone")),
       whatsapp: optionalText(formData.get("whatsapp")),
+      instagram: optionalText(formData.get("instagram")),
+      instagram_url: optionalText(formData.get("instagram_url")),
+      site_url: optionalText(formData.get("site_url")),
+      latitude: optionalNumber(formData.get("latitude")),
+      longitude: optionalNumber(formData.get("longitude")),
+      image_url: optionalText(formData.get("image_url")),
+      logo_url: optionalText(formData.get("logo_url")),
+      tags: textList(formData.get("tags")),
+      enabled_buttons: textList(formData.get("enabled_buttons")),
+      important_message: optionalText(formData.get("important_message")),
+      whatsapp_message: optionalText(formData.get("whatsapp_message")),
       google_maps_url: optionalText(formData.get("google_maps_url")),
       opening_hours: optionalText(formData.get("opening_hours")),
       business_hours: parseBusinessHours(optionalText(formData.get("business_hours"))),
       is_emergency: formData.get("is_emergency") === "on",
       is_featured: formData.get("is_featured") === "on",
+      is_24h: formData.get("is_24h") === "on",
       is_active: formData.get("ativo") === "on",
       notes: optionalText(formData.get("notes")),
     });
   }
 
   if (entity === "pousadas") {
+    const commercial = commercialPayloadFromForm(formData);
     return pousadaSchema.parse({
       nome: formData.get("nome"),
       slug: optionalText(formData.get("slug")) || slugify(String(formData.get("nome") || "")),
       descricao: formData.get("descricao"),
       historia: optionalText(formData.get("historia")),
       categoria: optionalText(formData.get("categoria")) || "Pousada",
+      plano: commercial.plan_type === "bronze" ? "basic" : "pro",
+      ...commercial,
       localizacao: formData.get("localizacao"),
       endereco: optionalText(formData.get("endereco")),
       mapa_url: optionalText(formData.get("mapa_url")),
@@ -413,17 +635,23 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
       diferenciais: formData.getAll("diferenciais").map((item) => String(item).trim()).filter(Boolean),
       diferencial_principal: optionalText(formData.get("diferencial_principal")),
       aceita_reservas: formData.get("aceita_reservas") === "on",
+      whatsapp_message: optionalText(formData.get("whatsapp_message")),
+      site_url: optionalText(formData.get("site_url")),
+      pagina_ativa: formData.get("pagina_ativa") === "on",
       destaque: formData.get("destaque") === "on",
       ativo: formData.get("ativo") === "on",
     });
   }
 
+  const commercial = commercialPayloadFromForm(formData);
   return restauranteSchema.parse({
     nome: formData.get("nome"),
     slug: optionalText(formData.get("slug")) || slugify(String(formData.get("nome") || "")),
     descricao: formData.get("descricao"),
     descricao_completa: optionalText(formData.get("descricao_completa")),
     categoria: formData.get("categoria"),
+    plano: commercial.plan_type === "bronze" ? "basic" : "pro",
+    ...commercial,
     horario_funcionamento: formData.get("horario_funcionamento"),
     business_hours: parseBusinessHours(optionalText(formData.get("business_hours"))),
     endereco: formData.get("endereco"),
@@ -444,9 +672,48 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     dica_turista: optionalText(formData.get("dica_turista")),
     cardapio_url: optionalText(formData.get("cardapio_url")),
     faixa_preco: optionalText(formData.get("faixa_preco")),
+    whatsapp_message: optionalText(formData.get("whatsapp_message")),
+    site_url: optionalText(formData.get("site_url")),
+    pagina_ativa: formData.get("pagina_ativa") === "on",
     destaque: formData.get("destaque") === "on",
     ativo: formData.get("ativo") === "on",
   });
+}
+
+function enforceCommercialRules(entity: AdminEntity, payload: ReturnType<typeof parsePayload>) {
+  if (entity === "pontos_turisticos") return payload;
+
+  const commercialPayload = payload as Exclude<ReturnType<typeof parsePayload>, z.infer<typeof pontoTuristicoSchema>>;
+  if (entity === "city_services" && "listing_type" in commercialPayload && commercialPayload.listing_type === "public_service") {
+    return commercialPayload;
+  }
+
+  const features = getEffectiveFeatures(commercialPayload.plan_type, {
+    status: commercialPayload.plan_status,
+    customFeatures: commercialPayload.custom_features,
+    pageEnabled: "pagina_ativa" in commercialPayload ? commercialPayload.pagina_ativa : undefined,
+    bookingEnabled: "aceita_reservas" in commercialPayload ? commercialPayload.aceita_reservas : undefined,
+  });
+  const photoLimits = getPhotoLimits(
+    commercialPayload.plan_type,
+    commercialPayload.carousel_photo_limit,
+    commercialPayload.gallery_photo_limit,
+  );
+
+  return {
+    ...commercialPayload,
+    carousel_photo_limit: photoLimits.carousel,
+    gallery_photo_limit: photoLimits.gallery,
+    ...(entity === "city_services"
+      ? { is_featured: features.highlighted }
+      : { pagina_ativa: features.individualPage, destaque: features.highlighted }),
+    professional_photography_included: features.professionalPhotography,
+    social_media_promotion_included: features.socialMediaPromotion,
+    advanced_report_enabled: features.advancedReport,
+    priority_support_enabled: features.prioritySupport,
+    seasonal_campaign_enabled: features.seasonalCampaign,
+    establishment_story_enabled: features.establishmentStory,
+  };
 }
 
 function revalidatePublicPages() {
@@ -528,17 +795,57 @@ export async function saveAdminItem(
   try {
     await assertSameOrigin();
     const supabase = await requireAdmin();
-    const payload = parsePayload(entity, formData);
+    const safeEntity = adminEntitySchema.parse(entity) as AdminEntity;
+    const safeId = id ? uuidSchema.parse(id) : null;
+    const payload = enforceCommercialRules(safeEntity, parsePayload(safeEntity, formData));
 
-    if (entity === "restaurantes" || entity === "pousadas" || entity === "city_services") {
+    if (safeEntity === "restaurantes" || safeEntity === "pousadas") {
+      const mediaPayload = payload as z.infer<typeof restauranteSchema> | z.infer<typeof pousadaSchema>;
+      const features = getEffectiveFeatures(mediaPayload.plan_type, {
+        status: mediaPayload.plan_status,
+        customFeatures: mediaPayload.custom_features,
+        pageEnabled: mediaPayload.pagina_ativa,
+      });
+      const limits = getPhotoLimits(
+        mediaPayload.plan_type,
+        mediaPayload.carousel_photo_limit,
+        mediaPayload.gallery_photo_limit,
+      );
+      const submittedImages = uniqueImageList(mediaPayload.imagens_urls);
+      let existingImages: string[] = [];
+
+      if (safeId) {
+        const { data: currentMedia, error: currentMediaError } = await supabase
+          .from(safeEntity)
+          .select("imagens_urls")
+          .eq("id", safeId)
+          .maybeSingle();
+        if (currentMediaError) {
+          logAdminError("media-plan-check", currentMediaError);
+          return { ok: false, message: "NÃ£o foi possÃ­vel validar as fotos atuais antes de salvar." };
+        }
+        existingImages = uniqueImageList((currentMedia?.imagens_urls as string[] | null) || []);
+      }
+
+      const addedImages = submittedImages.filter((image) => !existingImages.includes(image));
+      const maximumStoredImages = safeEntity === "pousadas" ? Math.max(1, limits.gallery) : limits.gallery;
+      if (addedImages.length && (!features.gallery || submittedImages.length > maximumStoredImages)) {
+        return {
+          ok: false,
+          message: `O plano ${mediaPayload.plan_type} nÃ£o permite adicionar essa quantidade de fotos. Os arquivos existentes foram preservados.`,
+        };
+      }
+    }
+
+    if (safeEntity === "restaurantes" || safeEntity === "pousadas" || safeEntity === "city_services") {
       const slugPayload = payload as
         | z.infer<typeof restauranteSchema>
         | z.infer<typeof pousadaSchema>
         | z.infer<typeof cityServiceSchema>;
       if (slugPayload.slug) {
-        let slugQuery = supabase.from(entity).select("id").eq("slug", slugPayload.slug);
-        if (id) {
-          slugQuery = slugQuery.neq("id", id);
+        let slugQuery = supabase.from(safeEntity).select("id").eq("slug", slugPayload.slug);
+        if (safeId) {
+          slugQuery = slugQuery.neq("id", safeId);
         }
 
         const { data: existingSlugs, error: slugError } = await slugQuery.limit(1);
@@ -553,10 +860,10 @@ export async function saveAdminItem(
       }
     }
 
-    const selectColumns = entity === "city_services" ? "id,name,is_active" : "id,nome,ativo";
-    const query = id
-      ? supabase.from(entity).update(payload as never).eq("id", id).select(selectColumns).single()
-      : supabase.from(entity).insert(payload as never).select(selectColumns).single();
+    const selectColumns = safeEntity === "city_services" ? "id,name,is_active" : "id,nome,ativo";
+    const query = safeId
+      ? supabase.from(safeEntity).update(payload as never).eq("id", safeId).select(selectColumns).single()
+      : supabase.from(safeEntity).insert(payload as never).select(selectColumns).single();
 
     const { data, error } = await query;
 
@@ -589,7 +896,7 @@ export async function saveAdminItem(
         };
       }
 
-      logAdminError("delete", error);
+      logAdminError("save", error);
       return { ok: false, message: "Não foi possível salvar. Verifique os dados e tente novamente." };
     }
 
@@ -625,7 +932,9 @@ export async function deleteAdminItem(
   try {
     await assertSameOrigin();
     const supabase = await requireAdmin();
-    const { error } = await supabase.from(entity).delete().eq("id", id);
+    const safeEntity = adminEntitySchema.parse(entity) as AdminEntity;
+    const safeId = uuidSchema.parse(id);
+    const { error } = await supabase.from(safeEntity).delete().eq("id", safeId);
 
     if (error) {
       logAdminError("gallery-update", error);
@@ -753,6 +1062,11 @@ export async function updateRestaurantGallery(input: unknown): Promise<ActionRes
     const supabase = await requireAdmin();
     const payload = restaurantGallerySchema.parse(input);
     const gallery = uniqueImageList(payload.imagens_urls).filter((image) => image !== payload.coverUrl);
+    const mediaPolicy = await getMediaPolicy(supabase, "restaurantes", payload.restaurantId);
+    if (!mediaPolicy) return { ok: false, message: "NÃ£o foi possÃ­vel validar o plano do restaurante." };
+    if (!mediaPolicy.features.gallery || gallery.length > mediaPolicy.limits.gallery) {
+      return { ok: false, message: "A galeria excede os recursos ou o limite de fotos do plano atual." };
+    }
 
     const { data, error } = await supabase
       .from("restaurantes")
@@ -926,6 +1240,11 @@ export async function updateLodgingGallery(input: unknown): Promise<ActionResult
     const supabase = await requireAdmin();
     const payload = lodgingGallerySchema.parse(input);
     const gallery = uniqueImageList(payload.imagens_urls);
+    const mediaPolicy = await getMediaPolicy(supabase, "pousadas", payload.lodgingId);
+    if (!mediaPolicy) return { ok: false, message: "NÃ£o foi possÃ­vel validar o plano da pousada." };
+    if (!mediaPolicy.features.gallery || gallery.length > Math.max(1, mediaPolicy.limits.gallery)) {
+      return { ok: false, message: "A galeria excede os recursos ou o limite de fotos do plano atual." };
+    }
 
     const { data, error } = await supabase
       .from("pousadas")
@@ -1263,24 +1582,32 @@ export async function uploadAdminImages(
       return { ok: false, message: `Envie no máximo ${maxUploadFiles} imagens por vez.`, urls: [] };
     }
 
-    const urls: string[] = [];
-
+    const validatedFiles: Array<{ file: File; safeName: string; extension: string }> = [];
     for (const file of files) {
       if (!allowedImageTypes.includes(file.type)) {
-        return { ok: false, message: "Use apenas imagens JPG, PNG ou WebP.", urls };
+        return { ok: false, message: "Use apenas imagens JPG, PNG ou WebP.", urls: [] };
       }
 
       if (file.size > maxImageSize) {
-        return { ok: false, message: "Cada imagem deve ter no máximo 6 MB.", urls };
+        return { ok: false, message: "Cada imagem deve ter no máximo 6 MB.", urls: [] };
       }
 
       const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
       if (!hasImageSignature(file.type, bytes)) {
-        return { ok: false, message: "O arquivo enviado não parece ser uma imagem válida.", urls };
+        return { ok: false, message: "O arquivo enviado não parece ser uma imagem válida.", urls: [] };
       }
 
-      const safeName = sanitizeFileName(file.name);
-      const extension = extensionFromType(file.type);
+      validatedFiles.push({
+        file,
+        safeName: sanitizeFileName(file.name),
+        extension: extensionFromType(file.type),
+      });
+    }
+
+    const urls: string[] = [];
+    const uploadedPaths: string[] = [];
+
+    for (const { file, safeName, extension } of validatedFiles) {
       const path = `${entity}/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`;
       const { error } = await supabase.storage.from("tourism").upload(path, file, {
         cacheControl: "31536000",
@@ -1289,11 +1616,16 @@ export async function uploadAdminImages(
       });
 
       if (error) {
+        if (uploadedPaths.length) {
+          const { error: rollbackError } = await supabase.storage.from("tourism").remove(uploadedPaths);
+          if (rollbackError) logAdminError("upload-rollback", rollbackError);
+        }
+
         if (error.message.toLowerCase().includes("bucket not found")) {
           return {
             ok: false,
             message: "O bucket 'tourism' não existe no Supabase. Rode o arquivo web/supabase/schema.sql no SQL Editor.",
-            urls,
+            urls: [],
           };
         }
 
@@ -1301,14 +1633,15 @@ export async function uploadAdminImages(
           return {
             ok: false,
             message: "O Storage bloqueou o upload por RLS. Rode novamente web/supabase/schema.sql para criar as policies.",
-            urls,
+            urls: [],
           };
         }
 
         logAdminError("upload", error);
-        return { ok: false, message: "Não foi possível enviar a imagem para o Supabase Storage.", urls };
+        return { ok: false, message: "Não foi possível enviar a imagem para o Supabase Storage.", urls: [] };
       }
 
+      uploadedPaths.push(path);
       const { data } = supabase.storage.from("tourism").getPublicUrl(path);
       urls.push(data.publicUrl);
     }
@@ -1324,6 +1657,7 @@ export async function uploadAdminImages(
 }
 
 export async function logoutAction() {
+  await assertSameOrigin();
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/admin/login");

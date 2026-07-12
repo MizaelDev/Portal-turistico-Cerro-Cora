@@ -35,10 +35,13 @@ import { JsonLd } from "@/components/json-ld";
 import { LodgingCard } from "@/components/lodging-card";
 import { LodgingGallery } from "@/components/lodging-gallery";
 import { SafeImage } from "@/components/safe-image";
+import { TrackedLink } from "@/components/tracked-link";
+import { TrackView } from "@/components/track-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Lodging } from "@/lib/data";
+import { getCommercialFeatures, whatsappUrl } from "@/lib/commercial";
 import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
 import { getPublicLodgingPage, getPublicLodgings } from "@/lib/public-content";
 import { createMetadata, lodgingDetailSchema } from "@/lib/seo";
@@ -198,7 +201,13 @@ function AmenityCard({ amenity }: { amenity: Amenity }) {
 
 export async function generateStaticParams() {
   const { items } = await getPublicLodgings();
-  return items.map((lodging) => ({ slug: lodgingSlug(lodging) }));
+  return items
+    .filter((lodging) => getCommercialFeatures(lodging.plan, {
+      status: lodging.planStatus,
+      customFeatures: lodging.customFeatures,
+      pageEnabled: lodging.pageEnabled,
+    }).individualPage)
+    .map((lodging) => ({ slug: lodgingSlug(lodging) }));
 }
 
 export async function generateMetadata({ params }: LodgingPageProps): Promise<Metadata> {
@@ -206,11 +215,7 @@ export async function generateMetadata({ params }: LodgingPageProps): Promise<Me
   const { item } = await getPublicLodgingPage(slug);
 
   if (!item) {
-    return createMetadata({
-      title: "Hospedagem não encontrada",
-      path: `/pousadas/${slug}`,
-      description: "Hospedagem não encontrada no guia de pousadas de Cerro Corá-RN.",
-    });
+    notFound();
   }
 
   return createMetadata({
@@ -236,13 +241,24 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
   const highlights = lodging.highlights || [];
   const accommodationTypes = lodging.accommodationTypes || [];
   const paymentMethods = lodging.paymentMethods || [];
-  const reservationText = encodeURIComponent(`Olá! Quero saber sobre reserva na ${lodging.name}.`);
+  const reservationMessage = lodging.whatsappMessage || `Olá! Quero saber sobre reserva na ${lodging.name}.`;
   const heroImage = lodging.heroImage?.trim() || null;
+  const commercialFeatures = lodging.commercialFeatures || getCommercialFeatures(lodging.plan, {
+    status: lodging.planStatus,
+    customFeatures: lodging.customFeatures,
+    pageEnabled: lodging.pageEnabled,
+  });
+  const analyticsMeta = {
+    establishmentName: lodging.name,
+    category: lodging.category || "Pousada",
+    planType: lodging.plan || "bronze",
+  };
 
   return (
     <>
       <JsonLd data={lodgingDetailSchema({ ...lodging, slug: lodgingSlug(lodging) })} />
 
+      <TrackView entityType="lodging" entityId={lodging.id} eventType="page_view" {...analyticsMeta}>
       <section className="relative min-h-[520px] overflow-hidden border-b border-border bg-[#10201b] text-white md:min-h-[560px]">
         {heroImage ? (
           <SafeImage
@@ -259,7 +275,14 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           <div className="max-w-4xl">
             {lodging.logo ? (
               <div className="relative mb-5 h-16 w-16 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2 shadow-glass sm:h-20 sm:w-20 md:h-24 md:w-24">
-                <SafeImage src={lodging.logo} alt={`Logo de ${lodging.name}`} fill sizes="96px" className="object-contain p-2" />
+                <SafeImage
+                  src={lodging.logo}
+                  alt={`Logo de ${lodging.name}`}
+                  fill
+                  priority={!heroImage}
+                  sizes="96px"
+                  className="object-contain p-2"
+                />
               </div>
             ) : null}
 
@@ -286,25 +309,57 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button asChild variant="warm">
-                <a href={`https://wa.me/${lodging.whatsapp}?text=${reservationText}`} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={whatsappUrl(lodging.whatsapp, reservationMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="lodging"
+                  entityId={lodging.id}
+                  eventType="reserve_click"
+                  {...analyticsMeta}
+                >
                   <MessageCircle className="h-4 w-4" /> Reservar
-                </a>
+                </TrackedLink>
               </Button>
               <Button asChild variant="glass">
-                <a href={`https://wa.me/${lodging.whatsapp}`} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={whatsappUrl(lodging.whatsapp, lodging.whatsappMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="lodging"
+                  entityId={lodging.id}
+                  eventType="whatsapp_click"
+                  {...analyticsMeta}
+                >
                   WhatsApp
-                </a>
+                </TrackedLink>
               </Button>
               <Button asChild variant="glass">
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="lodging"
+                  entityId={lodging.id}
+                  eventType="map_click"
+                  {...analyticsMeta}
+                >
                   <MapPin className="h-4 w-4" /> Como chegar
-                </a>
+                </TrackedLink>
               </Button>
               {instagramUrl ? (
                 <Button asChild variant="glass">
-                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <TrackedLink
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    entityType="lodging"
+                    entityId={lodging.id}
+                    eventType="instagram_click"
+                    {...analyticsMeta}
+                  >
                     <Instagram className="h-4 w-4" /> Instagram
-                  </a>
+                  </TrackedLink>
                 </Button>
               ) : null}
             </div>
@@ -318,7 +373,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             <Card>
               <CardContent className="grid gap-5 p-5 md:p-6">
                 <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-                  {lodging.story || lodging.description}
+                  {lodging.description}
                 </p>
                 {lodging.mainDifferential ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/10 p-4">
@@ -333,7 +388,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           </SectionShell>
 
           <SectionShell title="Informações úteis" eyebrow="Planeje sua reserva">
-            <BusinessStatusBadge businessHours={lodging.businessHours} className="w-fit" />
+            <BusinessStatusBadge businessHours={lodging.businessHours} context="lodging" className="w-fit" />
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoCard icon={Clock} label="Check-in" value={lodging.checkIn || "A combinar"} />
               <InfoCard icon={Clock} label="Check-out" value={lodging.checkOut || "A combinar"} />
@@ -346,6 +401,16 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             </div>
           </SectionShell>
         </div>
+
+        {commercialFeatures.establishmentStory && lodging.story && lodging.story !== lodging.description ? (
+          <SectionShell title="Nossa história" eyebrow="Identidade e tradição">
+            <Card>
+              <CardContent className="p-5 md:p-6">
+                <p className="max-w-4xl text-base leading-8 text-muted-foreground">{lodging.story}</p>
+              </CardContent>
+            </Card>
+          </SectionShell>
+        ) : null}
 
         {amenities.length ? (
           <SectionShell title="O que você encontrará" eyebrow="Comodidades">
@@ -376,7 +441,13 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             eyebrow="Ambientes e detalhes"
             description="Veja quartos, áreas comuns e detalhes da hospedagem antes de planejar sua estadia."
           >
-            <LodgingGallery images={images} name={lodging.name} />
+            <LodgingGallery
+              images={images}
+              name={lodging.name}
+              entityId={lodging.id}
+              category={analyticsMeta.category}
+              planType={analyticsMeta.planType}
+            />
           </SectionShell>
         ) : null}
 
@@ -412,9 +483,17 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
               </p>
             </div>
             <Button asChild variant="outline">
-              <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+              <TrackedLink
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                entityType="lodging"
+                entityId={lodging.id}
+                eventType="map_click"
+                {...analyticsMeta}
+              >
                 Abrir rota <ExternalLink className="h-4 w-4" />
-              </a>
+              </TrackedLink>
             </Button>
           </CardContent>
         </Card>
@@ -432,20 +511,44 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row md:flex-col lg:flex-row">
               <Button asChild variant="warm">
-                <a href={`https://wa.me/${lodging.whatsapp}?text=${reservationText}`} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={whatsappUrl(lodging.whatsapp, reservationMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="lodging"
+                  entityId={lodging.id}
+                  eventType="reserve_click"
+                  {...analyticsMeta}
+                >
                   <MessageCircle className="h-4 w-4" /> Reservar pelo WhatsApp
-                </a>
+                </TrackedLink>
               </Button>
               <Button asChild variant="glass">
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer">
+                <TrackedLink
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  entityType="lodging"
+                  entityId={lodging.id}
+                  eventType="map_click"
+                  {...analyticsMeta}
+                >
                   <MapPin className="h-4 w-4" /> Como chegar
-                </a>
+                </TrackedLink>
               </Button>
               {instagramUrl ? (
                 <Button asChild variant="glass">
-                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <TrackedLink
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    entityType="lodging"
+                    entityId={lodging.id}
+                    eventType="instagram_click"
+                    {...analyticsMeta}
+                  >
                     <Instagram className="h-4 w-4" /> Instagram
-                  </a>
+                  </TrackedLink>
                 </Button>
               ) : null}
             </div>
@@ -470,6 +573,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           </Button>
         </div>
       </main>
+      </TrackView>
     </>
   );
 }

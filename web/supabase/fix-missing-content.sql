@@ -14,18 +14,18 @@ create policy "Public read tourism files"
 create policy "Authenticated insert tourism files"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'tourism');
+  with check (bucket_id = 'tourism' and public.is_admin(auth.uid()));
 
 create policy "Authenticated update tourism files"
   on storage.objects for update
   to authenticated
-  using (bucket_id = 'tourism')
-  with check (bucket_id = 'tourism');
+  using (bucket_id = 'tourism' and public.is_admin(auth.uid()))
+  with check (bucket_id = 'tourism' and public.is_admin(auth.uid()));
 
 create policy "Authenticated delete tourism files"
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'tourism');
+  using (bucket_id = 'tourism' and public.is_admin(auth.uid()));
 
 delete from public.pousadas
 where nome in (

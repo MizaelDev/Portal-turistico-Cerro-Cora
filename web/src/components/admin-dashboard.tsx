@@ -8,6 +8,7 @@ import {
   DatabaseBackup,
   Edit3,
   ExternalLink,
+  History,
   ImagePlus,
   Loader2,
   LogOut,
@@ -50,11 +51,18 @@ import {
   serializeBusinessHours,
   weekdayLabels,
   weekdays,
+  type BusinessDayHours,
   type BusinessHours,
   type BusinessHoursMode,
   type WeekdayKey,
 } from "@/lib/business-hours";
 import { cityServiceCategories } from "@/lib/city-services";
+import {
+  getPlanFeatures,
+  normalizeCommercialPlan,
+  planDefinitions,
+  type CommercialFeatureKey,
+} from "@/lib/commercial";
 import type {
   AdminData,
   AdminEntity,
@@ -66,6 +74,46 @@ import type {
 
 type FormState = Record<string, string | boolean>;
 type AdminRow = PontoTuristicoRow | PousadaRow | RestauranteRow | CityServiceRow;
+
+const editableFeatureKeys: Array<{ key: CommercialFeatureKey; label: string }> = [
+  { key: "instagram", label: "Instagram" },
+  { key: "individualPage", label: "Página individual" },
+  { key: "carousel", label: "Carrossel" },
+  { key: "gallery", label: "Galeria" },
+  { key: "highlighted", label: "Destaque" },
+  { key: "professionalPhotography", label: "Ensaio fotográfico" },
+  { key: "socialMediaPromotion", label: "Divulgação nas redes" },
+  { key: "advancedReport", label: "Relatório avançado" },
+  { key: "monthlyComparison", label: "Comparação mensal" },
+  { key: "prioritySupport", label: "Suporte prioritário" },
+  { key: "seasonalCampaign", label: "Campanha sazonal" },
+  { key: "establishmentStory", label: "História institucional" },
+  { key: "bookingButton", label: "Botão de reserva" },
+];
+
+const emptyCommercialFields: FormState = {
+  plano: "bronze",
+  plan_type: "bronze",
+  plan_status: "active",
+  plan_started_at: "",
+  plan_expires_at: "",
+  custom_features_enabled: false,
+  carousel_photo_limit: "",
+  gallery_photo_limit: "",
+  featured_order: "",
+  category_priority: "0",
+  professional_photography_included: false,
+  photography_completed_at: "",
+  social_media_promotion_included: false,
+  social_media_publication_url: "",
+  advanced_report_enabled: false,
+  priority_support_enabled: false,
+  seasonal_campaign_enabled: false,
+  establishment_story_enabled: false,
+  commercial_notes: "",
+  plan_change_reason: "",
+  ...Object.fromEntries(editableFeatureKeys.map(({ key }) => [`feature_${key}`, getPlanFeatures("bronze")[key]])),
+};
 
 const entityLabels: Record<AdminEntity, string> = {
   pontos_turisticos: "Pontos Turísticos",
@@ -92,6 +140,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     ativo: true,
   },
   pousadas: {
+    ...emptyCommercialFields,
     nome: "",
     slug: "",
     descricao: "",
@@ -120,10 +169,14 @@ const emptyForms: Record<AdminEntity, FormState> = {
     diferenciais: "",
     diferencial_principal: "",
     aceita_reservas: true,
+    whatsapp_message: "",
+    site_url: "",
+    pagina_ativa: false,
     destaque: false,
     ativo: true,
   },
   restaurantes: {
+    ...emptyCommercialFields,
     nome: "",
     slug: "",
     descricao: "",
@@ -149,24 +202,41 @@ const emptyForms: Record<AdminEntity, FormState> = {
     dica_turista: "",
     cardapio_url: "",
     faixa_preco: "",
+    whatsapp_message: "",
+    site_url: "",
+    pagina_ativa: false,
     destaque: false,
     ativo: true,
   },
   city_services: {
+    ...emptyCommercialFields,
     nome: "",
     slug: "",
     descricao: "",
     categoria: "saude",
+    listing_type: "commercial",
     subcategory: "",
     address: "",
     neighborhood: "",
     phone: "",
     whatsapp: "",
+    instagram: "",
+    instagram_url: "",
+    site_url: "",
+    latitude: "",
+    longitude: "",
+    image_url: "",
+    logo_url: "",
+    tags: "",
+    enabled_buttons: "",
+    important_message: "",
+    whatsapp_message: "",
     google_maps_url: "",
     opening_hours: "",
     business_hours: "",
     is_emergency: false,
     is_featured: false,
+    is_24h: false,
     notes: "",
     ativo: true,
   },
@@ -295,7 +365,7 @@ function defaultBusinessHours(): BusinessHours {
     mode: "regular",
     days: Object.fromEntries(
       weekdays.map((day) => [day, { closed: true, open: "08:00", close: "18:00" }]),
-    ) as Record<WeekdayKey, { closed: boolean; open: string; close: string }>,
+    ) as unknown as Record<WeekdayKey, BusinessDayHours>,
   };
 }
 
@@ -315,18 +385,22 @@ function businessHoursFromForm(value: string | boolean | undefined): BusinessHou
           closed: parsed.days?.[day]?.closed ?? true,
           open: parsed.days?.[day]?.open || fallback.days?.[day]?.open || "08:00",
           close: parsed.days?.[day]?.close || fallback.days?.[day]?.close || "18:00",
+          secondOpen: parsed.days?.[day]?.secondOpen || "",
+          secondClose: parsed.days?.[day]?.secondClose || "",
         },
       ]),
-    ) as Record<WeekdayKey, { closed: boolean; open: string; close: string }>,
+    ) as unknown as Record<WeekdayKey, BusinessDayHours>,
   };
 }
 
 function BusinessHoursEditor({
   value,
   onChange,
+  context = "default",
 }: {
   value: string | boolean | undefined;
   onChange: (value: string) => void;
+  context?: "default" | "lodging";
 }) {
   const hours = businessHoursFromForm(value);
   const mode = hours.mode || "regular";
@@ -344,7 +418,7 @@ function BusinessHoursEditor({
     updateHours({ ...businessHoursFromForm(value), mode: "regular" });
   }
 
-  function updateDay(day: WeekdayKey, nextValue: Partial<{ closed: boolean; open: string; close: string }>) {
+  function updateDay(day: WeekdayKey, nextValue: Partial<{ closed: boolean; open: string; close: string; secondOpen: string; secondClose: string }>) {
     const regularHours = businessHoursFromForm(value);
     const currentDay = regularHours.days?.[day] || { closed: true, open: "08:00", close: "18:00" };
 
@@ -363,9 +437,13 @@ function BusinessHoursEditor({
   return (
     <Card className="border-border/70 bg-background/45">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Status de funcionamento</CardTitle>
+        <CardTitle className="text-base">
+          {context === "lodging" ? "Horário da recepção" : "Status de funcionamento"}
+        </CardTitle>
         <p className="text-xs leading-6 text-muted-foreground">
-          Configure os horários uma vez. O site calcula automaticamente se está aberto, fechado ou perto de fechar.
+          {context === "lodging"
+            ? "Este horário será usado para informar quando a recepção ou o atendimento da hospedagem está disponível."
+            : "Configure os horários uma vez. O site calcula automaticamente se está aberto, fechado ou perto de fechar."}
         </p>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -374,7 +452,7 @@ function BusinessHoursEditor({
           {[
             ["regular", "Horários por dia"],
             ["24h", "Atendimento 24 horas"],
-            ["appointment", "Somente agendamento"],
+            ["appointment", context === "lodging" ? "Atendimento mediante reserva" : "Somente agendamento"],
           ].map(([option, label]) => (
             <label
               key={option}
@@ -394,7 +472,7 @@ function BusinessHoursEditor({
 
         {mode === "appointment" ? (
           <p className="rounded-md border border-sky-500/20 bg-sky-500/10 p-3 text-sm text-muted-foreground">
-            O site exibirá: Atendimento mediante agendamento.
+            O site exibirá: {context === "lodging" ? "Atendimento mediante reserva." : "Atendimento mediante agendamento."}
           </p>
         ) : null}
 
@@ -412,7 +490,7 @@ function BusinessHoursEditor({
               return (
                 <div
                   key={day}
-                  className="grid gap-3 rounded-md border border-border bg-card p-3 md:grid-cols-[130px_1fr_1fr_120px] md:items-center"
+                  className="grid gap-3 rounded-md border border-border bg-card p-3 md:grid-cols-[110px_repeat(4,minmax(100px,1fr))_100px] md:items-center"
                 >
                   <p className="text-sm font-semibold">{weekdayLabels[day]}</p>
                   <Label className="grid gap-1 text-xs text-muted-foreground">
@@ -431,6 +509,24 @@ function BusinessHoursEditor({
                       value={dayHours.close || "18:00"}
                       disabled={Boolean(dayHours.closed)}
                       onChange={(event) => updateDay(day, { close: event.target.value })}
+                    />
+                  </Label>
+                  <Label className="grid gap-1 text-xs text-muted-foreground">
+                    2º período abre
+                    <Input
+                      type="time"
+                      value={dayHours.secondOpen || ""}
+                      disabled={Boolean(dayHours.closed)}
+                      onChange={(event) => updateDay(day, { secondOpen: event.target.value })}
+                    />
+                  </Label>
+                  <Label className="grid gap-1 text-xs text-muted-foreground">
+                    2º período fecha
+                    <Input
+                      type="time"
+                      value={dayHours.secondClose || ""}
+                      disabled={Boolean(dayHours.closed)}
+                      onChange={(event) => updateDay(day, { secondClose: event.target.value })}
                     />
                   </Label>
                   <label className="flex items-center gap-2 text-sm font-medium">
@@ -484,24 +580,77 @@ function imageSourceLabel(url: string) {
   return "Imagem externa";
 }
 
+type CommercialAdminRow = PousadaRow | RestauranteRow | CityServiceRow;
+
+function dateTimeLocalValue(value?: string | null) {
+  return value ? value.slice(0, 16) : "";
+}
+
+function commercialFieldsFromRow(row: CommercialAdminRow): FormState {
+  const legacyPlan = (row as PousadaRow | RestauranteRow).plano || (row as CityServiceRow).plan;
+  const plan = normalizeCommercialPlan(row.plan_type || legacyPlan);
+  const defaults = getPlanFeatures(plan);
+  const customFeatures = row.custom_features || {};
+
+  return {
+    plano: plan,
+    plan_type: plan,
+    plan_status: row.plan_status || "active",
+    plan_started_at: dateTimeLocalValue(row.plan_started_at),
+    plan_expires_at: dateTimeLocalValue(row.plan_expires_at),
+    custom_features_enabled: Object.keys(customFeatures).length > 0,
+    carousel_photo_limit: row.carousel_photo_limit?.toString() || "",
+    gallery_photo_limit: row.gallery_photo_limit?.toString() || "",
+    featured_order: row.featured_order?.toString() || "",
+    category_priority: row.category_priority?.toString() || "0",
+    professional_photography_included: Boolean(row.professional_photography_included),
+    photography_completed_at: dateTimeLocalValue(row.photography_completed_at),
+    social_media_promotion_included: Boolean(row.social_media_promotion_included),
+    social_media_publication_url: row.social_media_publication_url || "",
+    advanced_report_enabled: Boolean(row.advanced_report_enabled),
+    priority_support_enabled: Boolean(row.priority_support_enabled),
+    seasonal_campaign_enabled: Boolean(row.seasonal_campaign_enabled),
+    establishment_story_enabled: Boolean(row.establishment_story_enabled),
+    commercial_notes: row.commercial_notes || "",
+    plan_change_reason: row.plan_change_reason || "",
+    ...Object.fromEntries(
+      editableFeatureKeys.map(({ key }) => [`feature_${key}`, customFeatures[key] ?? defaults[key]]),
+    ),
+  };
+}
+
 function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "city_services") {
     const service = row as CityServiceRow;
     return {
+      ...commercialFieldsFromRow(service),
       nome: service.name,
       slug: service.slug || "",
       descricao: service.description || "",
       categoria: service.category,
+      listing_type: service.listing_type || "commercial",
       subcategory: service.subcategory || "",
       address: service.address || "",
       neighborhood: service.neighborhood || "",
       phone: service.phone || "",
       whatsapp: service.whatsapp || "",
+      instagram: service.instagram || "",
+      instagram_url: service.instagram_url || "",
+      site_url: service.site_url || "",
+      latitude: service.latitude?.toString() || "",
+      longitude: service.longitude?.toString() || "",
+      image_url: service.image_url || "",
+      logo_url: service.logo_url || "",
+      tags: (service.tags || []).join("\n"),
+      enabled_buttons: (service.enabled_buttons || []).join("\n"),
+      important_message: service.important_message || "",
+      whatsapp_message: service.whatsapp_message || "",
       google_maps_url: service.google_maps_url || "",
       opening_hours: service.opening_hours || "",
       business_hours: service.business_hours ? serializeBusinessHours(service.business_hours) : "",
       is_emergency: Boolean(service.is_emergency),
       is_featured: Boolean(service.is_featured),
+      is_24h: Boolean(service.is_24h),
       notes: service.notes || "",
       ativo: service.is_active,
     };
@@ -510,6 +659,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "pousadas") {
     const lodging = row as PousadaRow;
     return {
+      ...commercialFieldsFromRow(lodging),
       nome: lodging.nome,
       slug: lodging.slug || "",
       descricao: lodging.descricao,
@@ -538,6 +688,9 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       diferenciais: (lodging.diferenciais || []).join("|"),
       diferencial_principal: lodging.diferencial_principal || "",
       aceita_reservas: lodging.aceita_reservas ?? true,
+      whatsapp_message: lodging.whatsapp_message || "",
+      site_url: lodging.site_url || "",
+      pagina_ativa: lodging.pagina_ativa ?? Boolean(lodging.destaque),
       destaque: Boolean(lodging.destaque),
       ativo: lodging.ativo,
     };
@@ -546,6 +699,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "restaurantes") {
     const restaurant = row as RestauranteRow;
     return {
+      ...commercialFieldsFromRow(restaurant),
       nome: restaurant.nome,
       slug: restaurant.slug || "",
       descricao: restaurant.descricao,
@@ -571,6 +725,9 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       dica_turista: restaurant.dica_turista || "",
       cardapio_url: restaurant.cardapio_url || "",
       faixa_preco: restaurant.faixa_preco || "",
+      whatsapp_message: restaurant.whatsapp_message || "",
+      site_url: restaurant.site_url || "",
+      pagina_ativa: restaurant.pagina_ativa ?? Boolean(restaurant.destaque),
       destaque: Boolean(restaurant.destaque),
       ativo: restaurant.ativo,
     };
@@ -616,6 +773,225 @@ function rowIsActive(row: AdminRow) {
   return "ativo" in row ? row.ativo : row.is_active;
 }
 
+function MediaDestinationGuide({
+  kind,
+  plan,
+  carouselLimit,
+}: {
+  kind: "restaurant" | "lodging";
+  plan: "bronze" | "silver" | "gold";
+  carouselLimit: number;
+}) {
+  const hasPublicGallery = plan !== "bronze";
+  const hasCarousel = plan === "gold";
+
+  return (
+    <section className="grid gap-3 rounded-lg border border-border bg-accent/20 p-4" aria-labelledby={`${kind}-media-title`}>
+      <div>
+        <p id={`${kind}-media-title`} className="text-sm font-semibold">Organização das imagens</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Cada upload abaixo tem um destino específico. As fotos permanecem armazenadas ao trocar de plano.
+        </p>
+      </div>
+      <div className="grid gap-2 text-xs sm:grid-cols-2">
+        <div className="rounded-md border border-border bg-background/60 p-3">
+          <strong className="block text-foreground">Logo do estabelecimento</strong>
+          <span className="mt-1 block leading-5 text-muted-foreground">Identidade visual exibida sem cortes, em espaço próprio.</span>
+        </div>
+        <div className="rounded-md border border-border bg-background/60 p-3">
+          <strong className="block text-foreground">Foto principal / capa</strong>
+          <span className="mt-1 block leading-5 text-muted-foreground">
+            {kind === "restaurant" ? "Imagem principal do card na listagem." : "A primeira foto da galeria será a capa do card na listagem."}
+          </span>
+        </div>
+        <div className="rounded-md border border-border bg-background/60 p-3">
+          <strong className="block text-foreground">Fotos da galeria</strong>
+          <span className="mt-1 block leading-5 text-muted-foreground">
+            {hasPublicGallery ? "Exibidas na página individual do estabelecimento." : "Ficam armazenadas, mas não são publicadas no plano Bronze."}
+          </span>
+        </div>
+        <div className="rounded-md border border-border bg-background/60 p-3">
+          <strong className="block text-foreground">Fotos do carrossel</strong>
+          <span className="mt-1 block leading-5 text-muted-foreground">
+            {hasCarousel
+              ? `No Ouro, as primeiras ${carouselLimit} fotos da coleção, seguindo a ordem abaixo, formam o carrossel do card.`
+              : "O carrossel é exclusivo do plano Ouro. Não é exibido neste plano."}
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CommercialPlanEditor({
+  entity,
+  form,
+  selectedPlan,
+  isApplicable,
+  hasIndividualPage,
+  isGold,
+  updateField,
+  applyPlanDefaults,
+  restorePlanDefaults,
+}: {
+  entity: AdminEntity;
+  form: FormState;
+  selectedPlan: "bronze" | "silver" | "gold";
+  isApplicable: boolean;
+  hasIndividualPage: boolean;
+  isGold: boolean;
+  updateField: (name: string, value: string | boolean) => void;
+  applyPlanDefaults: (plan: string) => void;
+  restorePlanDefaults: () => void;
+}) {
+  return (
+    <div className="grid gap-4 rounded-lg border border-border bg-accent/20 p-4">
+      <div>
+        <p className="text-sm font-semibold">Configuração comercial</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Bronze garante presença no portal, Prata libera página e galeria, e Ouro acrescenta carrossel, prioridade e recursos avançados.
+        </p>
+      </div>
+
+      {entity === "city_services" ? (
+        <div className="grid gap-2">
+          <Label>Tipo de cadastro</Label>
+          <Select value={String(form.listing_type || "commercial")} onValueChange={(value) => updateField("listing_type", value)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="public_service">Serviço público essencial</SelectItem>
+              <SelectItem value="commercial">Estabelecimento comercial</SelectItem>
+            </SelectContent>
+          </Select>
+          <input type="hidden" name="listing_type" value={String(form.listing_type || "commercial")} />
+        </div>
+      ) : null}
+
+      {!isApplicable ? (
+        <>
+          <p className="rounded-md border border-border bg-background/55 p-3 text-sm text-muted-foreground">
+            Serviços públicos essenciais permanecem ativos sem assinatura comercial.
+          </p>
+          <input type="hidden" name="plan_type" value={selectedPlan} />
+          <input type="hidden" name="site_url" value={String(form.site_url || "")} />
+          <input type="hidden" name="whatsapp_message" value={String(form.whatsapp_message || "")} />
+        </>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-2">
+              <Label>Plano contratado</Label>
+              <Select value={selectedPlan} onValueChange={applyPlanDefaults}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.values(planDefinitions).map((plan) => (
+                    <SelectItem key={plan.id} value={plan.id}>{plan.label} — {plan.description}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input type="hidden" name="plan_type" value={selectedPlan} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Situação do plano</Label>
+              <Select value={String(form.plan_status || "active")} onValueChange={(value) => updateField("plan_status", value)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativo</SelectItem>
+                  <SelectItem value="trial">Período de teste</SelectItem>
+                  <SelectItem value="inactive">Inativo</SelectItem>
+                  <SelectItem value="expired">Vencido</SelectItem>
+                  <SelectItem value="suspended">Suspenso</SelectItem>
+                </SelectContent>
+              </Select>
+              <input type="hidden" name="plan_status" value={String(form.plan_status || "active")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="site_url">Site externo</Label>
+              <Input id="site_url" name="site_url" value={String(form.site_url || "")} onChange={(event) => updateField("site_url", event.target.value)} placeholder="https://..." />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2"><Label htmlFor="plan_started_at">Início do plano</Label><Input id="plan_started_at" name="plan_started_at" type="datetime-local" value={String(form.plan_started_at || "")} onChange={(event) => updateField("plan_started_at", event.target.value)} /></div>
+            <div className="grid gap-2"><Label htmlFor="plan_expires_at">Vencimento</Label><Input id="plan_expires_at" name="plan_expires_at" type="datetime-local" value={String(form.plan_expires_at || "")} onChange={(event) => updateField("plan_expires_at", event.target.value)} /></div>
+          </div>
+
+          {hasIndividualPage ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              {selectedPlan === "gold" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="carousel_photo_limit">Fotos no carrossel</Label>
+                  <Input id="carousel_photo_limit" name="carousel_photo_limit" type="number" min="1" max="30" value={String(form.carousel_photo_limit || "")} onChange={(event) => updateField("carousel_photo_limit", event.target.value)} />
+                </div>
+              ) : (
+                <input type="hidden" name="carousel_photo_limit" value="1" />
+              )}
+              <div className="grid gap-2"><Label htmlFor="gallery_photo_limit">Fotos na galeria</Label><Input id="gallery_photo_limit" name="gallery_photo_limit" type="number" min="0" max="60" value={String(form.gallery_photo_limit || "")} onChange={(event) => updateField("gallery_photo_limit", event.target.value)} /></div>
+              <div className="grid gap-2"><Label htmlFor="featured_order">Ordem de destaque</Label><Input id="featured_order" name="featured_order" type="number" min="0" value={String(form.featured_order || "")} onChange={(event) => updateField("featured_order", event.target.value)} /></div>
+              <div className="grid gap-2"><Label htmlFor="category_priority">Prioridade na categoria</Label><Input id="category_priority" name="category_priority" type="number" min="0" value={String(form.category_priority || "0")} onChange={(event) => updateField("category_priority", event.target.value)} /></div>
+            </div>
+          ) : null}
+
+          <div className="grid gap-2">
+            <Label htmlFor="whatsapp_message">Mensagem automática do WhatsApp</Label>
+            <Textarea id="whatsapp_message" name="whatsapp_message" value={String(form.whatsapp_message || "")} onChange={(event) => updateField("whatsapp_message", event.target.value)} placeholder="Olá! Encontrei seu estabelecimento através do portal..." />
+          </div>
+
+          {entity !== "city_services" && hasIndividualPage ? (
+            <label className="flex items-center gap-2 rounded-lg border border-border bg-background/55 p-3 text-sm font-medium">
+              <input type="checkbox" name="pagina_ativa" checked={Boolean(form.pagina_ativa)} onChange={(event) => updateField("pagina_ativa", event.target.checked)} className="h-4 w-4 rounded border-border" />
+              Página individual ativa
+            </label>
+          ) : null}
+
+          <div className="grid gap-3 rounded-md border border-border bg-background/55 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" name="custom_features_enabled" checked={Boolean(form.custom_features_enabled)} onChange={(event) => updateField("custom_features_enabled", event.target.checked)} className="h-4 w-4 rounded border-border" />
+                Aplicar exceções comerciais
+              </label>
+              <Button type="button" variant="outline" size="sm" onClick={restorePlanDefaults}>Restaurar padrão</Button>
+            </div>
+            {form.custom_features_enabled ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {editableFeatureKeys.filter(({ key }) => selectedPlan === "gold" || key !== "carousel").map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 rounded-md border border-border p-2.5 text-sm">
+                    <input type="checkbox" name={`feature_${key}`} checked={Boolean(form[`feature_${key}`])} onChange={(event) => updateField(`feature_${key}`, event.target.checked)} className="h-4 w-4 rounded border-border" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {isGold ? (
+            <div className="grid gap-4 rounded-md border border-[#d7aa58]/45 bg-[#FCF8F5] p-4 dark:bg-card md:grid-cols-2">
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="professional_photography_included" checked={Boolean(form.professional_photography_included)} onChange={(event) => updateField("professional_photography_included", event.target.checked)} /> Ensaio fotográfico incluído</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="social_media_promotion_included" checked={Boolean(form.social_media_promotion_included)} onChange={(event) => updateField("social_media_promotion_included", event.target.checked)} /> Divulgação nas redes sociais</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="advanced_report_enabled" checked={Boolean(form.advanced_report_enabled)} onChange={(event) => updateField("advanced_report_enabled", event.target.checked)} /> Relatório avançado</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="priority_support_enabled" checked={Boolean(form.priority_support_enabled)} onChange={(event) => updateField("priority_support_enabled", event.target.checked)} /> Suporte prioritário</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="seasonal_campaign_enabled" checked={Boolean(form.seasonal_campaign_enabled)} onChange={(event) => updateField("seasonal_campaign_enabled", event.target.checked)} /> Campanha sazonal</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="establishment_story_enabled" checked={Boolean(form.establishment_story_enabled)} onChange={(event) => updateField("establishment_story_enabled", event.target.checked)} /> História institucional</label>
+              <div className="grid gap-2"><Label htmlFor="photography_completed_at">Ensaio concluído em</Label><Input id="photography_completed_at" name="photography_completed_at" type="datetime-local" value={String(form.photography_completed_at || "")} onChange={(event) => updateField("photography_completed_at", event.target.value)} /></div>
+              <div className="grid gap-2"><Label htmlFor="social_media_publication_url">Link da publicação</Label><Input id="social_media_publication_url" name="social_media_publication_url" value={String(form.social_media_publication_url || "")} onChange={(event) => updateField("social_media_publication_url", event.target.value)} placeholder="https://..." /></div>
+            </div>
+          ) : null}
+
+          <div className="grid gap-2">
+            <Label htmlFor="plan_change_reason">Motivo da mudança</Label>
+            <Input id="plan_change_reason" name="plan_change_reason" value={String(form.plan_change_reason || "")} onChange={(event) => updateField("plan_change_reason", event.target.value)} placeholder="Upgrade, renovação, cortesia ou downgrade." />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="commercial_notes">Observações comerciais</Label>
+            <Textarea id="commercial_notes" name="commercial_notes" value={String(form.commercial_notes || "")} onChange={(event) => updateField("commercial_notes", event.target.value)} placeholder="Motivo da alteração ou observação interna." />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   const router = useRouter();
   const [entity, setEntity] = useState<AdminEntity>("pontos_turisticos");
@@ -643,6 +1019,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     () => (entity === "restaurantes" ? restaurantImagesFromForm(form) : []),
     [entity, form],
   );
+  const isCommercialEntity = entity === "restaurantes" || entity === "pousadas" || entity === "city_services";
+  const selectedPlan = normalizeCommercialPlan(String(form.plan_type || form.plano || "bronze"));
+  const isCommercialPlanApplicable = entity !== "city_services" || form.listing_type !== "public_service";
+  const hasIndividualPagePlan = isCommercialPlanApplicable && selectedPlan !== "bronze";
+  const isGoldSelected = isCommercialPlanApplicable && selectedPlan === "gold";
 
   function selectEntity(nextEntity: AdminEntity) {
     setEntity(nextEntity);
@@ -657,6 +1038,34 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
 
   function updateField(name: string, value: string | boolean) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function applyPlanDefaults(planValue: string) {
+    const plan = normalizeCommercialPlan(planValue);
+    const definition = planDefinitions[plan];
+    setForm((current) => ({
+      ...current,
+      plano: plan,
+      plan_type: plan,
+      custom_features_enabled: false,
+      pagina_ativa: definition.features.individualPage,
+      destaque: definition.features.highlighted,
+      is_featured: definition.features.highlighted,
+      carousel_photo_limit: String(definition.defaultCarouselPhotoLimit),
+      gallery_photo_limit: String(definition.defaultGalleryPhotoLimit),
+      professional_photography_included: definition.features.professionalPhotography,
+      social_media_promotion_included: definition.features.socialMediaPromotion,
+      advanced_report_enabled: definition.features.advancedReport,
+      priority_support_enabled: definition.features.prioritySupport,
+      seasonal_campaign_enabled: definition.features.seasonalCampaign,
+      establishment_story_enabled: definition.features.establishmentStory,
+      ...Object.fromEntries(editableFeatureKeys.map(({ key }) => [`feature_${key}`, definition.features[key]])),
+    }));
+  }
+
+  function restorePlanDefaults() {
+    applyPlanDefaults(selectedPlan);
+    setStatus({ type: "idle", text: "Recursos padrão do plano restaurados. Salve para confirmar." });
   }
 
   function resetForm() {
@@ -1357,6 +1766,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
           ))}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild type="button" variant="outline">
+            <a href="/admin/relatorios">
+              <ExternalLink className="h-4 w-4" />
+              Relatórios
+            </a>
+          </Button>
+          <Button asChild type="button" variant="outline">
+            <a href="/admin/historico-planos">
+              <History className="h-4 w-4" />
+              Planos
+            </a>
+          </Button>
           <Button type="button" variant="outline" onClick={restoreDefaultContent} disabled={isPending}>
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <DatabaseBackup className="h-4 w-4" />}
             Repor dados padrão
@@ -1412,7 +1833,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                 />
               </div>
 
-              {entity !== "pousadas" ? (
+              {entity !== "pousadas" && entity !== "city_services" ? (
                 <div className="grid gap-2">
                   <Label>Categoria</Label>
                   <Select
@@ -1434,6 +1855,20 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                 </div>
               ) : null}
 
+              {isCommercialEntity ? (
+                <CommercialPlanEditor
+                  entity={entity}
+                  form={form}
+                  selectedPlan={selectedPlan}
+                  isApplicable={isCommercialPlanApplicable}
+                  hasIndividualPage={hasIndividualPagePlan}
+                  isGold={isGoldSelected}
+                  updateField={updateField}
+                  applyPlanDefaults={applyPlanDefaults}
+                  restorePlanDefaults={restorePlanDefaults}
+                />
+              ) : null}
+
               {entity === "city_services" ? (
                 <>
                   <div className="rounded-lg border border-border bg-accent/20 p-4">
@@ -1453,6 +1888,17 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         value={String(form.slug || "")}
                         onChange={(event) => updateField("slug", event.target.value)}
                         placeholder="hospital-maternidade"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="categoria">Categoria</Label>
+                      <Input
+                        id="categoria"
+                        name="categoria"
+                        value={String(form.categoria || "")}
+                        onChange={(event) => updateField("categoria", event.target.value)}
+                        placeholder="saude, farmacias, postos..."
+                        required
                       />
                     </div>
                     <div className="grid gap-2">
@@ -1536,6 +1982,109 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input
+                        id="instagram"
+                        name="instagram"
+                        value={String(form.instagram || "")}
+                        onChange={(event) => updateField("instagram", event.target.value)}
+                        placeholder="@perfil"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="instagram_url">Link do Instagram</Label>
+                      <Input
+                        id="instagram_url"
+                        name="instagram_url"
+                        value={String(form.instagram_url || "")}
+                        onChange={(event) => updateField("instagram_url", event.target.value)}
+                        placeholder="https://www.instagram.com/perfil/"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        name="latitude"
+                        value={String(form.latitude || "")}
+                        onChange={(event) => updateField("latitude", event.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        name="longitude"
+                        value={String(form.longitude || "")}
+                        onChange={(event) => updateField("longitude", event.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {hasIndividualPagePlan || form.listing_type === "public_service" ? (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor="image_url">Imagem</Label>
+                          <Input
+                            id="image_url"
+                            name="image_url"
+                            value={String(form.image_url || "")}
+                            onChange={(event) => updateField("image_url", event.target.value)}
+                            placeholder="/images/servico.jpg ou https://..."
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="logo_url">Logo</Label>
+                          <Input
+                            id="logo_url"
+                            name="logo_url"
+                            value={String(form.logo_url || "")}
+                            onChange={(event) => updateField("logo_url", event.target.value)}
+                            placeholder="/images/logo.png ou https://..."
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label htmlFor="tags">Tags</Label>
+                          <Textarea
+                            id="tags"
+                            name="tags"
+                            value={String(form.tags || "")}
+                            onChange={(event) => updateField("tags", event.target.value)}
+                            placeholder="Uma tag por linha"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="enabled_buttons">Botões habilitados</Label>
+                          <Textarea
+                            id="enabled_buttons"
+                            name="enabled_buttons"
+                            value={String(form.enabled_buttons || "")}
+                            onChange={(event) => updateField("enabled_buttons", event.target.value)}
+                            placeholder={"whatsapp\nmapa\ntelefone"}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="important_message">Mensagem importante</Label>
+                        <Textarea
+                          id="important_message"
+                          name="important_message"
+                          value={String(form.important_message || "")}
+                          onChange={(event) => updateField("important_message", event.target.value)}
+                          placeholder="Aviso ou informação essencial para o visitante."
+                        />
+                      </div>
+                    </>
+                  ) : null}
 
                   <BusinessHoursEditor
                     value={form.business_hours}
@@ -1779,6 +2328,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
+                  {isGoldSelected ? (
                   <div className="grid gap-2">
                     <Label htmlFor="historia">História / texto completo</Label>
                     <Textarea
@@ -1789,6 +2339,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Texto maior para a seção Sobre a hospedagem."
                     />
                   </div>
+                  ) : <input type="hidden" name="historia" value={String(form.historia || "")} />}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="localizacao">Localização</Label>
@@ -1866,16 +2417,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                       Aceita reservas
                     </label>
-                    <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
-                      <input
-                        type="checkbox"
-                        name="destaque"
-                        checked={Boolean(form.destaque)}
-                        onChange={(event) => updateField("destaque", event.target.checked)}
-                        className="h-4 w-4 rounded border-border"
-                      />
-                      Destacar esta hospedagem
-                    </label>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
@@ -1902,6 +2443,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                   <BusinessHoursEditor
                     value={form.business_hours}
                     onChange={(value) => updateField("business_hours", value)}
+                    context="lodging"
                   />
                   <div className="grid gap-2">
                     <Label htmlFor="capacidade">Capacidade</Label>
@@ -1956,8 +2498,13 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="https://www.instagram.com/perfil/"
                     />
                   </div>
+                  <MediaDestinationGuide
+                    kind="lodging"
+                    plan={selectedPlan}
+                    carouselLimit={Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit}
+                  />
                   <div className="grid gap-2">
-                    <Label htmlFor="hero_image_url">Imagem principal do Hero</Label>
+                    <Label htmlFor="hero_image_url">1. Foto principal da página</Label>
                     <p className="text-xs leading-5 text-muted-foreground">
                       Use uma foto horizontal em boa qualidade. Não envie logo neste campo. Imagem recomendada:
                       1600x900 ou maior.
@@ -2028,7 +2575,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="logo_url">Logo da pousada</Label>
+                    <Label htmlFor="logo_url">2. Logo da pousada</Label>
                     <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 sm:grid-cols-[96px_1fr] sm:items-center">
                       <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white p-2">
                         {String(form.logo_url || "").trim() ? (
@@ -2094,7 +2641,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="imagens_urls">Imagens da galeria</Label>
+                    <Label htmlFor="imagens_urls">3. Fotos da galeria</Label>
                     <label className="flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-6 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
                         <Loader2 className="mb-3 h-7 w-7 animate-spin text-muted-foreground" />
@@ -2102,10 +2649,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <ImagePlus className="mb-3 h-7 w-7 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">
-                        {isUploading ? "Enviando imagens..." : "Selecionar fotos da pousada"}
+                        {isUploading ? "Enviando imagens..." : "Selecionar fotos para a galeria"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        Essas fotos aparecem na galeria e nos cards. A imagem de fundo do Hero é definida no campo separado acima.
+                        A primeira foto será a capa do card. No Prata, todas aparecem apenas na galeria. No Ouro, as primeiras fotos também formam o carrossel conforme a ordem abaixo.
                       </span>
                       <input
                         type="file"
@@ -2130,9 +2677,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold">Fotos da pousada</p>
+                            <p className="text-sm font-semibold">
+                              {selectedPlan === "gold" ? "Galeria e ordem do carrossel" : "Fotos da galeria"}
+                            </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              A primeira foto é a capa da listagem. O Hero usa o campo Imagem principal do Hero.
+                              A primeira foto é a capa da listagem. A foto principal da página usa o campo separado acima.
                             </p>
                           </div>
                           {isGalleryPending ? (
@@ -2162,7 +2711,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   />
                                   {isCover ? (
                                     <span className="absolute left-2 top-2 rounded-md bg-alpine-sunset px-2 py-0.5 text-[10px] font-semibold text-[#17251f]">
-                                      Capa
+                                      Capa do card
                                     </span>
                                   ) : null}
                                 </div>
@@ -2170,6 +2719,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold">Foto {index + 1}</p>
+                                      {selectedPlan === "gold" && index < (Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit) ? (
+                                        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-alpine-wine">
+                                          Carrossel · posição {index + 1}
+                                        </p>
+                                      ) : null}
                                       <p className="mt-1 text-xs text-muted-foreground">{imageSourceLabel(image)}</p>
                                       <p className="mt-1 truncate text-xs text-muted-foreground">{image}</p>
                                     </div>
@@ -2353,16 +2907,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 rounded-lg border border-border bg-accent/25 p-3 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      name="destaque"
-                      checked={Boolean(form.destaque)}
-                      onChange={(event) => updateField("destaque", event.target.checked)}
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    Destacar este restaurante nas listas e páginas relacionadas
-                  </label>
+                  {hasIndividualPagePlan ? (
                   <div className="grid gap-2">
                     <Label htmlFor="descricao_completa">Descrição completa</Label>
                     <Textarea
@@ -2373,6 +2918,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Texto maior para a seção Sobre da página individual."
                     />
                   </div>
+                  ) : <input type="hidden" name="descricao_completa" value={String(form.descricao_completa || "")} />}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="horario_funcionamento">Horário</Label>
@@ -2497,8 +3043,13 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       })}
                     </div>
                   </div>
+                  <MediaDestinationGuide
+                    kind="restaurant"
+                    plan={selectedPlan}
+                    carouselLimit={Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit}
+                  />
                   <div className="grid gap-2">
-                    <Label htmlFor="imagem_url">Imagem</Label>
+                    <Label htmlFor="imagem_url">1. Foto principal / capa do card</Label>
                     <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-5 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
                         <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground" />
@@ -2506,10 +3057,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <ImagePlus className="mb-3 h-6 w-6 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">
-                        {isUploading ? "Enviando imagem..." : "Selecionar foto do restaurante"}
+                        {isUploading ? "Enviando imagem..." : "Selecionar foto principal"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        A URL será preenchida automaticamente após o envio.
+                        Esta é a imagem principal do card. No Ouro, ela também será a primeira imagem do carrossel.
                       </span>
                       <input
                         type="file"
@@ -2532,7 +3083,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="logo_url">Logo do estabelecimento</Label>
+                    <Label htmlFor="logo_url">2. Logo do estabelecimento</Label>
                     <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3 sm:grid-cols-[96px_1fr] sm:items-center">
                       <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-white p-2">
                         {String(form.logo_url || "").trim() ? (
@@ -2598,7 +3149,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="imagens_urls">Fotos adicionais</Label>
+                    <Label htmlFor="imagens_urls">3. Fotos da galeria</Label>
                     <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-accent/40 p-5 text-center transition-colors hover:bg-accent/70">
                       {isUploading ? (
                         <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground" />
@@ -2606,10 +3157,10 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <ImagePlus className="mb-3 h-6 w-6 text-muted-foreground" />
                       )}
                       <span className="text-sm font-medium">
-                        {isUploading ? "Enviando imagens..." : "Selecionar fotos adicionais"}
+                        {isUploading ? "Enviando imagens..." : "Selecionar fotos para a galeria"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        Use fotos de pratos, ambiente ou fachada. Elas podem aparecer em áreas de destaque da página.
+                        Use fotos de pratos, ambiente ou fachada. No Prata, elas aparecem na galeria. No Ouro, as primeiras também entram no carrossel conforme a ordem abaixo.
                       </span>
                       <input
                         type="file"
@@ -2634,9 +3185,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       <div className="grid gap-3 rounded-lg border border-border bg-background/50 p-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold">Fotos do carrossel</p>
+                            <p className="text-sm font-semibold">
+                              {selectedPlan === "gold" ? "Galeria e ordem do carrossel" : "Fotos da galeria"}
+                            </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              A primeira foto é a capa principal. As demais entram como fotos adicionais.
+                              A foto principal aparece primeiro. Use as setas para organizar a galeria.
                             </p>
                           </div>
                           {isGalleryPending ? (
@@ -2666,7 +3219,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   />
                                   {isCover ? (
                                     <span className="absolute left-2 top-2 rounded-md bg-alpine-sunset px-2 py-0.5 text-[10px] font-semibold text-[#17251f]">
-                                      Capa
+                                      Capa do card
                                     </span>
                                   ) : null}
                                 </div>
@@ -2674,6 +3227,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold">Foto {index + 1}</p>
+                                      {selectedPlan === "gold" && index < (Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit) ? (
+                                        <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-alpine-wine">
+                                          Carrossel · posição {index + 1}
+                                        </p>
+                                      ) : null}
                                       <p className="mt-1 text-xs text-muted-foreground">{imageSourceLabel(image)}</p>
                                       <p className="mt-1 truncate text-xs text-muted-foreground">{image}</p>
                                     </div>

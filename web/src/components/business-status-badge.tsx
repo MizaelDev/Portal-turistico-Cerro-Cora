@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getBusinessStatus,
+  getBusinessStatusPresentation,
   parseBusinessHours,
   parseLegacyBusinessHours,
   type BusinessHours,
   type BusinessStatusKind,
+  type BusinessStatusContext,
 } from "@/lib/business-hours";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +17,7 @@ type BusinessStatusBadgeProps = {
   fallbackHours?: string | null;
   className?: string;
   compact?: boolean;
+  context?: BusinessStatusContext;
 };
 
 const statusStyles: Record<BusinessStatusKind, string> = {
@@ -33,15 +36,6 @@ const dotStyles: Record<BusinessStatusKind, string> = {
   always_open: "bg-emerald-500",
   appointment: "bg-sky-500",
   unknown: "bg-muted-foreground/60",
-};
-
-const statusLabels: Record<BusinessStatusKind, string> = {
-  open: "Aberto agora",
-  closing_soon: "Fecha em breve",
-  closed: "Fechado",
-  always_open: "Atendimento 24 horas",
-  appointment: "Somente agendamento",
-  unknown: "Horário a confirmar",
 };
 
 const minuteSubscribers = new Set<() => void>();
@@ -71,6 +65,7 @@ export function BusinessStatusBadge({
   fallbackHours,
   className,
   compact = false,
+  context = "food",
 }: BusinessStatusBadgeProps) {
   const [now, setNow] = useState<Date | null>(null);
   const parsedHours = useMemo(() => {
@@ -88,6 +83,7 @@ export function BusinessStatusBadge({
   if (!parsedHours || !now) return null;
 
   const status = getBusinessStatus(parsedHours, { now });
+  const presentation = getBusinessStatusPresentation(status, context);
 
   return (
     <div
@@ -98,10 +94,10 @@ export function BusinessStatusBadge({
       )}
     >
       <span className={cn("h-2 w-2 shrink-0 rounded-full", dotStyles[status.status])} />
-      <span className="min-w-0">
-        <span className="whitespace-nowrap">{statusLabels[status.status]}</span>
-        {!compact && status.message !== statusLabels[status.status] ? (
-          <span className="ml-2 font-medium opacity-80">{status.message}</span>
+      <span className="min-w-0 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2">
+        <span className="block whitespace-nowrap">{presentation.label}</span>
+        {!compact && presentation.message !== presentation.label ? (
+          <span className="block font-medium opacity-80">{presentation.message}</span>
         ) : null}
       </span>
     </div>

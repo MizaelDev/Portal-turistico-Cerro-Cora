@@ -18,6 +18,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { BusinessStatusBadge } from "@/components/business-status-badge";
+import { TrackedLink } from "@/components/tracked-link";
+import { TrackView } from "@/components/track-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,7 @@ type CityServicesListProps = {
   services: CityService[];
 };
 
-const categoryIcons: Record<CityServiceCategory, LucideIcon> = {
+const categoryIcons: Record<string, LucideIcon> = {
   saude: HeartPulse,
   seguranca: Shield,
   transporte_apoio: Fuel,
@@ -47,7 +49,7 @@ const categoryIcons: Record<CityServiceCategory, LucideIcon> = {
   emergencia: AlertTriangle,
 };
 
-const categoryAccent: Record<CityServiceCategory, string> = {
+const categoryAccent: Record<string, string> = {
   saude: "border-l-[#547546]",
   seguranca: "border-l-[#426d8d]",
   transporte_apoio: "border-l-alpine-sunset",
@@ -85,6 +87,11 @@ function ServiceBadge({ children }: { children: ReactNode }) {
 function ServiceActions({ service }: { service: CityService }) {
   const callUrl = phoneHref(service.phone);
   const whatsappUrl = whatsappHref(service.whatsapp);
+  const analyticsMeta = {
+    establishmentName: service.name,
+    category: service.category,
+    planType: service.listingType === "public_service" ? "public_service" : service.plan || "bronze",
+  };
 
   if (!callUrl && !whatsappUrl && !service.googleMapsUrl) {
     return null;
@@ -94,23 +101,45 @@ function ServiceActions({ service }: { service: CityService }) {
     <div className="flex flex-col gap-2 border-t border-border/80 pt-3 sm:flex-row sm:flex-wrap">
       {callUrl ? (
         <Button asChild variant="outline" className="w-full sm:w-auto">
-          <a href={callUrl}>
+          <TrackedLink
+            href={callUrl}
+            entityType="city_service"
+            entityId={service.id}
+            eventType="phone_click"
+            {...analyticsMeta}
+          >
             <Phone className="h-4 w-4" /> Ligar
-          </a>
+          </TrackedLink>
         </Button>
       ) : null}
       {service.googleMapsUrl ? (
         <Button asChild variant="warm" className="w-full sm:w-auto">
-          <a href={service.googleMapsUrl} target="_blank" rel="noopener noreferrer">
+          <TrackedLink
+            href={service.googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            entityType="city_service"
+            entityId={service.id}
+            eventType="map_click"
+            {...analyticsMeta}
+          >
             <MapPin className="h-4 w-4" /> Como chegar
-          </a>
+          </TrackedLink>
         </Button>
       ) : null}
       {whatsappUrl ? (
         <Button asChild variant="outline" className="w-full sm:w-auto">
-          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+          <TrackedLink
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            entityType="city_service"
+            entityId={service.id}
+            eventType="whatsapp_click"
+            {...analyticsMeta}
+          >
             <MessageCircle className="h-4 w-4" /> WhatsApp
-          </a>
+          </TrackedLink>
         </Button>
       ) : null}
     </div>
@@ -141,11 +170,17 @@ function ServiceInfoItem({
 
 function ServiceRow({ service }: { service: CityService }) {
   const CategoryIcon = categoryIcons[service.category] || Building2;
-  const accentClassName = categoryAccent[service.category];
+  const accentClassName = categoryAccent[service.category] || "border-l-primary";
   const hasImportantBadge =
     service.isEmergency || normalizeText(service.openingHours || "").includes("24");
+  const analyticsMeta = {
+    establishmentName: service.name,
+    category: service.category,
+    planType: service.listingType === "public_service" ? "public_service" : service.plan || "bronze",
+  };
 
   return (
+    <TrackView entityType="city_service" entityId={service.id} {...analyticsMeta}>
     <article
       className={`rounded-lg border border-border border-l-[6px] bg-card p-4 shadow-sm ${accentClassName}`}
     >
@@ -216,6 +251,7 @@ function ServiceRow({ service }: { service: CityService }) {
         <ServiceActions service={service} />
       </div>
     </article>
+    </TrackView>
   );
 }
 
@@ -227,10 +263,13 @@ export function CityServicesList({ services }: CityServicesListProps) {
   );
 
   const activeServices = useMemo(() => services.filter((service) => service.isActive), [services]);
-  const availableCategories = useMemo(
-    () => cityServiceCategories.filter((item) => activeServices.some((service) => service.category === item.value)),
-    [activeServices],
-  );
+  const availableCategories = useMemo(() => {
+    const known = new Map(cityServiceCategories.map((item) => [item.value, item]));
+    return Array.from(new Set(activeServices.map((service) => service.category))).map((value) => {
+      const item = known.get(value);
+      return item || { value, label: getCityServiceCategoryLabel(value), description: "Serviços cadastrados nesta categoria." };
+    });
+  }, [activeServices]);
 
   const filteredServices = useMemo(() => {
     const normalizedSearch = normalizeText(search.trim());
