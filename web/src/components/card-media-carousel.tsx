@@ -13,7 +13,6 @@ type CardMediaCarouselProps = {
   entityType: CommercialEntityType;
   entityId?: string;
   category?: string;
-  planType?: string;
   limit: number;
   logoImage?: string;
   className?: string;
@@ -32,7 +31,6 @@ export function CardMediaCarousel({
   entityType,
   entityId,
   category,
-  planType,
   limit,
   logoImage,
   className,
@@ -63,9 +61,8 @@ export function CardMediaCarousel({
       eventType: "carousel_click",
       establishmentName: name,
       category,
-      planType,
     });
-  }, [category, entityId, entityType, name, planType]);
+  }, [category, entityId, entityType, name]);
 
   const goToPrevious = useCallback(() => {
     trackCarousel();

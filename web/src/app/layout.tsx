@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
 import { GoogleAnalyticsPageView } from "@/components/google-analytics-page-view";
+import { JsonLd } from "@/components/json-ld";
 
 // Configuração das fontes
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
@@ -24,8 +25,12 @@ const playfair = Playfair_Display({
   variable: "--font-playfair",
   display: "swap",
 });
-const gaMeasurementId =
+const configuredGaMeasurementId =
   process.env.NODE_ENV === "production" ? process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID : undefined;
+const gaMeasurementId =
+  configuredGaMeasurementId && /^G-[A-Z0-9]+$/.test(configuredGaMeasurementId)
+    ? configuredGaMeasurementId
+    : undefined;
 
 export const metadata: Metadata = createMetadata();
 
@@ -59,17 +64,8 @@ export default function RootLayout({
           <Analytics />
         </ThemeProvider>
 
-        {/* Scripts de SEO */}
-        <Script
-          id="tourism-schema"
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(tourismSchema) }}
-        />
-        <Script
-          id="local-business-schema"
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
-        />
+        <JsonLd data={tourismSchema} />
+        <JsonLd data={localBusinessSchema} />
         {gaMeasurementId ? (
           <>
             <Script

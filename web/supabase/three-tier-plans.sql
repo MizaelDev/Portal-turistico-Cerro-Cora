@@ -1,3 +1,4 @@
+-- DEPRECATED: migration historica de planos. Nao execute em instalacoes novas.
 -- Planos Bronze, Prata e Ouro.
 -- Migration idempotente: execute no SQL Editor do Supabase após schema.sql e commercial-platform.sql.
 

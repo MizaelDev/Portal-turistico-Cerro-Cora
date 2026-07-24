@@ -66,7 +66,7 @@ export default function FestivalPage() {
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-white/78">
               De 07 a 09 de agosto, a Praça Pública recebe shows, artistas regionais,
-              comidas e bebidas em uma das noites mais aguardadas da cidade.
+              comidas e bebidas.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <span className="inline-flex items-center gap-2 rounded-md border border-white/20 bg-white/12 px-4 py-2 text-sm font-semibold backdrop-blur">
@@ -107,16 +107,16 @@ export default function FestivalPage() {
         <div className="container">
           <SectionHeader
             eyebrow="Área gastronômica"
-            title="Sabores para acompanhar as noites frias"
-            description="Comidas, bebidas quentes e opções regionais para quem vai acompanhar os shows na Praça Pública."
+            title="Comidas e bebidas na Praça Pública"
+            description="Cafés, caldos, massas, doces, queijos e pratos regionais durante as três noites do festival."
           />
-          <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8 grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
             {foodHighlights.map((item) => (
               <div
                 key={item.label}
-                className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 shadow-sm"
+                className="flex min-h-16 items-center gap-3 border-b border-border/70 py-4"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#18362f] text-alpine-sunset">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center text-alpine-wine dark:text-alpine-sunset">
                   <item.icon className="h-5 w-5" />
                 </span>
                 <span className="font-semibold">{item.label}</span>
@@ -130,18 +130,16 @@ export default function FestivalPage() {
         <div>
           <SectionHeader
             className="mb-8 text-left"
-            eyebrow="Mapa do evento"
-            title="Chegue sem complicação"
-            description="Localização da Praça Pública para abrir a rota no celular."
+            title="Como chegar à Praça Pública"
+            description="Abra a rota até o local do evento no seu celular."
           />
           <MapEmbed title="Mapa do Festival de Inverno" />
         </div>
         <div>
           <SectionHeader
             className="mb-8 text-left"
-            eyebrow="Galeria"
-            title="Fotos da cidade"
-            description="Registros de eventos, cafés, paisagens e pontos conhecidos de Cerro Corá."
+            title="Cerro Corá em imagens"
+            description="Eventos, cafés, paisagens e pontos conhecidos da cidade."
           />
           <PhotoGallery />
         </div>

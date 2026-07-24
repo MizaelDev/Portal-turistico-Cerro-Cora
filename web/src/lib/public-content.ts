@@ -1,11 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import {
-  getCommercialFeatures,
-  getEffectivePlanStatus,
-  getPhotoLimits,
-  getPlanPriority,
-  normalizeCommercialPlan,
-} from "@/lib/commercial";
+import { cache } from "react";
 import {
   attractions as fallbackAttractions,
   foodPlaces as fallbackFoodPlaces,
@@ -32,17 +26,19 @@ type PublicContent<T> = {
 };
 
 const attractionColumns =
+  "id,nome,descricao,categoria,localizacao,imagem_url,imagens_urls,info_url,ativo,created_at";
+const legacyAttractionColumns =
   "id,nome,descricao,categoria,localizacao,imagem_url,imagens_urls,ativo,created_at";
 const lodgingColumns =
   "id,nome,descricao,localizacao,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,imagens_urls,ativo,created_at";
 const legacyExtendedLodgingColumns =
-  "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,business_hours,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,plano,whatsapp_message,site_url,pagina_ativa,ativo,created_at,updated_at";
-const extendedLodgingColumns = `${legacyExtendedLodgingColumns},plan_type,plan_status,plan_started_at,plan_expires_at,custom_features,carousel_photo_limit,gallery_photo_limit,featured_order,category_priority,professional_photography_included,photography_completed_at,social_media_promotion_included,social_media_publication_url,advanced_report_enabled,priority_support_enabled,seasonal_campaign_enabled,establishment_story_enabled,commercial_notes,plan_change_reason`;
+  "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,business_hours,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,whatsapp_message,site_url,ativo,created_at,updated_at";
+const extendedLodgingColumns = `${legacyExtendedLodgingColumns},gallery_enabled,carousel_enabled,featured_order`;
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const legacyExtendedRestaurantColumns =
-  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,business_hours,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,plano,whatsapp_message,site_url,pagina_ativa,ativo,created_at,updated_at";
-const extendedRestaurantColumns = `${legacyExtendedRestaurantColumns},plan_type,plan_status,plan_started_at,plan_expires_at,custom_features,carousel_photo_limit,gallery_photo_limit,featured_order,category_priority,professional_photography_included,photography_completed_at,social_media_promotion_included,social_media_publication_url,advanced_report_enabled,priority_support_enabled,seasonal_campaign_enabled,establishment_story_enabled,commercial_notes,plan_change_reason`;
+  "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,business_hours,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,whatsapp_message,site_url,ativo,created_at,updated_at";
+const extendedRestaurantColumns = `${legacyExtendedRestaurantColumns},gallery_enabled,carousel_enabled,featured_order`;
 const publicContentTimeoutMs = 8000;
 
 const fetchWithTimeout: typeof fetch = async (input, init) => {
@@ -80,6 +76,22 @@ function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function safeExternalUrl(value: string | null | undefined) {
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function defaultAttractionInfoUrl(name: string) {
+  const query = new URLSearchParams({ q: `${name} Cerro Corá RN` });
+  return `https://www.google.com/search?${query.toString()}`;
+}
+
 function isSchemaCacheError(error: { message?: string } | null) {
   const message = error?.message?.toLowerCase() || "";
   return (
@@ -99,6 +111,7 @@ function mapPontoTuristico(row: PontoTuristicoRow): Attraction {
     gallery,
     description: row.descricao,
     location: row.localizacao,
+    infoUrl: safeExternalUrl(row.info_url) || defaultAttractionInfoUrl(row.nome),
     category: titleCase(row.categoria),
   };
 }
@@ -113,32 +126,21 @@ function formatPriceRange(min: number | null, max: number | null) {
 function mapPousada(row: PousadaRow): Lodging {
   const images = (row.imagens_urls || []).filter(Boolean);
   const location = row.distancia_centro ? `${row.localizacao} - ${row.distancia_centro}` : row.localizacao;
-  const plan = normalizeCommercialPlan(row.plan_type || row.plano);
-  const planStatus = getEffectivePlanStatus(row.plan_status, row.plan_expires_at);
-  const features = getCommercialFeatures(plan, {
-    status: planStatus,
-    customFeatures: row.custom_features,
-    pageEnabled: row.pagina_ativa ?? true,
-    galleryEnabled: images.length > 0,
-    carouselEnabled: images.length > 1,
-    highlighted: row.destaque,
-    bookingEnabled: row.aceita_reservas ?? true,
-  });
-  const photoLimits = getPhotoLimits(plan, row.carousel_photo_limit, row.gallery_photo_limit);
-  const publicImages = features.gallery ? images.slice(0, photoLimits.gallery || 1) : images.slice(0, 1);
+  const galleryEnabled = row.gallery_enabled !== false && images.length > 0;
+  const carouselEnabled = row.carousel_enabled !== false && images.length > 1;
 
   return {
     id: row.id,
     slug: row.slug || slugify(row.nome),
     name: row.nome,
     category: row.categoria || "Pousada",
-    image: publicImages[0] || row.logo_url || "/images/cerro-cora.jpg",
-    imageIsLogo: !publicImages[0] && Boolean(row.logo_url),
+    image: images[0] || row.logo_url || "/images/cerro-cora.jpg",
+    imageIsLogo: !images[0] && Boolean(row.logo_url),
     heroImage: row.hero_image_url || undefined,
     logo: row.logo_url || undefined,
-    gallery: features.gallery ? publicImages.slice(1) : [],
+    gallery: galleryEnabled ? images.slice(1) : [],
     description: row.descricao,
-    story: features.establishmentStory ? row.historia || undefined : undefined,
+    story: row.historia || undefined,
     mainDifferential: row.diferencial_principal || row.diferenciais?.[0] || undefined,
     whatsapp: row.whatsapp,
     phone: row.telefone || undefined,
@@ -157,16 +159,10 @@ function mapPousada(row: PousadaRow): Lodging {
     amenities: row.comodidades || undefined,
     highlights: row.diferenciais || undefined,
     acceptsReservations: row.aceita_reservas ?? true,
-    isFeatured: features.highlighted,
-    plan,
-    planStatus,
-    customFeatures: row.custom_features || undefined,
-    commercialFeatures: features,
-    carouselPhotoLimit: photoLimits.carousel,
-    galleryPhotoLimit: photoLimits.gallery,
+    isFeatured: Boolean(row.destaque),
+    carouselEnabled,
+    galleryEnabled,
     featuredOrder: row.featured_order ?? undefined,
-    categoryPriority: row.category_priority ?? undefined,
-    pageEnabled: features.individualPage,
     whatsappMessage: row.whatsapp_message || undefined,
     siteUrl: row.site_url || undefined,
     createdAt: row.created_at,
@@ -206,18 +202,8 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
   const tags = row.tags?.length ? row.tags : deriveRestaurantTags(row, category);
   const galleryImages = (row.imagens_urls || []).filter(Boolean);
   const specialties = row.especialidades?.length ? row.especialidades : tags;
-  const plan = normalizeCommercialPlan(row.plan_type || row.plano);
-  const planStatus = getEffectivePlanStatus(row.plan_status, row.plan_expires_at);
-  const features = getCommercialFeatures(plan, {
-    status: planStatus,
-    customFeatures: row.custom_features,
-    pageEnabled: row.pagina_ativa ?? true,
-    galleryEnabled: galleryImages.length > 0,
-    carouselEnabled: galleryImages.length > 1,
-    highlighted: row.destaque,
-  });
-  const photoLimits = getPhotoLimits(plan, row.carousel_photo_limit, row.gallery_photo_limit);
-  const publicGalleryImages = features.gallery ? galleryImages.slice(0, photoLimits.gallery) : [];
+  const galleryEnabled = row.gallery_enabled !== false && galleryImages.length > 0;
+  const carouselEnabled = row.carousel_enabled !== false && galleryImages.length > 1;
 
   return {
     id: row.id,
@@ -227,7 +213,7 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
     tags,
     image: row.imagem_url,
     logo: row.logo_url || undefined,
-    galleryImages: publicGalleryImages,
+    galleryImages: galleryEnabled ? galleryImages : [],
     description: row.descricao,
     story: row.descricao_completa || row.descricao,
     hours: row.horario_funcionamento,
@@ -247,16 +233,10 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
     specialties,
     recommendedDish: row.prato_recomendado || undefined,
     firstVisitTip: row.dica_turista || undefined,
-    isFeatured: features.highlighted,
+    isFeatured: Boolean(row.destaque),
     featuredOrder: row.featured_order ?? undefined,
-    plan,
-    planStatus,
-    customFeatures: row.custom_features || undefined,
-    commercialFeatures: features,
-    carouselPhotoLimit: photoLimits.carousel,
-    galleryPhotoLimit: photoLimits.gallery,
-    categoryPriority: row.category_priority ?? undefined,
-    pageEnabled: features.individualPage,
+    carouselEnabled,
+    galleryEnabled,
     whatsappMessage: row.whatsapp_message || undefined,
     siteUrl: row.site_url || undefined,
     createdAt: row.created_at,
@@ -280,28 +260,19 @@ function createSupabasePublicClient() {
   });
 }
 
-function sortCommercialItems<T extends {
-  plan?: string;
-  planStatus?: string;
+function sortContentItems<T extends {
   featuredOrder?: number;
-  categoryPriority?: number;
   updatedAt?: string;
   name: string;
 }>(items: T[]) {
   return [...items].sort((first, second) => {
-    const priorityDifference = getPlanPriority(second.plan, second.planStatus) - getPlanPriority(first.plan, first.planStatus);
-    if (priorityDifference) return priorityDifference;
-
-    const categoryDifference = (second.categoryPriority || 0) - (first.categoryPriority || 0);
-    if (categoryDifference) return categoryDifference;
-
     const orderDifference = (first.featuredOrder ?? Number.MAX_SAFE_INTEGER) - (second.featuredOrder ?? Number.MAX_SAFE_INTEGER);
     if (orderDifference) return orderDifference;
 
-    const updateDifference = new Date(second.updatedAt || 0).getTime() - new Date(first.updatedAt || 0).getTime();
-    if (updateDifference) return updateDifference;
+    const nameDifference = first.name.localeCompare(second.name, "pt-BR");
+    if (nameDifference) return nameDifference;
 
-    return first.name.localeCompare(second.name, "pt-BR");
+    return new Date(second.updatedAt || 0).getTime() - new Date(first.updatedAt || 0).getTime();
   });
 }
 
@@ -311,12 +282,26 @@ export async function getPublicAttractions(): Promise<PublicContent<Attraction>>
     return { items: fallbackAttractions, error: null, source: "mock" };
   }
 
-  const { data, error } = await supabase
+  const extendedResult = await supabase
     .from("pontos_turisticos")
     .select(attractionColumns)
     .eq("ativo", true)
     .order("nome")
     .limit(100);
+  let data = extendedResult.data as PontoTuristicoRow[] | null;
+  let error = extendedResult.error;
+
+  // Mantem a pagina publica funcionando ate a migration de info_url ser aplicada.
+  if (isSchemaCacheError(error)) {
+    const legacyResult = await supabase
+      .from("pontos_turisticos")
+      .select(legacyAttractionColumns)
+      .eq("ativo", true)
+      .order("nome")
+      .limit(100);
+    data = legacyResult.data as PontoTuristicoRow[] | null;
+    error = legacyResult.error;
+  }
 
   if (error) {
     logPublicContentError("attractions", error);
@@ -374,7 +359,7 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
   }
 
   return {
-    items: sortCommercialItems((data as PousadaRow[]).map(mapPousada)),
+    items: sortContentItems((data as PousadaRow[]).map(mapPousada)),
     error: null,
     source: "supabase",
   };
@@ -424,26 +409,20 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
   }
 
   return {
-    items: sortCommercialItems((data as RestauranteRow[]).map(mapRestaurante)),
+    items: sortContentItems((data as RestauranteRow[]).map(mapRestaurante)),
     error: null,
     source: "supabase",
   };
 }
 
-export async function getPublicLodgingPage(
+async function fetchPublicLodgingPage(
   slug: string,
 ): Promise<PublicContent<Lodging> & { item: Lodging | null; related: Lodging[] }> {
   const supabase = createSupabasePublicClient();
 
   if (!supabase) {
     const item = fallbackLodgings.find(
-      (lodging) =>
-        (lodging.slug || slugify(lodging.name)) === slug &&
-        getCommercialFeatures(lodging.plan, {
-          status: lodging.planStatus,
-          customFeatures: lodging.customFeatures,
-          pageEnabled: lodging.pageEnabled,
-        }).individualPage,
+      (lodging) => (lodging.slug || slugify(lodging.name)) === slug,
     ) || null;
 
     return {
@@ -452,7 +431,7 @@ export async function getPublicLodgingPage(
       related: item
         ? fallbackLodgings
             .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
-            .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+            .sort((first, second) => first.name.localeCompare(second.name, "pt-BR"))
             .slice(0, 3)
         : [],
       error: null,
@@ -470,13 +449,7 @@ export async function getPublicLodgingPage(
   if (isSchemaCacheError(itemResult.error)) {
     const { items, error, source } = await getPublicLodgings();
     const item = items.find(
-      (lodging) =>
-        (lodging.slug || slugify(lodging.name)) === slug &&
-        getCommercialFeatures(lodging.plan, {
-          status: lodging.planStatus,
-          customFeatures: lodging.customFeatures,
-          pageEnabled: lodging.pageEnabled,
-        }).individualPage,
+      (lodging) => (lodging.slug || slugify(lodging.name)) === slug,
     ) || null;
 
     return {
@@ -485,7 +458,7 @@ export async function getPublicLodgingPage(
       related: item
         ? items
             .filter((lodging) => (lodging.slug || slugify(lodging.name)) !== slug)
-            .sort((first, second) => Number(Boolean(second.isFeatured)) - Number(Boolean(first.isFeatured)))
+            .sort((first, second) => first.name.localeCompare(second.name, "pt-BR"))
             .slice(0, 3)
         : [],
       error,
@@ -503,19 +476,11 @@ export async function getPublicLodgingPage(
   }
 
   const item = mapPousada(itemResult.data as PousadaRow);
-  if (!getCommercialFeatures(item.plan, {
-    status: item.planStatus,
-    customFeatures: item.customFeatures,
-    pageEnabled: item.pageEnabled,
-  }).individualPage) {
-    return { items: [], item: null, related: [], error: null, source: "supabase" };
-  }
   const relatedResult = await supabase
     .from("pousadas")
     .select(extendedLodgingColumns)
     .eq("ativo", true)
     .neq("id", item.id)
-    .order("destaque", { ascending: false })
     .order("nome")
     .limit(3);
 
@@ -536,7 +501,9 @@ export async function getPublicLodgingPage(
   };
 }
 
-export async function getPublicRestaurantPage(slug: string): Promise<
+export const getPublicLodgingPage = cache(fetchPublicLodgingPage);
+
+async function fetchPublicRestaurantPage(slug: string): Promise<
   PublicContent<FoodPlace> & {
     item: FoodPlace | null;
     related: FoodPlace[];
@@ -546,13 +513,7 @@ export async function getPublicRestaurantPage(slug: string): Promise<
 
   if (!supabase) {
     const item = fallbackFoodPlaces.find(
-      (place) =>
-        (place.slug || slugify(place.name)) === slug &&
-        getCommercialFeatures(place.plan, {
-          status: place.planStatus,
-          customFeatures: place.customFeatures,
-          pageEnabled: place.pageEnabled,
-        }).individualPage,
+      (place) => (place.slug || slugify(place.name)) === slug,
     ) || null;
     const related = item
       ? fallbackFoodPlaces
@@ -580,13 +541,7 @@ export async function getPublicRestaurantPage(slug: string): Promise<
   if (isSchemaCacheError(itemResult.error)) {
     const { items, error, source } = await getPublicFoodPlaces();
     const item = items.find(
-      (place) =>
-        (place.slug || slugify(place.name)) === slug &&
-        getCommercialFeatures(place.plan, {
-          status: place.planStatus,
-          customFeatures: place.customFeatures,
-          pageEnabled: place.pageEnabled,
-        }).individualPage,
+      (place) => (place.slug || slugify(place.name)) === slug,
     ) || null;
     const related = item
       ? items
@@ -621,20 +576,12 @@ export async function getPublicRestaurantPage(slug: string): Promise<
 
   const row = itemResult.data as RestauranteRow;
   const item = mapRestaurante(row);
-  if (!getCommercialFeatures(item.plan, {
-    status: item.planStatus,
-    customFeatures: item.customFeatures,
-    pageEnabled: item.pageEnabled,
-  }).individualPage) {
-    return { items: [], item: null, related: [], error: null, source: "supabase" };
-  }
   const relatedResult = await supabase
     .from("restaurantes")
     .select(extendedRestaurantColumns)
     .eq("ativo", true)
     .eq("categoria", row.categoria)
     .neq("id", row.id)
-    .order("destaque", { ascending: false })
     .order("nome")
     .limit(3);
 
@@ -654,3 +601,5 @@ export async function getPublicRestaurantPage(slug: string): Promise<
     source: "supabase",
   };
 }
+
+export const getPublicRestaurantPage = cache(fetchPublicRestaurantPage);

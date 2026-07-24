@@ -13,15 +13,19 @@ const securityHeaders = [
       "frame-ancestors 'none'",
       "object-src 'none'",
       "form-action 'self'",
+      "script-src-attr 'none'",
       `script-src 'self' 'unsafe-inline' https://www.googletagmanager.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://images.unsplash.com https://images.pexels.com https://*.supabase.co https://www.google-analytics.com https://*.google-analytics.com",
       "font-src 'self' data:",
       "frame-src 'self' https://www.google.com https://maps.google.com",
+      "media-src 'self' https://*.supabase.co",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
       `connect-src 'self' https://api.openweathermap.org https://*.supabase.co https://vitals.vercel-insights.com https://www.google-analytics.com https://*.google-analytics.com${
         isDevelopment ? " ws://localhost:* http://localhost:*" : ""
       }`,
-      "upgrade-insecure-requests",
+      ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
     ].join("; "),
   },
   {
@@ -44,6 +48,18 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
   },
+  {
+    key: "Cross-Origin-Opener-Policy",
+    value: "same-origin-allow-popups",
+  },
+  {
+    key: "X-Permitted-Cross-Domain-Policies",
+    value: "none",
+  },
+  {
+    key: "Origin-Agent-Cluster",
+    value: "?1",
+  },
 ];
 
 const adminHeaders = [
@@ -62,7 +78,7 @@ const nextConfig = {
   outputFileTracingRoot: appDir,
   experimental: {
     serverActions: {
-      bodySizeLimit: "64mb",
+      bodySizeLimit: "32mb",
     },
   },
   images: {

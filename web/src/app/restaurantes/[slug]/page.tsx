@@ -44,11 +44,11 @@ import { RestaurantGallery } from "@/components/restaurant-gallery";
 import { SafeImage } from "@/components/safe-image";
 import { TrackedLink } from "@/components/tracked-link";
 import { TrackView } from "@/components/track-view";
+import { TrackedShareButton } from "@/components/tracked-share-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { FoodPlace } from "@/lib/data";
-import { getCommercialFeatures, whatsappUrl } from "@/lib/commercial";
-import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
+import { googleMapsSearchUrl, instagramUrlFromHandle, whatsappUrl } from "@/lib/links";
 import { getPublicFoodPlaces, getPublicRestaurantPage } from "@/lib/public-content";
 import { createMetadata, restaurantDetailSchema } from "@/lib/seo";
 import { slugify } from "@/lib/slug";
@@ -184,13 +184,7 @@ function getHouseOfferings(place: FoodPlace, specialties: string[], features: st
 
 export async function generateStaticParams() {
   const { items } = await getPublicFoodPlaces();
-  return items
-    .filter((place) => getCommercialFeatures(place.plan, {
-      status: place.planStatus,
-      customFeatures: place.customFeatures,
-      pageEnabled: place.pageEnabled,
-    }).individualPage)
-    .map((place) => ({ slug: restaurantSlug(place) }));
+  return items.map((place) => ({ slug: restaurantSlug(place) }));
 }
 
 export async function generateMetadata({ params }: RestaurantPageProps): Promise<Metadata> {
@@ -302,21 +296,17 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
   const heroImage = getHeroImage(place);
   const logoImage = getLogoImage(place);
   const recommendedImage = getRecommendedImage(place, heroImage);
-  const galleryImages = uniqueImages(place.galleryImages || []).filter((image) => image !== logoImage);
+  const galleryImages = place.galleryEnabled === false
+    ? []
+    : uniqueImages(place.galleryImages || []).filter((image) => image !== logoImage);
   const specialties = place.specialties?.length ? place.specialties : place.tags;
   const features = place.features || [];
   const houseOfferings = getHouseOfferings(place, specialties, features);
   const paymentMethods = place.paymentMethods || [];
   const priceRange = formatPriceRange(place.priceRange);
-  const commercialFeatures = place.commercialFeatures || getCommercialFeatures(place.plan, {
-    status: place.planStatus,
-    customFeatures: place.customFeatures,
-    pageEnabled: place.pageEnabled,
-  });
   const analyticsMeta = {
     establishmentName: place.name,
     category: place.category,
-    planType: place.plan || "bronze",
   };
 
   return (
@@ -341,6 +331,13 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
             ) : null}
 
             <h1 className="font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{place.name}</h1>
+            <TrackedShareButton
+              entityType="restaurant"
+              entityId={place.id}
+              establishmentName={place.name}
+              category={place.category}
+              variant="glass"
+            />
           </div>
         </div>
       </section>
@@ -393,7 +390,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
             <Card>
               <CardContent className="grid gap-5 p-5 md:p-6">
                 <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-                  {commercialFeatures.establishmentStory ? place.description : place.story || place.description}
+                  {place.description}
                 </p>
 
                 {houseOfferings.length ? (
@@ -445,7 +442,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
           </SectionShell>
         </div>
 
-        {commercialFeatures.establishmentStory && place.story && place.story !== place.description ? (
+        {place.story && place.story !== place.description ? (
           <SectionShell title="Nossa história" eyebrow="Identidade e tradição">
             <Card>
               <CardContent className="p-5 md:p-6">
@@ -466,7 +463,6 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
               name={place.name}
               entityId={place.id}
               category={place.category}
-              planType={analyticsMeta.planType}
             />
           </SectionShell>
         ) : null}

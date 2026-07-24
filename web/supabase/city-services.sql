@@ -2,9 +2,7 @@ create table if not exists public.city_services (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
-  category text not null check (
-    category in ('saude', 'seguranca', 'transporte_apoio', 'comercio_essencial', 'emergencia')
-  ),
+  category text not null,
   subcategory text not null,
   description text,
   address text,
@@ -24,6 +22,9 @@ create table if not exists public.city_services (
 
 alter table public.city_services
   add column if not exists business_hours jsonb;
+
+alter table public.city_services
+  drop constraint if exists city_services_category_check;
 
 alter table public.city_services enable row level security;
 

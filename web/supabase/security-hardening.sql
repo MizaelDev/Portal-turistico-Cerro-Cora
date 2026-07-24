@@ -8,6 +8,59 @@ begin;
 revoke execute on function public.clear_login_rate_limit(text) from anon;
 grant execute on function public.clear_login_rate_limit(text) to authenticated;
 
+create or replace function public.check_login_rate_limit(
+  p_identifier text,
+  p_max_attempts integer default 8,
+  p_window_seconds integer default 900
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  attempt_row public.login_rate_limits%rowtype;
+begin
+  if p_identifier is null or p_identifier !~ '^[0-9a-f]{64}$' then
+    return true;
+  end if;
+
+  delete from public.login_rate_limits
+  where reset_at < now() - interval '1 hour';
+
+  insert into public.login_rate_limits(identifier, attempts, reset_at, updated_at)
+  values (
+    p_identifier,
+    1,
+    now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600))),
+    now()
+  )
+  on conflict (identifier) do update set
+    attempts = case
+      when public.login_rate_limits.reset_at <= now() then 1
+      else public.login_rate_limits.attempts + 1
+    end,
+    reset_at = case
+      when public.login_rate_limits.reset_at <= now()
+        then now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600)))
+      else public.login_rate_limits.reset_at
+    end,
+    updated_at = now()
+  returning * into attempt_row;
+
+  return attempt_row.reset_at > now()
+    and attempt_row.attempts > greatest(3, least(p_max_attempts, 20));
+end;
+$$;
+
+revoke all on function public.check_login_rate_limit(text, integer, integer) from public;
+grant execute on function public.check_login_rate_limit(text, integer, integer)
+  to anon, authenticated;
+
+-- As categorias de servicos sao administraveis.
+alter table if exists public.city_services
+  drop constraint if exists city_services_category_check;
+
 -- Garante que scripts legados nao deixem mutacoes do bucket abertas a qualquer login.
 drop policy if exists "Authenticated insert tourism files" on storage.objects;
 drop policy if exists "Authenticated update tourism files" on storage.objects;
@@ -38,21 +91,21 @@ create unique index if not exists analytics_events_dedupe_key_idx
   on public.analytics_events(dedupe_key)
   where dedupe_key is not null;
 
+alter table if exists public.analytics_events
+  drop constraint if exists analytics_events_type_allowed;
+alter table if exists public.analytics_events
+  drop constraint if exists analytics_events_event_type_check;
+alter table if exists public.analytics_events
+  add constraint analytics_events_event_type_check check (
+    event_type in (
+      'card_view', 'page_view', 'whatsapp_click', 'map_click',
+      'instagram_click', 'site_click', 'phone_click', 'reserve_click',
+      'details_click', 'gallery_click', 'carousel_click', 'share_click', 'cta_click'
+    )
+  ) not valid;
+
 do $$
 begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'analytics_events_type_allowed'
-  ) then
-    alter table public.analytics_events
-      add constraint analytics_events_type_allowed check (
-        event_type in (
-          'card_view', 'page_view', 'whatsapp_click', 'map_click',
-          'instagram_click', 'site_click', 'phone_click', 'reserve_click',
-          'details_click', 'gallery_click', 'carousel_click', 'cta_click'
-        )
-      ) not valid;
-  end if;
-
   if not exists (
     select 1 from pg_constraint where conname = 'analytics_events_entity_type_allowed'
   ) then
@@ -171,8 +224,7 @@ begin
     tg_table_name,
     row_data ->> 'id',
     jsonb_build_object(
-      'active', coalesce(row_data -> 'ativo', row_data -> 'is_active'),
-      'plan', coalesce(row_data -> 'plan_type', row_data -> 'plano', row_data -> 'plan')
+      'active', coalesce(row_data -> 'ativo', row_data -> 'is_active')
     )
   );
 
@@ -226,5 +278,5 @@ grant execute on function public.purge_old_analytics_events(integer) to service_
 commit;
 
 -- Validacao posterior sugerida, apos conferir dados legados:
--- alter table public.analytics_events validate constraint analytics_events_type_allowed;
+-- alter table public.analytics_events validate constraint analytics_events_event_type_check;
 -- alter table public.analytics_events validate constraint analytics_events_entity_type_allowed;

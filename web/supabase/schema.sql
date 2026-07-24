@@ -10,6 +10,7 @@ create table if not exists public.pontos_turisticos (
   localizacao text not null,
   imagem_url text not null,
   imagens_urls text[] not null default '{}',
+  info_url text,
   ativo boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -34,6 +35,9 @@ create table if not exists public.pousadas (
   logo_url text,
   hero_image_url text,
   imagens_urls text[] not null default '{}',
+  gallery_enabled boolean not null default true,
+  carousel_enabled boolean not null default true,
+  featured_order integer,
   check_in text,
   check_out text,
   business_hours jsonb,
@@ -44,6 +48,8 @@ create table if not exists public.pousadas (
   diferenciais text[] not null default '{}',
   diferencial_principal text,
   aceita_reservas boolean not null default true,
+  whatsapp_message text,
+  site_url text,
   destaque boolean not null default false,
   ativo boolean not null default true,
   created_at timestamptz not null default now(),
@@ -71,6 +77,9 @@ create table if not exists public.restaurantes (
   imagem_url text not null,
   logo_url text,
   imagens_urls text[] not null default '{}',
+  gallery_enabled boolean not null default true,
+  carousel_enabled boolean not null default true,
+  featured_order integer,
   tags text[] not null default '{}',
   formas_pagamento text[] not null default '{}',
   diferenciais text[] not null default '{}',
@@ -79,6 +88,8 @@ create table if not exists public.restaurantes (
   dica_turista text,
   cardapio_url text,
   faixa_preco text,
+  whatsapp_message text,
+  site_url text,
   destaque boolean not null default false,
   ativo boolean not null default true,
   created_at timestamptz not null default now(),
@@ -89,9 +100,7 @@ create table if not exists public.city_services (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
-  category text not null check (
-    category in ('saude', 'seguranca', 'transporte_apoio', 'comercio_essencial', 'emergencia')
-  ),
+  category text not null,
   subcategory text not null,
   description text,
   address text,
@@ -119,6 +128,9 @@ alter table public.restaurantes
   add column if not exists localizacao_resumida text,
   add column if not exists logo_url text,
   add column if not exists imagens_urls text[] not null default '{}',
+  add column if not exists gallery_enabled boolean not null default true,
+  add column if not exists carousel_enabled boolean not null default true,
+  add column if not exists featured_order integer,
   add column if not exists formas_pagamento text[] not null default '{}',
   add column if not exists diferenciais text[] not null default '{}',
   add column if not exists especialidades text[] not null default '{}',
@@ -126,6 +138,8 @@ alter table public.restaurantes
   add column if not exists dica_turista text,
   add column if not exists cardapio_url text,
   add column if not exists faixa_preco text,
+  add column if not exists whatsapp_message text,
+  add column if not exists site_url text,
   add column if not exists business_hours jsonb,
   add column if not exists destaque boolean not null default false,
   add column if not exists updated_at timestamptz;
@@ -141,6 +155,9 @@ alter table public.pousadas
   add column if not exists instagram_url text,
   add column if not exists logo_url text,
   add column if not exists hero_image_url text,
+  add column if not exists gallery_enabled boolean not null default true,
+  add column if not exists carousel_enabled boolean not null default true,
+  add column if not exists featured_order integer,
   add column if not exists check_in text,
   add column if not exists check_out text,
   add column if not exists business_hours jsonb,
@@ -151,6 +168,8 @@ alter table public.pousadas
   add column if not exists diferenciais text[] not null default '{}',
   add column if not exists diferencial_principal text,
   add column if not exists aceita_reservas boolean not null default true,
+  add column if not exists whatsapp_message text,
+  add column if not exists site_url text,
   add column if not exists destaque boolean not null default false,
   add column if not exists updated_at timestamptz;
 
@@ -162,11 +181,32 @@ create unique index if not exists restaurantes_slug_unique
   on public.restaurantes(slug)
   where slug is not null;
 
+create index if not exists pontos_turisticos_public_order_idx
+  on public.pontos_turisticos(ativo, nome);
+create index if not exists pousadas_public_order_idx
+  on public.pousadas(ativo, featured_order, nome);
+create index if not exists restaurantes_public_order_idx
+  on public.restaurantes(ativo, featured_order, nome);
+
 alter table public.pontos_turisticos
   add column if not exists imagens_urls text[] not null default '{}';
 
+alter table public.pontos_turisticos
+  add column if not exists info_url text;
+
+alter table public.pontos_turisticos
+  drop constraint if exists pontos_turisticos_info_url_https_check;
+
+alter table public.pontos_turisticos
+  add constraint pontos_turisticos_info_url_https_check
+  check (info_url is null or info_url ~* '^https://');
+
 alter table public.city_services
   add column if not exists business_hours jsonb;
+
+-- Categorias de servicos sao administraveis e nao devem exigir nova migration.
+alter table public.city_services
+  drop constraint if exists city_services_category_check;
 
 alter table public.restaurantes
   drop constraint if exists restaurantes_categoria_check;
@@ -217,8 +257,8 @@ as $$
 declare
   attempt_row public.login_rate_limits%rowtype;
 begin
-  if p_identifier is null or length(trim(p_identifier)) = 0 then
-    return false;
+  if p_identifier is null or p_identifier !~ '^[0-9a-f]{64}$' then
+    return true;
   end if;
 
   delete from public.login_rate_limits
@@ -228,7 +268,7 @@ begin
   values (
     p_identifier,
     1,
-    now() + make_interval(secs => greatest(p_window_seconds, 60)),
+    now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600))),
     now()
   )
   on conflict (identifier) do update
@@ -239,13 +279,14 @@ begin
     end,
     reset_at = case
       when public.login_rate_limits.reset_at <= now()
-        then now() + make_interval(secs => greatest(p_window_seconds, 60))
+        then now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600)))
       else public.login_rate_limits.reset_at
     end,
     updated_at = now()
   returning * into attempt_row;
 
-  return attempt_row.reset_at > now() and attempt_row.attempts > greatest(p_max_attempts, 1);
+  return attempt_row.reset_at > now()
+    and attempt_row.attempts > greatest(3, least(p_max_attempts, 20));
 end;
 $$;
 
@@ -262,7 +303,7 @@ $$;
 revoke all on function public.check_login_rate_limit(text, integer, integer) from public;
 revoke all on function public.clear_login_rate_limit(text) from public;
 grant execute on function public.check_login_rate_limit(text, integer, integer) to anon, authenticated;
-grant execute on function public.clear_login_rate_limit(text) to anon, authenticated;
+grant execute on function public.clear_login_rate_limit(text) to authenticated;
 
 insert into storage.buckets (id, name, public)
 values ('tourism', 'tourism', true)
@@ -333,6 +374,7 @@ drop policy if exists "Admin delete restaurantes" on public.restaurantes;
 
 create policy "Public read active pontos_turisticos"
   on public.pontos_turisticos for select
+  to anon, authenticated
   using (ativo = true);
 
 create policy "Admin read pontos_turisticos"
@@ -358,6 +400,7 @@ create policy "Admin delete pontos_turisticos"
 
 create policy "Public read active pousadas"
   on public.pousadas for select
+  to anon, authenticated
   using (ativo = true);
 
 create policy "Admin read pousadas"
@@ -383,6 +426,7 @@ create policy "Admin delete pousadas"
 
 create policy "Public read active restaurantes"
   on public.restaurantes for select
+  to anon, authenticated
   using (ativo = true);
 
 create policy "Admin read restaurantes"
@@ -431,6 +475,8 @@ create policy "city_services admin write"
 create index if not exists city_services_category_idx on public.city_services(category);
 create index if not exists city_services_active_idx on public.city_services(is_active);
 create index if not exists city_services_emergency_idx on public.city_services(is_emergency);
+create index if not exists city_services_public_order_idx
+  on public.city_services(is_active, is_emergency desc, is_featured desc, name);
 
 drop policy if exists "Public read tourism files" on storage.objects;
 drop policy if exists "Authenticated insert tourism files" on storage.objects;

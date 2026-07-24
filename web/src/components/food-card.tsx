@@ -1,13 +1,12 @@
 import dynamic from "next/dynamic";
-import { ArrowRight, Clock, Instagram, MapPin, MessageCircle, Sparkles, Utensils } from "lucide-react";
+import { Clock, Instagram, MapPin, Utensils } from "lucide-react";
 import { BusinessStatusBadge } from "@/components/business-status-badge";
+import { EstablishmentCardActions } from "@/components/establishment-card-actions";
 import { SafeImage } from "@/components/safe-image";
 import { TrackedLink } from "@/components/tracked-link";
 import { TrackView } from "@/components/track-view";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { FoodPlace } from "@/lib/data";
-import { getCommercialFeatures, isGoldPlan, whatsappUrl } from "@/lib/commercial";
 import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
 import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/utils";
@@ -81,7 +80,7 @@ function getVisibleTags(place: FoodPlace) {
 function FoodImage({ place }: { place: FoodPlace }) {
   const image = place.image?.trim();
   const logo = place.logo?.trim();
-  const galleryPhoto = place.commercialFeatures?.gallery
+  const galleryPhoto = place.galleryEnabled !== false
     ? place.galleryImages?.find((galleryImage) => {
         const normalizedImage = galleryImage.trim();
         return normalizedImage !== logo && shouldShowPhoto(normalizedImage);
@@ -118,19 +117,10 @@ function FoodImage({ place }: { place: FoodPlace }) {
 
 export function FoodCard({ place, compact = false }: { place: FoodPlace; compact?: boolean }) {
   const instagramHref = place.instagram ? place.instagramUrl || instagramUrlFromHandle(place.instagram) : null;
-  const mapHref = place.mapUrl || googleMapsSearchUrl(place.name, place.location);
+  const mapHref = place.mapUrl || (place.location ? googleMapsSearchUrl(place.name, place.location) : undefined);
   const detailHref = `/restaurantes/${place.slug || slugify(place.name)}`;
   const { visibleTags, hiddenCount } = getVisibleTags(place);
-  const features = place.commercialFeatures || getCommercialFeatures(place.plan, {
-    status: place.planStatus,
-    customFeatures: place.customFeatures,
-    pageEnabled: place.pageEnabled,
-    galleryEnabled: Boolean(place.galleryImages?.length),
-    carouselEnabled: (place.galleryImages?.length || 0) > 1,
-    highlighted: place.isFeatured,
-  });
-  const isGold = isGoldPlan(place.plan);
-  const showDetails = features.individualPage;
+  const showDetails = true;
   const cardImages = Array.from(new Set([
     place.image,
     ...(place.galleryImages || []),
@@ -140,48 +130,32 @@ export function FoodCard({ place, compact = false }: { place: FoodPlace; compact
   const analyticsMeta = {
     establishmentName: place.name,
     category: place.category,
-    planType: place.plan || "bronze",
   };
 
   return (
     <TrackView entityType="restaurant" entityId={entityId} className="h-full" {...analyticsMeta}>
     <article
-      className={cn(
-        "relative flex h-full flex-col overflow-hidden rounded-lg border bg-card shadow-sm transition-all duration-300 ease-out",
-        features.highlighted
-          ? "border-2 border-[#d7aa58]/75 bg-[#FCF8F5] shadow-[0_14px_40px_rgba(90,67,0,0.10)] hover:-translate-y-1 hover:border-[#c89539] hover:shadow-[0_20px_52px_rgba(90,67,0,0.14)] dark:border-alpine-sunset/60 dark:bg-card dark:shadow-[0_18px_45px_rgba(236,171,92,0.13)] dark:hover:border-alpine-sunset/80 dark:hover:shadow-[0_20px_54px_rgba(236,171,92,0.18)]"
-          : "border-border hover:-translate-y-0.5 hover:shadow-md",
-      )}
+      className="relative flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md"
     >
-      {features.highlighted ? (
-        <span className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 bg-gradient-to-r from-transparent via-[#d7aa58] to-transparent dark:via-alpine-sunset/75" />
-      ) : null}
       <div
         className={cn(
           "relative overflow-hidden bg-[#1a2e1a]",
           compact ? "aspect-[3/2]" : "aspect-[4/3]",
         )}
       >
-        {features.carousel && cardImages.length > 1 ? (
+        {place.carouselEnabled !== false && cardImages.length > 1 ? (
           <CardMediaCarousel
             images={cardImages}
             name={place.name}
             entityType="restaurant"
             entityId={entityId}
             category={place.category}
-            planType={place.plan}
-            limit={place.carouselPhotoLimit || 5}
+            limit={10}
             logoImage={place.logo}
           />
         ) : (
           <FoodImage place={place} />
         )}
-        {features.highlighted ? (
-          <span className="pointer-events-none absolute left-3 top-3 inline-flex select-none items-center gap-1.5 rounded-full border border-[#dfc277] bg-[#f4e5c4] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#5a4300] shadow-sm backdrop-blur-md dark:border-alpine-sunset/45 dark:bg-alpine-sunset/15 dark:text-alpine-sunset">
-            <Sparkles className="h-3 w-3" />
-            {isGold ? "Ouro" : "Destaque"}
-          </span>
-        ) : null}
       </div>
       <div className={cn("flex flex-1 flex-col", compact ? "gap-4 p-4 lg:p-5" : "gap-5 p-5")}>
         <div>
@@ -232,7 +206,7 @@ export function FoodCard({ place, compact = false }: { place: FoodPlace; compact
             <MapPin className="h-4 w-4 shrink-0 text-alpine-wine" />
             <span className="line-clamp-1">{place.location}</span>
           </TrackedLink>
-          {instagramHref && features.instagram ? (
+          {instagramHref ? (
             <TrackedLink
               href={instagramHref}
               target="_blank"
@@ -248,41 +222,16 @@ export function FoodCard({ place, compact = false }: { place: FoodPlace; compact
             </TrackedLink>
           ) : null}
         </div>
-        <div className={cn("mt-auto grid gap-2", showDetails ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
-          {showDetails ? (
-            <Button asChild variant="outline">
-              <TrackedLink href={detailHref} entityType="restaurant" entityId={entityId} eventType="details_click" {...analyticsMeta}>
-                Ver detalhes <ArrowRight className="h-4 w-4" />
-              </TrackedLink>
-            </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <TrackedLink
-              href={mapHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              entityType="restaurant"
-              entityId={entityId}
-              eventType="map_click"
-              {...analyticsMeta}
-            >
-              <MapPin className="h-4 w-4" /> Como chegar
-            </TrackedLink>
-          </Button>
-          <Button asChild variant="warm">
-            <TrackedLink
-              href={whatsappUrl(place.whatsapp, place.whatsappMessage)}
-              target="_blank"
-              rel="noopener noreferrer"
-              entityType="restaurant"
-              entityId={entityId}
-              eventType="whatsapp_click"
-              {...analyticsMeta}
-            >
-              <MessageCircle className="h-4 w-4" /> WhatsApp
-            </TrackedLink>
-          </Button>
-        </div>
+        <EstablishmentCardActions
+          entityType="restaurant"
+          entityId={entityId}
+          establishmentName={place.name}
+          category={place.category}
+          detailsUrl={showDetails ? detailHref : undefined}
+          mapsUrl={mapHref}
+          whatsappNumber={place.whatsapp}
+          whatsappMessage={place.whatsappMessage}
+        />
       </div>
     </article>
     </TrackView>

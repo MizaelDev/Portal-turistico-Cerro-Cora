@@ -39,7 +39,18 @@ export function instagramLabel(value: string) {
 }
 
 export function googleMapsSearchUrl(name: string, location?: string) {
-  const query = [name, location, "Cerro Corá RN"].filter(Boolean).join(" ");
+  const query = [name, location, "Cerro Corá-RN"].filter(Boolean).join(" ");
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+export const defaultWhatsappMessage =
+  "Olá! Encontrei seu estabelecimento através do Portal Turístico de Cerro Corá e gostaria de obter mais informações.";
+
+export function whatsappUrl(phone: string, message?: string | null) {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.startsWith("55") ? digits : `55${digits}`;
+  const text = encodeURIComponent(message?.trim() || defaultWhatsappMessage);
+
+  return `https://wa.me/${normalized}?text=${text}`;
 }

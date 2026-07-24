@@ -5,7 +5,6 @@ import { SectionHeader } from "@/components/section-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { isGoldPlan, normalizeCommercialPlan, planDefinitions } from "@/lib/commercial";
 import { createMetadata } from "@/lib/seo";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -30,7 +29,6 @@ type MetricRow = {
   created_at: string;
   establishment_name: string | null;
   category: string | null;
-  plan_type: string | null;
 };
 
 type ReportSummary = {
@@ -43,7 +41,6 @@ type ReportSummary = {
     id: string;
     name: string;
     category: string;
-    plan: string;
     views: number;
     clicks: number;
     total: number;
@@ -65,6 +62,7 @@ const eventLabels: Record<string, string> = {
   details_click: "Detalhes",
   gallery_click: "Galeria",
   carousel_click: "Carrossel",
+  share_click: "Compartilhamentos",
   cta_click: "CTA",
 };
 
@@ -100,7 +98,6 @@ function buildFallbackSummary(metrics: MetricRow[]): ReportSummary {
         const current = acc[key] || {
           name: item.establishment_name || "Estabelecimento",
           category: item.category || item.entity_type,
-          plan: item.plan_type || "basic",
           views: 0,
           clicks: 0,
           total: 0,
@@ -159,7 +156,7 @@ export default async function AdminReportsPage({
   if (!summary) {
     const fallbackResult = await supabase
       .from("analytics_events")
-      .select("entity_type,establishment_id,event_type,created_at,establishment_name,category,plan_type")
+      .select("entity_type,establishment_id,event_type,created_at,establishment_name,category")
       .gte("created_at", daysAgo(period).toISOString())
       .order("created_at", { ascending: false })
       .limit(5000);
@@ -210,7 +207,7 @@ export default async function AdminReportsPage({
       {reportError ? (
         <Card className="mt-10 border-destructive/30 bg-destructive/10">
           <CardContent className="text-sm text-destructive">
-            Não foi possível carregar as métricas. Rode o arquivo web/supabase/commercial-platform.sql no Supabase.
+            Não foi possível carregar as métricas. Rode o arquivo web/supabase/unified-establishment-access.sql no Supabase.
           </CardContent>
         </Card>
       ) : null}
@@ -245,14 +242,14 @@ export default async function AdminReportsPage({
                 <div>
                   <p className="font-semibold">{item.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.category} · plano {planDefinitions[normalizeCommercialPlan(item.plan)].label}
+                    {item.category}
                   </p>
-                  {isGoldPlan(item.plan) && item.evolution !== null ? (
+                  {item.evolution !== null ? (
                     <p className="mt-1 text-xs font-semibold text-alpine-wine">
                       {item.evolution >= 0 ? "+" : ""}{item.evolution}% em relação ao período anterior
                     </p>
                   ) : null}
-                  {isGoldPlan(item.plan) && (item.busiestHour != null || item.busiestDay) ? (
+                  {item.busiestHour != null || item.busiestDay ? (
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.busiestDay ? `Dia de maior procura: ${item.busiestDay.split("-").reverse().join("/")}. ` : ""}
                       {item.busiestHour !== null && item.busiestHour !== undefined

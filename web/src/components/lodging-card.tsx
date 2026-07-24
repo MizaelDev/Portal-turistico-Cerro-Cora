@@ -1,20 +1,18 @@
 import dynamic from "next/dynamic";
-import { ArrowRight, BedDouble, CalendarCheck, CalendarX, Info, Instagram, MapPin, MessageCircle, Phone, Sparkles, WalletCards } from "lucide-react";
+import { BedDouble, CalendarCheck, CalendarX, Info, Instagram, MapPin, Phone, WalletCards } from "lucide-react";
 import { BusinessStatusBadge } from "@/components/business-status-badge";
+import { EstablishmentCardActions } from "@/components/establishment-card-actions";
 import { SafeImage } from "@/components/safe-image";
 import { TrackedLink } from "@/components/tracked-link";
 import { TrackView } from "@/components/track-view";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Lodging } from "@/lib/data";
-import { getCommercialFeatures, isGoldPlan, whatsappUrl } from "@/lib/commercial";
 import { googleMapsSearchUrl, instagramLabel, instagramUrlFromHandle } from "@/lib/links";
 import { slugify } from "@/lib/slug";
-import { cn } from "@/lib/utils";
 
 const CardMediaCarousel = dynamic(() =>
   import("@/components/card-media-carousel").then((module) => module.CardMediaCarousel),
@@ -30,20 +28,11 @@ function stayTimeLabel(kind: "check-in" | "check-out", value: string) {
 }
 
 export function LodgingCard({ lodging }: { lodging: Lodging }) {
-  const mapHref = lodging.mapUrl || googleMapsSearchUrl(lodging.name, lodging.address || lodging.location);
+  const location = lodging.address || lodging.location;
+  const mapHref = lodging.mapUrl || (location ? googleMapsSearchUrl(lodging.name, location) : undefined);
   const detailHref = `/pousadas/${lodging.slug || slugify(lodging.name)}`;
   const amenities = (lodging.amenities || lodging.highlights || []).slice(0, 4);
-  const features = lodging.commercialFeatures || getCommercialFeatures(lodging.plan, {
-    status: lodging.planStatus,
-    customFeatures: lodging.customFeatures,
-    pageEnabled: lodging.pageEnabled,
-    galleryEnabled: Boolean(lodging.gallery.length),
-    carouselEnabled: lodging.gallery.length > 1,
-    highlighted: lodging.isFeatured,
-    bookingEnabled: lodging.acceptsReservations,
-  });
-  const isGold = isGoldPlan(lodging.plan);
-  const showDetails = features.individualPage;
+  const showDetails = true;
   const cardImages = Array.from(new Set([lodging.image, ...lodging.gallery].filter(Boolean)));
   const entityId = lodging.id;
   const instagramHref = lodging.instagram
@@ -53,32 +42,22 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
   const analyticsMeta = {
     establishmentName: lodging.name,
     category: lodging.category || "Pousada",
-    planType: lodging.plan || "bronze",
   };
 
   return (
     <TrackView entityType="lodging" entityId={entityId} {...analyticsMeta}>
     <article
-      className={cn(
-        "relative grid overflow-hidden rounded-lg border bg-card shadow-sm transition-all duration-300 ease-out md:grid-cols-[1.05fr_0.95fr]",
-        features.highlighted
-          ? "border-2 border-[#d7aa58]/75 bg-[#FCF8F5] shadow-[0_14px_40px_rgba(90,67,0,0.10)] hover:-translate-y-1 hover:border-[#c89539] hover:shadow-[0_20px_52px_rgba(90,67,0,0.14)] dark:border-alpine-sunset/60 dark:bg-card dark:shadow-[0_18px_45px_rgba(236,171,92,0.13)] dark:hover:border-alpine-sunset/80 dark:hover:shadow-[0_20px_54px_rgba(236,171,92,0.18)]"
-          : "border-border hover:-translate-y-0.5 hover:shadow-md",
-      )}
+      className="relative grid overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[1.05fr_0.95fr]"
     >
-      {features.highlighted ? (
-        <span className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 bg-gradient-to-r from-transparent via-[#d7aa58] to-transparent dark:via-alpine-sunset/75" />
-      ) : null}
       <div className="relative min-h-80">
-        {features.carousel && cardImages.length > 1 ? (
+        {lodging.carouselEnabled !== false && cardImages.length > 1 ? (
           <CardMediaCarousel
             images={cardImages}
             name={lodging.name}
             entityType="lodging"
             entityId={entityId}
             category={lodging.category || "Pousada"}
-            planType={lodging.plan}
-            limit={lodging.carouselPhotoLimit || 5}
+            limit={10}
           />
         ) : (
           <SafeImage
@@ -90,12 +69,6 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
             className={lodging.imageIsLogo ? "bg-white object-contain p-8" : "object-cover"}
           />
         )}
-        {features.highlighted ? (
-          <span className="pointer-events-none absolute left-4 top-4 inline-flex select-none items-center gap-1.5 rounded-full border border-[#dfc277] bg-[#f4e5c4] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#5a4300] shadow-sm backdrop-blur-md dark:border-alpine-sunset/45 dark:bg-alpine-sunset/15 dark:text-alpine-sunset">
-            <Sparkles className="h-3 w-3" />
-            {isGold ? "Ouro" : "Destaque"}
-          </span>
-        ) : null}
       </div>
 
       <div className="flex flex-col p-6">
@@ -173,7 +146,7 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
               <span>{stayTimeLabel("check-out", lodging.checkOut)}</span>
             </span>
           ) : null}
-          {features.instagram && instagramHref && lodging.instagram ? (
+          {instagramHref && lodging.instagram ? (
             <TrackedLink
               href={instagramHref}
               target="_blank"
@@ -203,56 +176,17 @@ export function LodgingCard({ lodging }: { lodging: Lodging }) {
           ) : null}
         </div>
 
-        <div className="mt-auto grid gap-2 pt-6 sm:grid-cols-2">
-          {showDetails ? (
-            <Button asChild variant="outline" className="sm:col-span-2">
-              <TrackedLink href={detailHref} entityType="lodging" entityId={entityId} eventType="details_click" {...analyticsMeta}>
-                Conhecer hospedagem <ArrowRight className="h-4 w-4" />
-              </TrackedLink>
-            </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <TrackedLink
-              href={mapHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              entityType="lodging"
-              entityId={entityId}
-              eventType="map_click"
-              {...analyticsMeta}
-            >
-              <MapPin className="h-4 w-4" /> Como chegar
-            </TrackedLink>
-          </Button>
-          <Button asChild variant="outline">
-            <TrackedLink
-              href={whatsappUrl(lodging.whatsapp, lodging.whatsappMessage)}
-              target="_blank"
-              rel="noopener noreferrer"
-              entityType="lodging"
-              entityId={entityId}
-              eventType="whatsapp_click"
-              {...analyticsMeta}
-            >
-              <MessageCircle className="h-4 w-4" /> WhatsApp
-            </TrackedLink>
-          </Button>
-          {features.bookingButton ? (
-          <Button asChild variant="warm" className="sm:col-span-2">
-            <TrackedLink
-              href={whatsappUrl(lodging.whatsapp, lodging.whatsappMessage || "Olá! Encontrei sua hospedagem pelo Portal Turístico de Cerro Corá e gostaria de saber sobre disponibilidade.")}
-              target="_blank"
-              rel="noopener noreferrer"
-              entityType="lodging"
-              entityId={entityId}
-              eventType="reserve_click"
-              {...analyticsMeta}
-            >
-              Reservar
-            </TrackedLink>
-          </Button>
-          ) : null}
-        </div>
+        <EstablishmentCardActions
+          entityType="lodging"
+          entityId={entityId}
+          establishmentName={lodging.name}
+          category={lodging.category || "Pousada"}
+          detailsUrl={showDetails ? detailHref : undefined}
+          mapsUrl={mapHref}
+          whatsappNumber={lodging.whatsapp}
+          whatsappMessage={lodging.whatsappMessage}
+          className="pt-5"
+        />
       </div>
     </article>
     </TrackView>

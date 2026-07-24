@@ -37,12 +37,12 @@ import { LodgingGallery } from "@/components/lodging-gallery";
 import { SafeImage } from "@/components/safe-image";
 import { TrackedLink } from "@/components/tracked-link";
 import { TrackView } from "@/components/track-view";
+import { TrackedShareButton } from "@/components/tracked-share-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Lodging } from "@/lib/data";
-import { getCommercialFeatures, whatsappUrl } from "@/lib/commercial";
-import { googleMapsSearchUrl, instagramUrlFromHandle } from "@/lib/links";
+import { googleMapsSearchUrl, instagramUrlFromHandle, whatsappUrl } from "@/lib/links";
 import { getPublicLodgingPage, getPublicLodgings } from "@/lib/public-content";
 import { createMetadata, lodgingDetailSchema } from "@/lib/seo";
 import { slugify } from "@/lib/slug";
@@ -139,7 +139,11 @@ function SectionShell({
         {eyebrow ? (
           <span className="text-xs font-semibold uppercase tracking-[0.28em] text-alpine-wine">{eyebrow}</span>
         ) : null}
-        <h2 className="mt-2 font-display text-3xl font-semibold leading-tight md:text-4xl">{title}</h2>
+        <h2
+          className={`${eyebrow ? "mt-2 " : ""}font-display text-3xl font-semibold leading-tight md:text-4xl`}
+        >
+          {title}
+        </h2>
         {description ? <p className="mt-3 leading-7 text-muted-foreground">{description}</p> : null}
       </div>
       {children}
@@ -201,13 +205,7 @@ function AmenityCard({ amenity }: { amenity: Amenity }) {
 
 export async function generateStaticParams() {
   const { items } = await getPublicLodgings();
-  return items
-    .filter((lodging) => getCommercialFeatures(lodging.plan, {
-      status: lodging.planStatus,
-      customFeatures: lodging.customFeatures,
-      pageEnabled: lodging.pageEnabled,
-    }).individualPage)
-    .map((lodging) => ({ slug: lodgingSlug(lodging) }));
+  return items.map((lodging) => ({ slug: lodgingSlug(lodging) }));
 }
 
 export async function generateMetadata({ params }: LodgingPageProps): Promise<Metadata> {
@@ -234,7 +232,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
     notFound();
   }
 
-  const images = allImages(lodging);
+  const images = lodging.galleryEnabled === false ? [] : allImages(lodging);
   const mapUrl = lodgingMapUrl(lodging);
   const instagramUrl = lodgingInstagramUrl(lodging);
   const amenities = lodgingAmenities(lodging);
@@ -243,15 +241,9 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
   const paymentMethods = lodging.paymentMethods || [];
   const reservationMessage = lodging.whatsappMessage || `Olá! Quero saber sobre reserva na ${lodging.name}.`;
   const heroImage = lodging.heroImage?.trim() || null;
-  const commercialFeatures = lodging.commercialFeatures || getCommercialFeatures(lodging.plan, {
-    status: lodging.planStatus,
-    customFeatures: lodging.customFeatures,
-    pageEnabled: lodging.pageEnabled,
-  });
   const analyticsMeta = {
     establishmentName: lodging.name,
     category: lodging.category || "Pousada",
-    planType: lodging.plan || "bronze",
   };
 
   return (
@@ -362,6 +354,13 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
                   </TrackedLink>
                 </Button>
               ) : null}
+              <TrackedShareButton
+                entityType="lodging"
+                entityId={lodging.id}
+                establishmentName={lodging.name}
+                category={analyticsMeta.category}
+                variant="glass"
+              />
             </div>
           </div>
         </div>
@@ -369,22 +368,18 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
 
       <main className="container grid gap-10 py-12 md:gap-14 md:py-16">
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
-          <SectionShell title="Sobre a hospedagem" eyebrow="Estadia em Cerro Corá">
-            <Card>
-              <CardContent className="grid gap-5 p-5 md:p-6">
-                <p className="max-w-3xl text-base leading-8 text-muted-foreground">
-                  {lodging.description}
-                </p>
-                {lodging.mainDifferential ? (
-                  <div className="rounded-lg border border-primary/20 bg-primary/10 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-alpine-wine">
-                      Diferencial principal
-                    </p>
-                    <p className="mt-2 font-display text-2xl font-semibold">{lodging.mainDifferential}</p>
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
+          <SectionShell title="Sobre a hospedagem">
+            <div className="grid gap-5 border-l-2 border-alpine-wine/35 pl-5 md:pl-6">
+              <p className="max-w-3xl text-base leading-8 text-muted-foreground">
+                {lodging.description}
+              </p>
+              {lodging.mainDifferential ? (
+                <div className="grid gap-1.5 border-t border-border/70 pt-4">
+                  <p className="text-xs font-semibold text-alpine-wine">Destaque da hospedagem</p>
+                  <p className="font-display text-2xl font-semibold">{lodging.mainDifferential}</p>
+                </div>
+              ) : null}
+            </div>
           </SectionShell>
 
           <SectionShell title="Informações úteis" eyebrow="Planeje sua reserva">
@@ -402,8 +397,8 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           </SectionShell>
         </div>
 
-        {commercialFeatures.establishmentStory && lodging.story && lodging.story !== lodging.description ? (
-          <SectionShell title="Nossa história" eyebrow="Identidade e tradição">
+        {lodging.story && lodging.story !== lodging.description ? (
+          <SectionShell title="Nossa história">
             <Card>
               <CardContent className="p-5 md:p-6">
                 <p className="max-w-4xl text-base leading-8 text-muted-foreground">{lodging.story}</p>
@@ -413,7 +408,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
         ) : null}
 
         {amenities.length ? (
-          <SectionShell title="O que você encontrará" eyebrow="Comodidades">
+          <SectionShell title="Comodidades">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {amenities.map((amenity) => (
                 <AmenityCard key={amenity.label} amenity={amenity} />
@@ -423,10 +418,10 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
         ) : null}
 
         {highlights.length ? (
-          <SectionShell title="Por que escolher esta hospedagem?" eyebrow="Diferenciais">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <SectionShell title="Por que escolher esta hospedagem?">
+            <div className="grid gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
               {highlights.map((highlight) => (
-                <div key={highlight} className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 shadow-sm">
+                <div key={highlight} className="flex min-h-14 items-center gap-3 border-b border-border/70 py-4">
                   <Sparkles className="h-5 w-5 shrink-0 text-alpine-sunset" />
                   <p className="text-sm font-semibold">{highlight}</p>
                 </div>
@@ -438,15 +433,13 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
         {images.length ? (
           <SectionShell
             title="Galeria"
-            eyebrow="Ambientes e detalhes"
-            description="Veja quartos, áreas comuns e detalhes da hospedagem antes de planejar sua estadia."
+            description="Quartos, áreas comuns e outros detalhes da hospedagem."
           >
             <LodgingGallery
               images={images}
               name={lodging.name}
               entityId={lodging.id}
               category={analyticsMeta.category}
-              planType={analyticsMeta.planType}
             />
           </SectionShell>
         ) : null}

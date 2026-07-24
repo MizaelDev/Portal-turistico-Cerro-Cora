@@ -10,7 +10,6 @@ type TrackedLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   eventType: CommercialEventType;
   establishmentName?: string;
   category?: string;
-  planType?: string;
 };
 
 export function TrackedLink({
@@ -20,7 +19,6 @@ export function TrackedLink({
   eventType,
   establishmentName,
   category,
-  planType,
   onClick,
   ...props
 }: TrackedLinkProps) {
@@ -34,7 +32,6 @@ export function TrackedLink({
           eventType,
           establishmentName,
           category,
-          planType,
         });
         onClick?.(event);
       }}

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ unauthorized?: string }>;
+  searchParams: Promise<{ unauthorized?: string; expired?: string }>;
 }) {
   const params = await searchParams;
 
@@ -40,6 +40,11 @@ export default async function AdminLoginPage({
             {params.unauthorized ? (
               <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
                 Este usuário não tem permissão de administrador.
+              </div>
+            ) : null}
+            {params.expired ? (
+              <div className="mb-4 rounded-md border border-border bg-muted/50 p-4 text-sm text-foreground">
+                Sua sessão expirou. Entre novamente para continuar.
               </div>
             ) : null}
             {isSupabaseConfigured ? (

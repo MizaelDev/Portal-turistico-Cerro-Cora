@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { FoodCard } from "@/components/food-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { getCommercialFeatures, getPlanPriority } from "@/lib/commercial";
 import type { FoodPlace } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +10,6 @@ type GastronomyDirectoryProps = {
   places: FoodPlace[];
 };
 
-const INITIAL_FEATURED_LIMIT = 6;
 const INITIAL_LIST_LIMIT = 12;
 const LIST_PAGE_SIZE = 12;
 
@@ -46,12 +44,7 @@ function hasAnyTag(place: FoodPlace, values: string[]) {
 }
 
 const categories: CategoryOption[] = [
-  {
-    id: "all",
-    label: "Todos",
-    listTitle: "Todos os estabelecimentos",
-    matches: () => true,
-  },
+  { id: "all", label: "Todos", listTitle: "Todos os estabelecimentos", matches: () => true },
   {
     id: "restaurants",
     label: "Restaurantes",
@@ -129,77 +122,33 @@ function FilterButton({
   );
 }
 
-function PlacesGrid({ places, keyPrefix }: { places: FoodPlace[]; keyPrefix: string }) {
+function PlacesGrid({ places }: { places: FoodPlace[] }) {
   return (
     <div className="grid items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3">
       {places.map((place) => (
-        <FoodCard key={`${keyPrefix}-${place.id || place.slug || place.name}`} place={place} compact />
+        <FoodCard key={place.id || place.slug || place.name} place={place} compact />
       ))}
     </div>
   );
 }
 
-function sortFeaturedPlaces(first: FoodPlace, second: FoodPlace) {
-  const planDifference = getPlanPriority(second.plan, second.planStatus) - getPlanPriority(first.plan, first.planStatus);
-  if (planDifference) return planDifference;
-  const firstOrder = first.featuredOrder ?? Number.MAX_SAFE_INTEGER;
-  const secondOrder = second.featuredOrder ?? Number.MAX_SAFE_INTEGER;
-
-  if (firstOrder !== secondOrder) return firstOrder - secondOrder;
-  if (Boolean(first.isFeatured) !== Boolean(second.isFeatured)) return first.isFeatured ? -1 : 1;
-
-  const firstUpdatedAt = first.updatedAt ? new Date(first.updatedAt).getTime() : 0;
-  const secondUpdatedAt = second.updatedAt ? new Date(second.updatedAt).getTime() : 0;
-  if (firstUpdatedAt !== secondUpdatedAt) return secondUpdatedAt - firstUpdatedAt;
-
-  return first.name.localeCompare(second.name, "pt-BR");
-}
-
-function isHighlightedPlace(place: FoodPlace) {
-  return (place.commercialFeatures || getCommercialFeatures(place.plan, {
-    status: place.planStatus,
-    customFeatures: place.customFeatures,
-    highlighted: place.isFeatured,
-  })).highlighted;
-}
-
 export function GastronomyDirectory({ places }: GastronomyDirectoryProps) {
   const [categoryId, setCategoryId] = useState<CategoryId>("all");
-  const [showAllFeatured, setShowAllFeatured] = useState(false);
   const [visibleListCount, setVisibleListCount] = useState(INITIAL_LIST_LIMIT);
 
   const selectedCategory = categories.find((category) => category.id === categoryId) || categories[0];
-
   const availableCategories = useMemo(
     () => categories.filter((category) => category.id === "all" || places.some(category.matches)),
     [places],
   );
-
   const categoryPlaces = useMemo(
     () => places.filter(selectedCategory.matches),
     [places, selectedCategory],
   );
-
-  const featuredPlaces = useMemo(
-    () => categoryPlaces
-      .filter(isHighlightedPlace)
-      .sort(sortFeaturedPlaces),
-    [categoryPlaces],
-  );
-
-  const regularPlaces = useMemo(
-    () => categoryPlaces.filter((place) => !isHighlightedPlace(place)),
-    [categoryPlaces],
-  );
-
-  const visibleFeaturedPlaces = showAllFeatured
-    ? featuredPlaces
-    : featuredPlaces.slice(0, INITIAL_FEATURED_LIMIT);
-  const visibleCategoryPlaces = regularPlaces.slice(0, visibleListCount);
+  const visibleCategoryPlaces = categoryPlaces.slice(0, visibleListCount);
 
   function selectCategory(nextCategory: CategoryId) {
     setCategoryId(nextCategory);
-    setShowAllFeatured(false);
     setVisibleListCount(INITIAL_LIST_LIMIT);
   }
 
@@ -241,31 +190,7 @@ export function GastronomyDirectory({ places }: GastronomyDirectoryProps) {
         </nav>
       </div>
 
-      {featuredPlaces.length ? (
-        <section className="mt-9 border-t-2 border-[#d7aa58]/45 pt-5" aria-labelledby="gastronomy-highlights-title">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <h2 id="gastronomy-highlights-title" className="font-display text-2xl font-semibold sm:text-3xl">
-                Destaques da gastronomia
-              </h2>
-            </div>
-          </div>
-          <PlacesGrid places={visibleFeaturedPlaces} keyPrefix="featured" />
-          {featuredPlaces.length > INITIAL_FEATURED_LIMIT ? (
-            <div className="mt-5 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowAllFeatured((current) => !current)}
-                className="min-h-10 rounded-md border border-border bg-background px-4 text-sm font-semibold transition-colors hover:border-primary/45 hover:bg-accent/55"
-              >
-                {showAllFeatured ? "Mostrar menos destaques" : "Ver todos os destaques"}
-              </button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      <section className="mt-11" aria-labelledby="gastronomy-list-title">
+      <section className="mt-9" aria-labelledby="gastronomy-list-title">
         <div className="mb-5 flex items-end justify-between gap-4 border-b border-border/70 pb-3.5">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -276,14 +201,14 @@ export function GastronomyDirectory({ places }: GastronomyDirectoryProps) {
             </h2>
           </div>
           <span className="shrink-0 text-sm text-muted-foreground">
-            {regularPlaces.length} {regularPlaces.length === 1 ? "opção" : "opções"}
+            {categoryPlaces.length} {categoryPlaces.length === 1 ? "opção" : "opções"}
           </span>
         </div>
 
-        {regularPlaces.length ? (
+        {categoryPlaces.length ? (
           <>
-            <PlacesGrid places={visibleCategoryPlaces} keyPrefix="all" />
-            {regularPlaces.length > visibleListCount ? (
+            <PlacesGrid places={visibleCategoryPlaces} />
+            {categoryPlaces.length > visibleListCount ? (
               <div className="mt-6 flex justify-center">
                 <button
                   type="button"
@@ -298,9 +223,7 @@ export function GastronomyDirectory({ places }: GastronomyDirectoryProps) {
         ) : (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              {featuredPlaces.length
-                ? "Os estabelecimentos desta categoria já estão apresentados nos destaques."
-                : "Nenhum estabelecimento combina com os filtros selecionados."}
+              Nenhum estabelecimento combina com o filtro selecionado.
             </CardContent>
           </Card>
         )}

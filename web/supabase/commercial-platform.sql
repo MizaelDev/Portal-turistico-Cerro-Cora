@@ -1,3 +1,4 @@
+-- DEPRECATED: migration historica de planos. Nao execute em instalacoes novas.
 -- Evolução comercial do portal.
 -- Pode ser executado mais de uma vez no SQL Editor do Supabase.
 

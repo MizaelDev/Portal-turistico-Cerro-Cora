@@ -5,35 +5,35 @@ import {
   sanitizeAnalyticsPath,
   sanitizeAnalyticsReferrer,
   type AnalyticsEntity,
+  type AnalyticsEventType,
 } from "../../src/lib/analytics-policy.ts";
-import { getCommercialFeatures } from "../../src/lib/commercial.ts";
 
-function entity(plan: "bronze" | "silver" | "gold"): AnalyticsEntity {
-  return {
-    id: "00000000-0000-4000-8000-000000000001",
-    name: "Teste",
-    category: "Restaurante",
-    plan,
-    features: getCommercialFeatures(plan),
-  };
-}
+const entity: AnalyticsEntity = {
+  id: "00000000-0000-4000-8000-000000000001",
+  name: "Teste",
+  category: "Restaurante",
+};
 
-test("Bronze nao contabiliza acesso a pagina, galeria ou carrossel", () => {
-  const bronze = entity("bronze");
-  assert.equal(isAnalyticsEventAllowed("card_view", bronze), true);
-  assert.equal(isAnalyticsEventAllowed("whatsapp_click", bronze), true);
-  assert.equal(isAnalyticsEventAllowed("details_click", bronze), false);
-  assert.equal(isAnalyticsEventAllowed("page_view", bronze), false);
-  assert.equal(isAnalyticsEventAllowed("gallery_click", bronze), false);
-  assert.equal(isAnalyticsEventAllowed("carousel_click", bronze), false);
-});
+test("todos os eventos comerciais validos sao aceitos para estabelecimentos ativos", () => {
+  const events: AnalyticsEventType[] = [
+    "card_view",
+    "page_view",
+    "whatsapp_click",
+    "map_click",
+    "instagram_click",
+    "site_click",
+    "phone_click",
+    "reserve_click",
+    "details_click",
+    "gallery_click",
+    "carousel_click",
+    "share_click",
+    "cta_click",
+  ];
 
-test("Prata permite pagina e galeria, mas carrossel continua exclusivo do Ouro", () => {
-  const silver = entity("silver");
-  assert.equal(isAnalyticsEventAllowed("page_view", silver), true);
-  assert.equal(isAnalyticsEventAllowed("gallery_click", silver), true);
-  assert.equal(isAnalyticsEventAllowed("carousel_click", silver), false);
-  assert.equal(isAnalyticsEventAllowed("carousel_click", entity("gold")), true);
+  for (const event of events) {
+    assert.equal(isAnalyticsEventAllowed(event, entity), true);
+  }
 });
 
 test("caminhos e referrers removem query string e protocolos perigosos", () => {

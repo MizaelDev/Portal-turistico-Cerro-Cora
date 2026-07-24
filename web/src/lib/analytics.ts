@@ -14,6 +14,7 @@ export type CommercialEventType =
   | "details_click"
   | "gallery_click"
   | "carousel_click"
+  | "share_click"
   | "cta_click";
 
 export type AnalyticsPayload = {
@@ -22,7 +23,6 @@ export type AnalyticsPayload = {
   eventType: CommercialEventType;
   establishmentName?: string;
   category?: string;
-  planType?: string;
 };
 
 type TrackOptions = {
@@ -52,6 +52,7 @@ const gaEventNames: Record<CommercialEventType, string> = {
   details_click: "click_details",
   gallery_click: "click_gallery",
   carousel_click: "click_carousel",
+  share_click: "share_establishment",
   cta_click: "click_cta",
 };
 
@@ -90,6 +91,7 @@ function shouldSkip(payload: AnalyticsPayload, dedupe: TrackOptions["dedupe"]) {
     const now = Date.now();
     const last = lastClickMap.get(key) || 0;
     if (now - last < clickDebounceMs) return true;
+    if (lastClickMap.size > 1_000) lastClickMap.clear();
     lastClickMap.set(key, now);
   }
 
@@ -105,7 +107,6 @@ function sendToGoogleAnalytics(payload: Required<Pick<AnalyticsPayload, "entityI
       establishment_name: payload.establishmentName,
       entity_type: payload.entityType,
       category: payload.category,
-      plan_type: payload.planType,
       page_path: window.location.pathname,
     });
   } catch {
@@ -134,6 +135,17 @@ function sendToSupabase(payload: Required<Pick<AnalyticsPayload, "entityId">> & 
 }
 
 export const analyticsService = {
+  trackDirectoryEvent(eventName: "search" | "category_select" | "subcategory_select" | "quick_access_click", value: string) {
+    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+    try {
+      window.gtag("event", `city_services_${eventName}`, {
+        filter_value: value.slice(0, 120),
+        page_path: window.location.pathname,
+      });
+    } catch {
+      // Falhas ou bloqueadores do GA4 não podem afetar os filtros do diretório.
+    }
+  },
   track(payload: AnalyticsPayload, options: TrackOptions = { dedupe: "debounce" }) {
     if (shouldSkip(payload, options.dedupe)) return;
 

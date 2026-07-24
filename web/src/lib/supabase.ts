@@ -1,11 +1,12 @@
 import type { BusinessHours } from "@/lib/business-hours";
-import type {
-  CommercialPlan,
-  CustomCommercialFeatures,
-  LegacyCommercialPlan,
-  ListingType,
-  PlanStatus,
-} from "@/lib/commercial";
+
+export type ListingType = "public_service" | "commercial";
+
+// Compatibility-only fields. The application no longer uses plans to grant access.
+type DeprecatedCommercialPlan = "bronze" | "silver" | "gold";
+type DeprecatedLegacyPlan = "basic" | "pro";
+type DeprecatedPlanStatus = "active" | "inactive" | "trial" | "expired" | "suspended";
+type DeprecatedCustomFeatures = Record<string, boolean>;
 
 export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -31,6 +32,7 @@ export type PontoTuristicoRow = {
   localizacao: string;
   imagem_url: string;
   imagens_urls?: string[] | null;
+  info_url?: string | null;
   ativo: boolean;
   created_at: string;
 };
@@ -55,6 +57,8 @@ export type PousadaRow = {
   logo_url?: string | null;
   hero_image_url?: string | null;
   imagens_urls: string[] | null;
+  gallery_enabled?: boolean | null;
+  carousel_enabled?: boolean | null;
   check_in?: string | null;
   check_out?: string | null;
   business_hours?: BusinessHours | null;
@@ -66,12 +70,12 @@ export type PousadaRow = {
   diferencial_principal?: string | null;
   aceita_reservas?: boolean | null;
   destaque?: boolean | null;
-  plano?: CommercialPlan | LegacyCommercialPlan | null;
-  plan_type?: CommercialPlan | null;
-  plan_status?: PlanStatus | null;
+  plano?: DeprecatedCommercialPlan | DeprecatedLegacyPlan | null;
+  plan_type?: DeprecatedCommercialPlan | null;
+  plan_status?: DeprecatedPlanStatus | null;
   plan_started_at?: string | null;
   plan_expires_at?: string | null;
-  custom_features?: CustomCommercialFeatures | null;
+  custom_features?: DeprecatedCustomFeatures | null;
   carousel_photo_limit?: number | null;
   gallery_photo_limit?: number | null;
   featured_order?: number | null;
@@ -113,6 +117,8 @@ export type RestauranteRow = {
   imagem_url: string;
   logo_url?: string | null;
   imagens_urls?: string[] | null;
+  gallery_enabled?: boolean | null;
+  carousel_enabled?: boolean | null;
   tags: string[] | null;
   formas_pagamento?: string[] | null;
   diferenciais?: string[] | null;
@@ -122,12 +128,12 @@ export type RestauranteRow = {
   cardapio_url?: string | null;
   faixa_preco?: "R$" | "R$$" | "R$$$" | null;
   destaque?: boolean | null;
-  plano?: CommercialPlan | LegacyCommercialPlan | null;
-  plan_type?: CommercialPlan | null;
-  plan_status?: PlanStatus | null;
+  plano?: DeprecatedCommercialPlan | DeprecatedLegacyPlan | null;
+  plan_type?: DeprecatedCommercialPlan | null;
+  plan_status?: DeprecatedPlanStatus | null;
   plan_started_at?: string | null;
   plan_expires_at?: string | null;
-  custom_features?: CustomCommercialFeatures | null;
+  custom_features?: DeprecatedCustomFeatures | null;
   carousel_photo_limit?: number | null;
   gallery_photo_limit?: number | null;
   featured_order?: number | null;
@@ -156,6 +162,12 @@ export type CityServiceRow = {
   slug: string;
   category: CityServiceCategory;
   subcategory: string;
+  category_id?: string | null;
+  subcategory_id?: string | null;
+  short_description?: string | null;
+  full_description?: string | null;
+  services_offered?: string[] | null;
+  special_status?: string | null;
   description: string | null;
   address: string | null;
   neighborhood: string | null;
@@ -170,14 +182,24 @@ export type CityServiceRow = {
   latitude?: number | null;
   longitude?: number | null;
   image_url?: string | null;
+  photo_url?: string | null;
+  image_type?: "photo" | "logo" | "auto" | null;
+  alt_text?: string | null;
+  details_enabled?: boolean | null;
+  gallery_enabled?: boolean | null;
+  gallery_urls?: string[] | null;
+  is_published?: boolean | null;
+  sort_order?: number | null;
+  last_confirmed_at?: string | null;
+  public_notice?: string | null;
   logo_url?: string | null;
-  plan?: CommercialPlan | LegacyCommercialPlan | null;
+  plan?: DeprecatedCommercialPlan | DeprecatedLegacyPlan | null;
   listing_type?: ListingType | null;
-  plan_type?: CommercialPlan | null;
-  plan_status?: PlanStatus | null;
+  plan_type?: DeprecatedCommercialPlan | null;
+  plan_status?: DeprecatedPlanStatus | null;
   plan_started_at?: string | null;
   plan_expires_at?: string | null;
-  custom_features?: CustomCommercialFeatures | null;
+  custom_features?: DeprecatedCustomFeatures | null;
   carousel_photo_limit?: number | null;
   gallery_photo_limit?: number | null;
   featured_order?: number | null;
@@ -205,6 +227,22 @@ export type CityServiceRow = {
   updated_at?: string | null;
 };
 
+
+export type ServiceCategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  icon?: string | null;
+  accent?: string | null;
+  listing_type?: "public_service" | "commercial" | "mixed" | null;
+  parent_id?: string | null;
+  parent_slug?: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+};
 export type AdminEntity = "pontos_turisticos" | "pousadas" | "restaurantes" | "city_services";
 
 export type AdminData = {

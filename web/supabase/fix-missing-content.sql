@@ -1,3 +1,13 @@
+-- DEPRECATEDO E DESTRUTIVO.
+-- Este arquivo removia e recriava cadastros de demonstracao. Nao execute em producao.
+-- Use schema.sql e as migrations incrementais atuais.
+begin;
+do $$
+begin
+  raise exception 'Script bloqueado: fix-missing-content.sql e legado e destrutivo.';
+end;
+$$;
+
 insert into storage.buckets (id, name, public)
 values ('tourism', 'tourism', true)
 on conflict (id) do update set public = true;

@@ -9,14 +9,9 @@ import {
   Utensils,
 } from "lucide-react";
 import type { BusinessHours } from "@/lib/business-hours";
-import type {
-  CommercialFeatures,
-  CommercialPlan,
-  CustomCommercialFeatures,
-  ListingType,
-  PlanStatus,
-} from "@/lib/commercial";
 import { enableCityServicesPage } from "@/lib/feature-flags";
+
+export type ListingType = "public_service" | "commercial";
 
 export type Attraction = {
   slug: string;
@@ -60,14 +55,8 @@ export type FoodPlace = {
   firstVisitTip?: string;
   isFeatured?: boolean;
   featuredOrder?: number;
-  plan?: CommercialPlan;
-  planStatus?: PlanStatus;
-  customFeatures?: CustomCommercialFeatures;
-  commercialFeatures?: CommercialFeatures;
-  carouselPhotoLimit?: number;
-  galleryPhotoLimit?: number;
-  categoryPriority?: number;
-  pageEnabled?: boolean;
+  carouselEnabled?: boolean;
+  galleryEnabled?: boolean;
   whatsappMessage?: string;
   siteUrl?: string;
   createdAt?: string;
@@ -106,16 +95,10 @@ export type Lodging = {
   highlights?: string[];
   acceptsReservations?: boolean;
   isFeatured?: boolean;
-  plan?: CommercialPlan;
-  planStatus?: PlanStatus;
-  customFeatures?: CustomCommercialFeatures;
-  commercialFeatures?: CommercialFeatures;
-  carouselPhotoLimit?: number;
-  galleryPhotoLimit?: number;
   featuredOrder?: number;
-  categoryPriority?: number;
   listingType?: ListingType;
-  pageEnabled?: boolean;
+  carouselEnabled?: boolean;
+  galleryEnabled?: boolean;
   whatsappMessage?: string;
   siteUrl?: string;
   createdAt?: string;
@@ -265,7 +248,6 @@ export const foodPlaces: FoodPlace[] = [
   {
     name: "Açaí Bistrô",
     slug: "acai-bistro",
-    plan: "silver",
     category: "Restaurante",
     tags: ["Açaí", "Sobremesas", "Jantar", "Petiscos"],
     image:
@@ -313,7 +295,6 @@ export const foodPlaces: FoodPlace[] = [
   {
     name: "Mirante bar e petiscaria",
     slug: "mirante-bar-e-petiscaria",
-    plan: "silver",
     category: "Restaurante",
     tags: ["Petiscos", "Almoço", "Bar", "Vista"],
     image:
@@ -388,7 +369,6 @@ export const foodPlaces: FoodPlace[] = [
   {
     name: "Parque das Aroeiras",
     slug: "parque-das-aroeiras",
-    plan: "silver",
     category: "Restaurante",
     tags: ["Almoço", "Pratos regionais", "Área verde", "Jantar","Pousada"],
     image:
@@ -481,7 +461,6 @@ export const foodPlaces: FoodPlace[] = [
 export const lodgings: Lodging[] = [
   {
     name: "Pousada e Restaurante Seridó",
-    plan: "silver",
     image: "/pousadas/POUSADA-SUICA-DO-SERIDO/serido-1.jpg",
     gallery: [
   "/pousadas/POUSADA-SUICA-DO-SERIDO/serido-2.jpg",
@@ -500,7 +479,6 @@ export const lodgings: Lodging[] = [
   },
   {
     name: "Colina dos Flamboyants",
-   plan: "silver",
    image: "/pousadas/COLINA-DOS-Flamboyant/flamboyant-img.jpeg",
 gallery: [
   "/pousadas/COLINA-DOS-Flamboyant/colina-flanboyants-2.jpg",
@@ -517,7 +495,6 @@ gallery: [
   },
   {
     name: "Pousada do Teté",
-    plan: "silver",
     image:
       "/pousadas/POUSADA-TETE/tete.jpg",
     gallery: [
@@ -535,7 +512,6 @@ gallery: [
   },
   {
     name: "Parque das Aroeiras",
-    plan: "silver",
     image:
       "/pousadas/aroeiras/aroeiras-1.jpg",
     gallery: [
@@ -553,7 +529,6 @@ gallery: [
   },
   {
     name: "Pousada Mirante",
-    plan: "silver",
     image:
       "/pousadas/POUSADA-MIRANTE/mirante-4.jpg",
     gallery: [
@@ -571,7 +546,6 @@ gallery: [
   },
   {
     name: "Pousada Central",
-    plan: "silver",
     image:
       "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=1200&q=85",
     gallery: [
@@ -589,7 +563,6 @@ gallery: [
   },
   {
     name: "Pousada Platô da Nascente",
-    plan: "silver",
     image:
       "/pousadas/Plato/plato-1.jpg",
     gallery: [

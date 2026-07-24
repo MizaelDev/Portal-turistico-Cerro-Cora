@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { assertSameOriginRequest } from "@/lib/server-request-security";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const loginSchema = z.object({
-  email: z.string().email("Informe um email válido."),
-  password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres."),
+  email: z.string().trim().email("Informe um email válido.").max(254),
+  password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres.").max(128),
 });
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -31,6 +32,14 @@ async function getLoginAttemptKey(email: string) {
 
 async function isLocallyRateLimited(key: string) {
   const now = Date.now();
+
+  if (loginAttempts.size > 5_000) {
+    for (const [attemptKey, attempt] of loginAttempts) {
+      if (attempt.resetAt <= now) loginAttempts.delete(attemptKey);
+    }
+  }
+  if (loginAttempts.size > 10_000) loginAttempts.clear();
+
   const current = loginAttempts.get(key);
 
   if (!current || current.resetAt <= now) {
@@ -66,29 +75,6 @@ async function clearLoginAttempts(supabase: SupabaseServerClient, email: string)
   });
 }
 
-async function assertSameOrigin() {
-  const headersList = await headers();
-  const origin = headersList.get("origin");
-  const referer = headersList.get("referer");
-  const host = headersList.get("host");
-  const source = origin || referer;
-
-  if (!host || !source) {
-    throw new Error("Invalid login origin.");
-  }
-
-  const allowedOrigins = new Set(
-    [`https://${host}`, `http://${host}`, process.env.NEXT_PUBLIC_SITE_URL]
-      .filter(Boolean)
-      .map((value) => String(value).replace(/\/$/, "")),
-  );
-
-  const sourceOrigin = new URL(source).origin;
-  if (!allowedOrigins.has(sourceOrigin)) {
-    throw new Error("Invalid login origin.");
-  }
-}
-
 export async function loginAction(_: { error: string }, formData: FormData) {
   const parsed = loginSchema.safeParse({
     email: String(formData.get("email") || ""),
@@ -100,7 +86,7 @@ export async function loginAction(_: { error: string }, formData: FormData) {
   }
 
   try {
-    await assertSameOrigin();
+    await assertSameOriginRequest("Invalid login origin.");
     const supabase = await createSupabaseServerClient();
 
     if (await isRateLimited(supabase, parsed.data.email)) {

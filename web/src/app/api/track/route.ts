@@ -14,6 +14,7 @@ import {
 
 const maxPayloadBytes = 16 * 1024;
 const maxEventsPerMinute = 120;
+const analyticsRequestTimeoutMs = 5_000;
 const requestCounters = new Map<string, { count: number; resetAt: number }>();
 
 const trackSchema = z.object({
@@ -31,6 +32,7 @@ const trackSchema = z.object({
     "details_click",
     "gallery_click",
     "carousel_click",
+    "share_click",
     "cta_click",
   ]),
   sourcePath: z.string().trim().max(300).optional(),
@@ -39,10 +41,8 @@ const trackSchema = z.object({
 
 function isAllowedRequest(request: Request) {
   const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite === "cross-site") return false;
-
   const origin = request.headers.get("origin");
-  if (!origin) return true;
+  if (!origin) return fetchSite === "same-origin";
 
   const allowedOrigins = new Set([
     new URL(request.url).origin,
@@ -51,6 +51,59 @@ function isAllowedRequest(request: Request) {
 
   return allowedOrigins.has(origin.replace(/\/$/, ""));
 }
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
+}
+
+async function readLimitedJson(request: Request) {
+  if (!request.body) return null;
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    totalBytes += value.byteLength;
+    if (totalBytes > maxPayloadBytes) {
+      await reader.cancel();
+      throw new RangeError("Payload too large.");
+    }
+
+    text += decoder.decode(value, { stream: true });
+  }
+
+  text += decoder.decode();
+  return JSON.parse(text);
+}
+
+const analyticsFetch: typeof fetch = async (input, init) => {
+  const controller = new AbortController();
+  const upstreamSignal = init?.signal;
+  const abortRequest = () => controller.abort();
+  const timeout = setTimeout(abortRequest, analyticsRequestTimeoutMs);
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) controller.abort();
+    else upstreamSignal.addEventListener("abort", abortRequest, { once: true });
+  }
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+    upstreamSignal?.removeEventListener("abort", abortRequest);
+  }
+};
 
 function isRateLimited(key: string) {
   const now = Date.now();
@@ -89,16 +142,20 @@ function hashClientIp(ip: string | null) {
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured || !supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json({ ok: true, skipped: true });
+    return jsonResponse({ ok: true, skipped: true });
   }
 
   if (!isAllowedRequest(request)) {
-    return NextResponse.json({ ok: false }, { status: 403 });
+    return jsonResponse({ ok: false }, 403);
+  }
+
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+    return jsonResponse({ ok: false }, 415);
   }
 
   const contentLength = Number(request.headers.get("content-length") || 0);
   if (contentLength > maxPayloadBytes) {
-    return NextResponse.json({ ok: false }, { status: 413 });
+    return jsonResponse({ ok: false }, 413);
   }
 
   const clientIp = getClientIp(request);
@@ -107,17 +164,24 @@ export async function POST(request: Request) {
     ? createHash("sha256").update(`rate-limit:${clientIp}`).digest("hex")
     : "anonymous";
   if (isRateLimited(rateLimitKey)) {
-    return NextResponse.json({ ok: false }, { status: 429 });
+    return jsonResponse({ ok: false }, 429);
   }
 
-  const parsed = trackSchema.safeParse(await request.json().catch(() => null));
+  let requestBody: unknown;
+  try {
+    requestBody = await readLimitedJson(request);
+  } catch (error) {
+    return jsonResponse({ ok: false }, error instanceof RangeError ? 413 : 400);
+  }
+
+  const parsed = trackSchema.safeParse(requestBody);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false }, { status: 400 });
+    return jsonResponse({ ok: false }, 400);
   }
 
   const serverKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serverKey) {
-    return NextResponse.json({ ok: true, skipped: true });
+    return jsonResponse({ ok: true, skipped: true });
   }
 
   const supabase = createClient(supabaseUrl, serverKey, {
@@ -125,12 +189,15 @@ export async function POST(request: Request) {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: {
+      fetch: analyticsFetch,
+    },
   });
 
   const { entityType, entityId, eventType, sourcePath, sessionId } = parsed.data;
   const entity = await resolveAnalyticsEntity(supabase, entityType, entityId);
   if (!entity || !isAnalyticsEventAllowed(eventType, entity)) {
-    return NextResponse.json({ ok: false }, { status: 404 });
+    return jsonResponse({ ok: false }, 404);
   }
 
   const distributedIdentifier = ipHash || `session:${sessionId || "anonymous"}`;
@@ -143,7 +210,7 @@ export async function POST(request: Request) {
     },
   );
   if (!distributedLimitError && distributedLimit === false) {
-    return NextResponse.json({ ok: false }, { status: 429 });
+    return jsonResponse({ ok: false }, 429);
   }
 
   const dedupeWindow = eventType.endsWith("_view") ? 86_400_000 : 2_000;
@@ -160,7 +227,7 @@ export async function POST(request: Request) {
     session_id: sessionId || null,
     establishment_name: entity.name,
     category: entity.category,
-    plan_type: entity.plan,
+    plan_type: null,
     dedupe_key: dedupeKey,
     ip_hash: ipHash,
     user_agent: request.headers.get("user-agent")?.slice(0, 300) || null,
@@ -177,16 +244,13 @@ export async function POST(request: Request) {
   }
 
   if (error?.code === "23505") {
-    return NextResponse.json({ ok: true, duplicate: true });
+    return jsonResponse({ ok: true, duplicate: true });
   }
 
   if (error) {
     console.error("[track] insert failed", { code: error.code });
-    return NextResponse.json({ ok: false }, { status: 503 });
+    return jsonResponse({ ok: false }, 503);
   }
 
-  return NextResponse.json(
-    { ok: true },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return jsonResponse({ ok: true });
 }

@@ -5,10 +5,10 @@ import { useMemo, useState, useTransition } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Copy,
   DatabaseBackup,
   Edit3,
   ExternalLink,
-  History,
   ImagePlus,
   Loader2,
   LogOut,
@@ -23,11 +23,13 @@ import {
   deleteAdminItem,
   logoutAction,
   removeAttractionGalleryImage,
+  removeCityServiceGalleryImage,
   removeLodgingGalleryImage,
   removeRestaurantGalleryImage,
   saveAdminItem,
   seedDefaultContent,
   updateAttractionGallery,
+  updateCityServiceAssetImage,
   updateLodgingGallery,
   updateLodgingLogoImage,
   updateRestaurantAssetImage,
@@ -57,12 +59,6 @@ import {
   type WeekdayKey,
 } from "@/lib/business-hours";
 import { cityServiceCategories } from "@/lib/city-services";
-import {
-  getPlanFeatures,
-  normalizeCommercialPlan,
-  planDefinitions,
-  type CommercialFeatureKey,
-} from "@/lib/commercial";
 import type {
   AdminData,
   AdminEntity,
@@ -70,49 +66,16 @@ import type {
   PontoTuristicoRow,
   PousadaRow,
   RestauranteRow,
+  ServiceCategoryRow,
 } from "@/lib/supabase";
 
 type FormState = Record<string, string | boolean>;
 type AdminRow = PontoTuristicoRow | PousadaRow | RestauranteRow | CityServiceRow;
 
-const editableFeatureKeys: Array<{ key: CommercialFeatureKey; label: string }> = [
-  { key: "instagram", label: "Instagram" },
-  { key: "individualPage", label: "Página individual" },
-  { key: "carousel", label: "Carrossel" },
-  { key: "gallery", label: "Galeria" },
-  { key: "highlighted", label: "Destaque" },
-  { key: "professionalPhotography", label: "Ensaio fotográfico" },
-  { key: "socialMediaPromotion", label: "Divulgação nas redes" },
-  { key: "advancedReport", label: "Relatório avançado" },
-  { key: "monthlyComparison", label: "Comparação mensal" },
-  { key: "prioritySupport", label: "Suporte prioritário" },
-  { key: "seasonalCampaign", label: "Campanha sazonal" },
-  { key: "establishmentStory", label: "História institucional" },
-  { key: "bookingButton", label: "Botão de reserva" },
-];
-
-const emptyCommercialFields: FormState = {
-  plano: "bronze",
-  plan_type: "bronze",
-  plan_status: "active",
-  plan_started_at: "",
-  plan_expires_at: "",
-  custom_features_enabled: false,
-  carousel_photo_limit: "",
-  gallery_photo_limit: "",
+const emptyContentSettings: FormState = {
+  gallery_enabled: true,
+  carousel_enabled: true,
   featured_order: "",
-  category_priority: "0",
-  professional_photography_included: false,
-  photography_completed_at: "",
-  social_media_promotion_included: false,
-  social_media_publication_url: "",
-  advanced_report_enabled: false,
-  priority_support_enabled: false,
-  seasonal_campaign_enabled: false,
-  establishment_story_enabled: false,
-  commercial_notes: "",
-  plan_change_reason: "",
-  ...Object.fromEntries(editableFeatureKeys.map(({ key }) => [`feature_${key}`, getPlanFeatures("bronze")[key]])),
 };
 
 const entityLabels: Record<AdminEntity, string> = {
@@ -135,12 +98,13 @@ const emptyForms: Record<AdminEntity, FormState> = {
     descricao: "",
     categoria: "mirante",
     localizacao: "",
+    info_url: "",
     imagem_url: "",
     imagens_urls: "",
     ativo: true,
   },
   pousadas: {
-    ...emptyCommercialFields,
+    ...emptyContentSettings,
     nome: "",
     slug: "",
     descricao: "",
@@ -171,12 +135,10 @@ const emptyForms: Record<AdminEntity, FormState> = {
     aceita_reservas: true,
     whatsapp_message: "",
     site_url: "",
-    pagina_ativa: false,
-    destaque: false,
     ativo: true,
   },
   restaurantes: {
-    ...emptyCommercialFields,
+    ...emptyContentSettings,
     nome: "",
     slug: "",
     descricao: "",
@@ -204,18 +166,21 @@ const emptyForms: Record<AdminEntity, FormState> = {
     faixa_preco: "",
     whatsapp_message: "",
     site_url: "",
-    pagina_ativa: false,
-    destaque: false,
     ativo: true,
   },
   city_services: {
-    ...emptyCommercialFields,
+    ...emptyContentSettings,
     nome: "",
     slug: "",
     descricao: "",
     categoria: "saude",
+    category_id: "",
     listing_type: "commercial",
     subcategory: "",
+    subcategory_id: "",
+    full_description: "",
+    services_offered: "",
+    special_status: "",
     address: "",
     neighborhood: "",
     phone: "",
@@ -226,7 +191,17 @@ const emptyForms: Record<AdminEntity, FormState> = {
     latitude: "",
     longitude: "",
     image_url: "",
+    photo_url: "",
     logo_url: "",
+    image_type: "auto",
+    alt_text: "",
+    gallery_urls: "",
+    details_enabled: false,
+    gallery_enabled: false,
+    is_published: true,
+    sort_order: "",
+    last_confirmed_at: "",
+    public_notice: "",
     tags: "",
     enabled_buttons: "",
     important_message: "",
@@ -580,42 +555,15 @@ function imageSourceLabel(url: string) {
   return "Imagem externa";
 }
 
-type CommercialAdminRow = PousadaRow | RestauranteRow | CityServiceRow;
-
-function dateTimeLocalValue(value?: string | null) {
-  return value ? value.slice(0, 16) : "";
+function isSafePreviewImage(value: string) {
+  return value.startsWith("/") || value.startsWith("https://");
 }
 
-function commercialFieldsFromRow(row: CommercialAdminRow): FormState {
-  const legacyPlan = (row as PousadaRow | RestauranteRow).plano || (row as CityServiceRow).plan;
-  const plan = normalizeCommercialPlan(row.plan_type || legacyPlan);
-  const defaults = getPlanFeatures(plan);
-  const customFeatures = row.custom_features || {};
-
+function contentFieldsFromRow(row: PousadaRow | RestauranteRow | CityServiceRow): FormState {
   return {
-    plano: plan,
-    plan_type: plan,
-    plan_status: row.plan_status || "active",
-    plan_started_at: dateTimeLocalValue(row.plan_started_at),
-    plan_expires_at: dateTimeLocalValue(row.plan_expires_at),
-    custom_features_enabled: Object.keys(customFeatures).length > 0,
-    carousel_photo_limit: row.carousel_photo_limit?.toString() || "",
-    gallery_photo_limit: row.gallery_photo_limit?.toString() || "",
+    gallery_enabled: "gallery_enabled" in row ? row.gallery_enabled !== false : true,
+    carousel_enabled: "carousel_enabled" in row ? row.carousel_enabled !== false : true,
     featured_order: row.featured_order?.toString() || "",
-    category_priority: row.category_priority?.toString() || "0",
-    professional_photography_included: Boolean(row.professional_photography_included),
-    photography_completed_at: dateTimeLocalValue(row.photography_completed_at),
-    social_media_promotion_included: Boolean(row.social_media_promotion_included),
-    social_media_publication_url: row.social_media_publication_url || "",
-    advanced_report_enabled: Boolean(row.advanced_report_enabled),
-    priority_support_enabled: Boolean(row.priority_support_enabled),
-    seasonal_campaign_enabled: Boolean(row.seasonal_campaign_enabled),
-    establishment_story_enabled: Boolean(row.establishment_story_enabled),
-    commercial_notes: row.commercial_notes || "",
-    plan_change_reason: row.plan_change_reason || "",
-    ...Object.fromEntries(
-      editableFeatureKeys.map(({ key }) => [`feature_${key}`, customFeatures[key] ?? defaults[key]]),
-    ),
   };
 }
 
@@ -623,13 +571,18 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "city_services") {
     const service = row as CityServiceRow;
     return {
-      ...commercialFieldsFromRow(service),
+      ...contentFieldsFromRow(service),
       nome: service.name,
       slug: service.slug || "",
       descricao: service.description || "",
       categoria: service.category,
+      category_id: service.category_id || "",
       listing_type: service.listing_type || "commercial",
       subcategory: service.subcategory || "",
+      subcategory_id: service.subcategory_id || "",
+      full_description: service.full_description || "",
+      services_offered: (service.services_offered || []).join("\n"),
+      special_status: service.special_status || "",
       address: service.address || "",
       neighborhood: service.neighborhood || "",
       phone: service.phone || "",
@@ -639,8 +592,18 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       site_url: service.site_url || "",
       latitude: service.latitude?.toString() || "",
       longitude: service.longitude?.toString() || "",
-      image_url: service.image_url || "",
+      image_url: service.photo_url || service.image_url || "",
+      photo_url: service.photo_url || service.image_url || "",
       logo_url: service.logo_url || "",
+      image_type: service.image_type || "auto",
+      alt_text: service.alt_text || "",
+      gallery_urls: (service.gallery_urls || []).join("\n"),
+      details_enabled: Boolean(service.details_enabled),
+      gallery_enabled: Boolean(service.gallery_enabled),
+      is_published: service.is_published !== false,
+      sort_order: service.sort_order?.toString() || "",
+      last_confirmed_at: service.last_confirmed_at?.slice(0, 10) || "",
+      public_notice: service.public_notice || "",
       tags: (service.tags || []).join("\n"),
       enabled_buttons: (service.enabled_buttons || []).join("\n"),
       important_message: service.important_message || "",
@@ -659,7 +622,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "pousadas") {
     const lodging = row as PousadaRow;
     return {
-      ...commercialFieldsFromRow(lodging),
+      ...contentFieldsFromRow(lodging),
       nome: lodging.nome,
       slug: lodging.slug || "",
       descricao: lodging.descricao,
@@ -690,8 +653,6 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       aceita_reservas: lodging.aceita_reservas ?? true,
       whatsapp_message: lodging.whatsapp_message || "",
       site_url: lodging.site_url || "",
-      pagina_ativa: lodging.pagina_ativa ?? Boolean(lodging.destaque),
-      destaque: Boolean(lodging.destaque),
       ativo: lodging.ativo,
     };
   }
@@ -699,7 +660,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
   if (entity === "restaurantes") {
     const restaurant = row as RestauranteRow;
     return {
-      ...commercialFieldsFromRow(restaurant),
+      ...contentFieldsFromRow(restaurant),
       nome: restaurant.nome,
       slug: restaurant.slug || "",
       descricao: restaurant.descricao,
@@ -727,8 +688,6 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       faixa_preco: restaurant.faixa_preco || "",
       whatsapp_message: restaurant.whatsapp_message || "",
       site_url: restaurant.site_url || "",
-      pagina_ativa: restaurant.pagina_ativa ?? Boolean(restaurant.destaque),
-      destaque: Boolean(restaurant.destaque),
       ativo: restaurant.ativo,
     };
   }
@@ -739,6 +698,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
     descricao: attraction.descricao,
     categoria: attraction.categoria,
     localizacao: attraction.localizacao,
+    info_url: attraction.info_url || "",
     imagem_url: attraction.imagem_url,
     imagens_urls: (attraction.imagens_urls || []).join("\n"),
     ativo: attraction.ativo,
@@ -775,22 +735,15 @@ function rowIsActive(row: AdminRow) {
 
 function MediaDestinationGuide({
   kind,
-  plan,
-  carouselLimit,
 }: {
   kind: "restaurant" | "lodging";
-  plan: "bronze" | "silver" | "gold";
-  carouselLimit: number;
 }) {
-  const hasPublicGallery = plan !== "bronze";
-  const hasCarousel = plan === "gold";
-
   return (
     <section className="grid gap-3 rounded-lg border border-border bg-accent/20 p-4" aria-labelledby={`${kind}-media-title`}>
       <div>
         <p id={`${kind}-media-title`} className="text-sm font-semibold">Organização das imagens</p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Cada upload abaixo tem um destino específico. As fotos permanecem armazenadas ao trocar de plano.
+          Cada upload abaixo tem um destino especifico. Galeria e carrossel podem ser ativados conforme o conteudo disponivel.
         </p>
       </div>
       <div className="grid gap-2 text-xs sm:grid-cols-2">
@@ -807,15 +760,13 @@ function MediaDestinationGuide({
         <div className="rounded-md border border-border bg-background/60 p-3">
           <strong className="block text-foreground">Fotos da galeria</strong>
           <span className="mt-1 block leading-5 text-muted-foreground">
-            {hasPublicGallery ? "Exibidas na página individual do estabelecimento." : "Ficam armazenadas, mas não são publicadas no plano Bronze."}
+            Exibidas na pagina individual quando a galeria estiver ativa.
           </span>
         </div>
         <div className="rounded-md border border-border bg-background/60 p-3">
           <strong className="block text-foreground">Fotos do carrossel</strong>
           <span className="mt-1 block leading-5 text-muted-foreground">
-            {hasCarousel
-              ? `No Ouro, as primeiras ${carouselLimit} fotos da coleção, seguindo a ordem abaixo, formam o carrossel do card.`
-              : "O carrossel é exclusivo do plano Ouro. Não é exibido neste plano."}
+            As fotos seguem a ordem definida abaixo. Com apenas uma imagem, o portal exibe uma foto estatica.
           </span>
         </div>
       </div>
@@ -823,33 +774,23 @@ function MediaDestinationGuide({
   );
 }
 
-function CommercialPlanEditor({
+function ContentSettingsEditor({
   entity,
   form,
-  selectedPlan,
-  isApplicable,
-  hasIndividualPage,
-  isGold,
   updateField,
-  applyPlanDefaults,
-  restorePlanDefaults,
 }: {
   entity: AdminEntity;
   form: FormState;
-  selectedPlan: "bronze" | "silver" | "gold";
-  isApplicable: boolean;
-  hasIndividualPage: boolean;
-  isGold: boolean;
   updateField: (name: string, value: string | boolean) => void;
-  applyPlanDefaults: (plan: string) => void;
-  restorePlanDefaults: () => void;
 }) {
+  const supportsMedia = entity === "restaurantes" || entity === "pousadas";
+
   return (
     <div className="grid gap-4 rounded-lg border border-border bg-accent/20 p-4">
       <div>
-        <p className="text-sm font-semibold">Configuração comercial</p>
+        <p className="text-sm font-semibold">Publicacao e canais</p>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Bronze garante presença no portal, Prata libera página e galeria, e Ouro acrescenta carrossel, prioridade e recursos avançados.
+          Todos os estabelecimentos ativos possuem pagina individual, analytics e os mesmos recursos de divulgacao.
         </p>
       </div>
 
@@ -859,7 +800,7 @@ function CommercialPlanEditor({
           <Select value={String(form.listing_type || "commercial")} onValueChange={(value) => updateField("listing_type", value)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="public_service">Serviço público essencial</SelectItem>
+              <SelectItem value="public_service">Servico publico essencial</SelectItem>
               <SelectItem value="commercial">Estabelecimento comercial</SelectItem>
             </SelectContent>
           </Select>
@@ -867,132 +808,44 @@ function CommercialPlanEditor({
         </div>
       ) : null}
 
-      {!isApplicable ? (
-        <>
-          <p className="rounded-md border border-border bg-background/55 p-3 text-sm text-muted-foreground">
-            Serviços públicos essenciais permanecem ativos sem assinatura comercial.
-          </p>
-          <input type="hidden" name="plan_type" value={selectedPlan} />
-          <input type="hidden" name="site_url" value={String(form.site_url || "")} />
-          <input type="hidden" name="whatsapp_message" value={String(form.whatsapp_message || "")} />
-        </>
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="grid gap-2">
-              <Label>Plano contratado</Label>
-              <Select value={selectedPlan} onValueChange={applyPlanDefaults}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.values(planDefinitions).map((plan) => (
-                    <SelectItem key={plan.id} value={plan.id}>{plan.label} — {plan.description}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <input type="hidden" name="plan_type" value={selectedPlan} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Situação do plano</Label>
-              <Select value={String(form.plan_status || "active")} onValueChange={(value) => updateField("plan_status", value)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Ativo</SelectItem>
-                  <SelectItem value="trial">Período de teste</SelectItem>
-                  <SelectItem value="inactive">Inativo</SelectItem>
-                  <SelectItem value="expired">Vencido</SelectItem>
-                  <SelectItem value="suspended">Suspenso</SelectItem>
-                </SelectContent>
-              </Select>
-              <input type="hidden" name="plan_status" value={String(form.plan_status || "active")} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="site_url">Site externo</Label>
-              <Input id="site_url" name="site_url" value={String(form.site_url || "")} onChange={(event) => updateField("site_url", event.target.value)} placeholder="https://..." />
-            </div>
-          </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="site_url">Site externo</Label>
+          <Input id="site_url" name="site_url" value={String(form.site_url || "")} onChange={(event) => updateField("site_url", event.target.value)} placeholder="https://..." />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="featured_order">Ordem manual</Label>
+          <Input id="featured_order" name="featured_order" type="number" min="0" value={String(form.featured_order || "")} onChange={(event) => updateField("featured_order", event.target.value)} placeholder="Opcional" />
+        </div>
+      </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="grid gap-2"><Label htmlFor="plan_started_at">Início do plano</Label><Input id="plan_started_at" name="plan_started_at" type="datetime-local" value={String(form.plan_started_at || "")} onChange={(event) => updateField("plan_started_at", event.target.value)} /></div>
-            <div className="grid gap-2"><Label htmlFor="plan_expires_at">Vencimento</Label><Input id="plan_expires_at" name="plan_expires_at" type="datetime-local" value={String(form.plan_expires_at || "")} onChange={(event) => updateField("plan_expires_at", event.target.value)} /></div>
-          </div>
+      <div className="grid gap-2">
+        <Label htmlFor="whatsapp_message">Mensagem automatica do WhatsApp</Label>
+        <Textarea id="whatsapp_message" name="whatsapp_message" value={String(form.whatsapp_message || "")} onChange={(event) => updateField("whatsapp_message", event.target.value)} placeholder="Ola! Encontrei seu estabelecimento atraves do portal..." />
+      </div>
 
-          {hasIndividualPage ? (
-            <div className="grid gap-4 md:grid-cols-4">
-              {selectedPlan === "gold" ? (
-                <div className="grid gap-2">
-                  <Label htmlFor="carousel_photo_limit">Fotos no carrossel</Label>
-                  <Input id="carousel_photo_limit" name="carousel_photo_limit" type="number" min="1" max="30" value={String(form.carousel_photo_limit || "")} onChange={(event) => updateField("carousel_photo_limit", event.target.value)} />
-                </div>
-              ) : (
-                <input type="hidden" name="carousel_photo_limit" value="1" />
-              )}
-              <div className="grid gap-2"><Label htmlFor="gallery_photo_limit">Fotos na galeria</Label><Input id="gallery_photo_limit" name="gallery_photo_limit" type="number" min="0" max="60" value={String(form.gallery_photo_limit || "")} onChange={(event) => updateField("gallery_photo_limit", event.target.value)} /></div>
-              <div className="grid gap-2"><Label htmlFor="featured_order">Ordem de destaque</Label><Input id="featured_order" name="featured_order" type="number" min="0" value={String(form.featured_order || "")} onChange={(event) => updateField("featured_order", event.target.value)} /></div>
-              <div className="grid gap-2"><Label htmlFor="category_priority">Prioridade na categoria</Label><Input id="category_priority" name="category_priority" type="number" min="0" value={String(form.category_priority || "0")} onChange={(event) => updateField("category_priority", event.target.value)} /></div>
-            </div>
-          ) : null}
-
-          <div className="grid gap-2">
-            <Label htmlFor="whatsapp_message">Mensagem automática do WhatsApp</Label>
-            <Textarea id="whatsapp_message" name="whatsapp_message" value={String(form.whatsapp_message || "")} onChange={(event) => updateField("whatsapp_message", event.target.value)} placeholder="Olá! Encontrei seu estabelecimento através do portal..." />
-          </div>
-
-          {entity !== "city_services" && hasIndividualPage ? (
-            <label className="flex items-center gap-2 rounded-lg border border-border bg-background/55 p-3 text-sm font-medium">
-              <input type="checkbox" name="pagina_ativa" checked={Boolean(form.pagina_ativa)} onChange={(event) => updateField("pagina_ativa", event.target.checked)} className="h-4 w-4 rounded border-border" />
-              Página individual ativa
-            </label>
-          ) : null}
-
-          <div className="grid gap-3 rounded-md border border-border bg-background/55 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" name="custom_features_enabled" checked={Boolean(form.custom_features_enabled)} onChange={(event) => updateField("custom_features_enabled", event.target.checked)} className="h-4 w-4 rounded border-border" />
-                Aplicar exceções comerciais
-              </label>
-              <Button type="button" variant="outline" size="sm" onClick={restorePlanDefaults}>Restaurar padrão</Button>
-            </div>
-            {form.custom_features_enabled ? (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {editableFeatureKeys.filter(({ key }) => selectedPlan === "gold" || key !== "carousel").map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2 rounded-md border border-border p-2.5 text-sm">
-                    <input type="checkbox" name={`feature_${key}`} checked={Boolean(form[`feature_${key}`])} onChange={(event) => updateField(`feature_${key}`, event.target.checked)} className="h-4 w-4 rounded border-border" />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          {isGold ? (
-            <div className="grid gap-4 rounded-md border border-[#d7aa58]/45 bg-[#FCF8F5] p-4 dark:bg-card md:grid-cols-2">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="professional_photography_included" checked={Boolean(form.professional_photography_included)} onChange={(event) => updateField("professional_photography_included", event.target.checked)} /> Ensaio fotográfico incluído</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="social_media_promotion_included" checked={Boolean(form.social_media_promotion_included)} onChange={(event) => updateField("social_media_promotion_included", event.target.checked)} /> Divulgação nas redes sociais</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="advanced_report_enabled" checked={Boolean(form.advanced_report_enabled)} onChange={(event) => updateField("advanced_report_enabled", event.target.checked)} /> Relatório avançado</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="priority_support_enabled" checked={Boolean(form.priority_support_enabled)} onChange={(event) => updateField("priority_support_enabled", event.target.checked)} /> Suporte prioritário</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="seasonal_campaign_enabled" checked={Boolean(form.seasonal_campaign_enabled)} onChange={(event) => updateField("seasonal_campaign_enabled", event.target.checked)} /> Campanha sazonal</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="establishment_story_enabled" checked={Boolean(form.establishment_story_enabled)} onChange={(event) => updateField("establishment_story_enabled", event.target.checked)} /> História institucional</label>
-              <div className="grid gap-2"><Label htmlFor="photography_completed_at">Ensaio concluído em</Label><Input id="photography_completed_at" name="photography_completed_at" type="datetime-local" value={String(form.photography_completed_at || "")} onChange={(event) => updateField("photography_completed_at", event.target.value)} /></div>
-              <div className="grid gap-2"><Label htmlFor="social_media_publication_url">Link da publicação</Label><Input id="social_media_publication_url" name="social_media_publication_url" value={String(form.social_media_publication_url || "")} onChange={(event) => updateField("social_media_publication_url", event.target.value)} placeholder="https://..." /></div>
-            </div>
-          ) : null}
-
-          <div className="grid gap-2">
-            <Label htmlFor="plan_change_reason">Motivo da mudança</Label>
-            <Input id="plan_change_reason" name="plan_change_reason" value={String(form.plan_change_reason || "")} onChange={(event) => updateField("plan_change_reason", event.target.value)} placeholder="Upgrade, renovação, cortesia ou downgrade." />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="commercial_notes">Observações comerciais</Label>
-            <Textarea id="commercial_notes" name="commercial_notes" value={String(form.commercial_notes || "")} onChange={(event) => updateField("commercial_notes", event.target.value)} placeholder="Motivo da alteração ou observação interna." />
-          </div>
-        </>
-      )}
+      {supportsMedia ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-start gap-3 rounded-md border border-border bg-background/55 p-3 text-sm">
+            <input type="checkbox" name="gallery_enabled" checked={Boolean(form.gallery_enabled)} onChange={(event) => updateField("gallery_enabled", event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-border" />
+            <span><strong className="block">Galeria ativa</strong><span className="text-xs text-muted-foreground">Exibe a secao somente quando houver fotos.</span></span>
+          </label>
+          <label className="flex items-start gap-3 rounded-md border border-border bg-background/55 p-3 text-sm">
+            <input type="checkbox" name="carousel_enabled" checked={Boolean(form.carousel_enabled)} onChange={(event) => updateField("carousel_enabled", event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-border" />
+            <span><strong className="block">Carrossel ativo</strong><span className="text-xs text-muted-foreground">Com uma unica foto, o portal usa imagem estatica.</span></span>
+          </label>
+        </div>
+      ) : null}
     </div>
   );
 }
-
-export function AdminDashboard({ initialData }: { initialData: AdminData }) {
+export function AdminDashboard({
+  initialData,
+  serviceCategories = [],
+}: {
+  initialData: AdminData;
+  serviceCategories?: ServiceCategoryRow[];
+}) {
   const router = useRouter();
   const [entity, setEntity] = useState<AdminEntity>("pontos_turisticos");
   const [form, setForm] = useState<FormState>(emptyForms.pontos_turisticos);
@@ -1005,8 +858,18 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
   const [isUploading, startUploadTransition] = useTransition();
   const [isGalleryPending, startGalleryTransition] = useTransition();
   const [galleryAction, setGalleryAction] = useState<string | null>(null);
+  const [adminSearch, setAdminSearch] = useState("");
 
   const rows = useMemo(() => initialData[entity] as AdminRow[], [entity, initialData]);
+  const filteredRows = useMemo(() => {
+    const query = adminSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!query || entity !== "city_services") return rows;
+    return rows.filter((row) =>
+      `${rowName(row)} ${rowSummary(entity, row)}`
+        .toLocaleLowerCase("pt-BR")
+        .includes(query),
+    );
+  }, [adminSearch, entity, rows]);
   const attractionImages = useMemo(
     () => (entity === "pontos_turisticos" ? attractionImagesFromForm(form) : []),
     [entity, form],
@@ -1019,11 +882,42 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     () => (entity === "restaurantes" ? restaurantImagesFromForm(form) : []),
     [entity, form],
   );
-  const isCommercialEntity = entity === "restaurantes" || entity === "pousadas" || entity === "city_services";
-  const selectedPlan = normalizeCommercialPlan(String(form.plan_type || form.plano || "bronze"));
-  const isCommercialPlanApplicable = entity !== "city_services" || form.listing_type !== "public_service";
-  const hasIndividualPagePlan = isCommercialPlanApplicable && selectedPlan !== "bronze";
-  const isGoldSelected = isCommercialPlanApplicable && selectedPlan === "gold";
+  const cityServiceGalleryImages = useMemo(
+    () =>
+      entity === "city_services"
+        ? uniqueImages(splitImageLines(form.gallery_urls)).filter(isSafePreviewImage)
+        : [],
+    [entity, form.gallery_urls],
+  );
+  const supportsEstablishmentSettings = entity === "restaurantes" || entity === "pousadas" || entity === "city_services";
+  const activeServiceCategories = useMemo(
+    () => serviceCategories.filter((category) => category.is_active),
+    [serviceCategories],
+  );
+  const mainServiceCategories = useMemo(
+    () => activeServiceCategories.filter((category) => !category.parent_id && !category.parent_slug),
+    [activeServiceCategories],
+  );
+  const selectedServiceCategory = useMemo(
+    () => mainServiceCategories.find((category) => category.slug === String(form.categoria || "")),
+    [form.categoria, mainServiceCategories],
+  );
+  const serviceSubcategories = useMemo(
+    () =>
+      activeServiceCategories.filter(
+        (category) =>
+          category.parent_id === selectedServiceCategory?.id ||
+          category.parent_slug === selectedServiceCategory?.slug,
+      ),
+    [activeServiceCategories, selectedServiceCategory],
+  );
+  const selectedServiceSubcategory = useMemo(
+    () =>
+      serviceSubcategories.find(
+        (subcategory) => subcategory.name === String(form.subcategory || ""),
+      ),
+    [form.subcategory, serviceSubcategories],
+  );
 
   function selectEntity(nextEntity: AdminEntity) {
     setEntity(nextEntity);
@@ -1040,38 +934,29 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     setForm((current) => ({ ...current, [name]: value }));
   }
 
-  function applyPlanDefaults(planValue: string) {
-    const plan = normalizeCommercialPlan(planValue);
-    const definition = planDefinitions[plan];
-    setForm((current) => ({
-      ...current,
-      plano: plan,
-      plan_type: plan,
-      custom_features_enabled: false,
-      pagina_ativa: definition.features.individualPage,
-      destaque: definition.features.highlighted,
-      is_featured: definition.features.highlighted,
-      carousel_photo_limit: String(definition.defaultCarouselPhotoLimit),
-      gallery_photo_limit: String(definition.defaultGalleryPhotoLimit),
-      professional_photography_included: definition.features.professionalPhotography,
-      social_media_promotion_included: definition.features.socialMediaPromotion,
-      advanced_report_enabled: definition.features.advancedReport,
-      priority_support_enabled: definition.features.prioritySupport,
-      seasonal_campaign_enabled: definition.features.seasonalCampaign,
-      establishment_story_enabled: definition.features.establishmentStory,
-      ...Object.fromEntries(editableFeatureKeys.map(({ key }) => [`feature_${key}`, definition.features[key]])),
-    }));
-  }
-
-  function restorePlanDefaults() {
-    applyPlanDefaults(selectedPlan);
-    setStatus({ type: "idle", text: "Recursos padrão do plano restaurados. Salve para confirmar." });
-  }
-
   function resetForm() {
     setForm(emptyForms[entity]);
     setEditingId(null);
     setGalleryAction(null);
+  }
+
+  function duplicateRow(row: AdminRow) {
+    const duplicated = rowToForm(entity, row);
+    const originalName = String(duplicated.nome || rowName(row));
+    const originalSlug = String(duplicated.slug || "");
+    setForm({
+      ...duplicated,
+      nome: `${originalName} (cópia)`,
+      slug: originalSlug ? `${originalSlug}-copia` : "",
+      ativo: false,
+      is_published: false,
+    });
+    setEditingId(null);
+    setGalleryAction(null);
+    setStatus({
+      type: "idle",
+      text: "Cópia criada no formulário. Revise os dados antes de cadastrar.",
+    });
   }
 
   function editRow(row: AdminRow) {
@@ -1714,6 +1599,134 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
     });
   }
 
+  function uploadCityServiceAsset(
+    field: "photo_url" | "logo_url" | "gallery_urls",
+    files: FileList | null,
+  ) {
+    if (!files?.length) return;
+
+    const formData = new FormData();
+    const selectedFiles = field === "gallery_urls" ? Array.from(files) : [files[0]];
+    selectedFiles.forEach((file) => formData.append("files", file));
+    const previousImage = field === "gallery_urls" ? "" : String(form[field] || "").trim();
+
+    startUploadTransition(async () => {
+      try {
+        const result = await uploadAdminImages("city_services", formData);
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        if (!result.ok || !result.urls.length) return;
+
+        if (field !== "gallery_urls" && editingId) {
+          const updateResult = await updateCityServiceAssetImage({
+            serviceId: editingId,
+            field,
+            imageUrl: previousImage || null,
+            nextUrl: result.urls[0],
+          });
+          setStatus({
+            type: updateResult.ok ? "success" : "error",
+            text: updateResult.message,
+          });
+          if (!updateResult.ok) return;
+          router.refresh();
+        }
+
+        setForm((current) => {
+          if (field === "gallery_urls") {
+            const currentGallery = splitImageLines(current.gallery_urls);
+            return {
+              ...current,
+              gallery_urls: uniqueImages([...currentGallery, ...result.urls]).join("\n"),
+              gallery_enabled: true,
+            };
+          }
+
+          return {
+            ...current,
+            [field]: result.urls[0],
+            ...(field === "photo_url" ? { image_url: result.urls[0], image_type: "photo" } : {}),
+          };
+        });
+      } catch {
+        setStatus({
+          type: "error",
+          text: "Não foi possível enviar a imagem. Use JPEG, PNG, WebP ou AVIF com até 6 MB.",
+        });
+      }
+    });
+  }
+
+  function removeCityServiceAsset(field: "photo_url" | "logo_url") {
+    const currentImage = String(form[field] || "").trim();
+    if (!currentImage || isGalleryPending) return;
+    if (!window.confirm("Tem certeza que deseja remover esta imagem?")) return;
+
+    setGalleryAction(`city-service-${field}`);
+    startGalleryTransition(async () => {
+      if (editingId) {
+        const result = await updateCityServiceAssetImage({
+          serviceId: editingId,
+          field,
+          imageUrl: currentImage,
+          nextUrl: null,
+        });
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        if (!result.ok) {
+          setGalleryAction(null);
+          return;
+        }
+        router.refresh();
+      }
+
+      setForm((current) => ({
+        ...current,
+        [field]: "",
+        ...(field === "photo_url" ? { image_url: "", image_type: "auto" } : {}),
+      }));
+      setGalleryAction(null);
+      setStatus({ type: "success", text: "Imagem removida do serviço." });
+    });
+  }
+
+  function moveCityServiceGalleryImage(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= cityServiceGalleryImages.length || isGalleryPending) return;
+    const images = [...cityServiceGalleryImages];
+    [images[index], images[nextIndex]] = [images[nextIndex], images[index]];
+    updateField("gallery_urls", images.join("\n"));
+    setStatus({
+      type: "idle",
+      text: "Ordem alterada no formulário. Salve a edição para publicar a mudança.",
+    });
+  }
+
+  function removeCityServiceGalleryPhoto(image: string) {
+    if (isGalleryPending || !window.confirm("Tem certeza que deseja remover esta foto?")) return;
+    const nextImages = cityServiceGalleryImages.filter((item) => item !== image);
+    setGalleryAction(image);
+    startGalleryTransition(async () => {
+      if (editingId) {
+        const result = await removeCityServiceGalleryImage({
+          serviceId: editingId,
+          imageUrl: image,
+          gallery_urls: nextImages,
+        });
+        setStatus({ type: result.ok ? "success" : "error", text: result.message });
+        if (!result.ok) {
+          setGalleryAction(null);
+          return;
+        }
+        router.refresh();
+      }
+      setForm((current) => ({
+        ...current,
+        gallery_urls: nextImages.join("\n"),
+        gallery_enabled: nextImages.length > 0,
+      }));
+      setGalleryAction(null);
+    });
+  }
+
   function toggleRestaurantTag(tag: string, checked: boolean) {
     setForm((current) => {
       const tags = new Set(selectedTags(current.tags));
@@ -1767,15 +1780,15 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild type="button" variant="outline">
-            <a href="/admin/relatorios">
+            <a href="/admin/categorias-servicos">
               <ExternalLink className="h-4 w-4" />
-              Relatórios
+              Categorias de serviços
             </a>
           </Button>
           <Button asChild type="button" variant="outline">
-            <a href="/admin/historico-planos">
-              <History className="h-4 w-4" />
-              Planos
+            <a href="/admin/relatorios">
+              <ExternalLink className="h-4 w-4" />
+              Relatórios
             </a>
           </Button>
           <Button type="button" variant="outline" onClick={restoreDefaultContent} disabled={isPending}>
@@ -1855,17 +1868,11 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                 </div>
               ) : null}
 
-              {isCommercialEntity ? (
-                <CommercialPlanEditor
+              {supportsEstablishmentSettings ? (
+                <ContentSettingsEditor
                   entity={entity}
                   form={form}
-                  selectedPlan={selectedPlan}
-                  isApplicable={isCommercialPlanApplicable}
-                  hasIndividualPage={hasIndividualPagePlan}
-                  isGold={isGoldSelected}
                   updateField={updateField}
-                  applyPlanDefaults={applyPlanDefaults}
-                  restorePlanDefaults={restorePlanDefaults}
                 />
               ) : null}
 
@@ -1891,29 +1898,105 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="categoria">Categoria</Label>
-                      <Input
-                        id="categoria"
-                        name="categoria"
-                        value={String(form.categoria || "")}
-                        onChange={(event) => updateField("categoria", event.target.value)}
-                        placeholder="saude, farmacias, postos..."
-                        required
-                      />
+                      <Label htmlFor="categoria">Categoria principal</Label>
+                      {mainServiceCategories.length ? (
+                        <select
+                          id="categoria"
+                          name="categoria"
+                          value={String(form.categoria || "")}
+                          onChange={(event) => {
+                            const category = mainServiceCategories.find(
+                              (item) => item.slug === event.target.value,
+                            );
+                            updateField("categoria", event.target.value);
+                            updateField("category_id", category?.id || "");
+                            updateField("subcategory", "");
+                            updateField("subcategory_id", "");
+                            if (category?.listing_type && category.listing_type !== "mixed") {
+                              updateField("listing_type", category.listing_type);
+                            }
+                          }}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          required
+                        >
+                          <option value="">Selecione uma categoria</option>
+                          {mainServiceCategories.map((category) => (
+                            <option key={category.id} value={category.slug}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="categoria"
+                          name="categoria"
+                          value={String(form.categoria || "")}
+                          onChange={(event) => updateField("categoria", event.target.value)}
+                          placeholder="Cadastre as categorias na área de categorias"
+                          required
+                        />
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="subcategory">Tipo de serviço</Label>
-                      <Input
-                        id="subcategory"
-                        name="subcategory"
-                        value={String(form.subcategory || "")}
-                        onChange={(event) => updateField("subcategory", event.target.value)}
-                        placeholder="Hospital, farmácia, posto..."
-                        required
-                      />
+                      {serviceSubcategories.length ? (
+                        <select
+                          id="subcategory"
+                          name="subcategory"
+                          value={String(form.subcategory || "")}
+                          onChange={(event) => {
+                            const subcategory = serviceSubcategories.find(
+                              (item) => item.name === event.target.value,
+                            );
+                            updateField("subcategory", event.target.value);
+                            updateField("subcategory_id", subcategory?.id || "");
+                          }}
+                          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                          required
+                        >
+                          <option value="">Selecione uma subcategoria</option>
+                          {serviceSubcategories.map((subcategory) => (
+                            <option key={subcategory.id} value={subcategory.name}>
+                              {subcategory.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          id="subcategory"
+                          name="subcategory"
+                          value={String(form.subcategory || "")}
+                          onChange={(event) => {
+                            const subcategory = serviceSubcategories.find(
+                              (item) => item.name === event.target.value,
+                            );
+                            updateField("subcategory", event.target.value);
+                            updateField("subcategory_id", subcategory?.id || "");
+                          }}
+                          placeholder="Cadastre uma subcategoria para a categoria selecionada"
+                          required
+                        />
+                      )}
                     </div>
                   </div>
+                  <input type="hidden" name="category_id" value={selectedServiceCategory?.id || String(form.category_id || "")} />
+                  <input type="hidden" name="subcategory_id" value={selectedServiceSubcategory?.id || String(form.subcategory_id || "")} />
 
+                  <div className="grid gap-2">
+                    <Label htmlFor="full_description">Descrição completa</Label>
+                    <Textarea id="full_description" name="full_description" value={String(form.full_description || "")} onChange={(event) => updateField("full_description", event.target.value)} placeholder="Informações detalhadas para a página individual." className="min-h-28" />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="services_offered">Serviços oferecidos</Label>
+                      <Textarea id="services_offered" name="services_offered" value={String(form.services_offered || "")} onChange={(event) => updateField("services_offered", event.target.value)} placeholder="Um serviço por linha" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="special_status">Status especial</Label>
+                      <Input id="special_status" name="special_status" value={String(form.special_status || "")} onChange={(event) => updateField("special_status", event.target.value)} placeholder="Plantão, atendimento mediante encaminhamento..." />
+                    </div>
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="address">Endereço</Label>
@@ -2027,65 +2110,133 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     </div>
                   </div>
 
-                  {hasIndividualPagePlan || form.listing_type === "public_service" ? (
-                    <>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                          <Label htmlFor="image_url">Imagem</Label>
-                          <Input
-                            id="image_url"
-                            name="image_url"
-                            value={String(form.image_url || "")}
-                            onChange={(event) => updateField("image_url", event.target.value)}
-                            placeholder="/images/servico.jpg ou https://..."
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="logo_url">Logo</Label>
-                          <Input
-                            id="logo_url"
-                            name="logo_url"
-                            value={String(form.logo_url || "")}
-                            onChange={(event) => updateField("logo_url", event.target.value)}
-                            placeholder="/images/logo.png ou https://..."
-                          />
-                        </div>
+                  <section className="grid gap-4 rounded-lg border border-border bg-accent/15 p-4">
+                    <div>
+                      <p className="text-sm font-semibold">Imagens do serviço</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Foto, logo e galeria têm destinos separados. Use apenas imagens próprias ou autorizadas.</p>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Foto do card</Label>
+                        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/50 p-4 text-center hover:bg-background/80">
+                          {isUploading ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <ImagePlus className="mb-2 h-5 w-5" />}
+                          <span className="text-sm font-medium">Enviar foto</span>
+                          <span className="mt-1 text-xs text-muted-foreground">Fachada, entrada ou placa. Exibida com corte proporcional.</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("photo_url", event.target.files); event.target.value = ""; }} />
+                        </label>
+                        <Input name="photo_url" value={String(form.photo_url || "")} onChange={(event) => { updateField("photo_url", event.target.value); updateField("image_url", event.target.value); }} placeholder="URL da foto" />
+                        {isSafePreviewImage(String(form.photo_url || "")) ? (
+                          <div className="flex items-center gap-3 rounded-md border border-border bg-background/60 p-2">
+                            <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md bg-accent">
+                              <NextImage src={String(form.photo_url)} alt="Prévia da foto do serviço" fill sizes="80px" className="object-cover" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs text-muted-foreground">{imageSourceLabel(String(form.photo_url))}</p>
+                              <Button type="button" variant="ghost" size="sm" disabled={isGalleryPending} onClick={() => removeCityServiceAsset("photo_url")}>
+                                {galleryAction === "city-service-photo_url" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Remover foto
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                        <input type="hidden" name="image_url" value={String(form.photo_url || form.image_url || "")} />
                       </div>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="grid gap-2">
-                          <Label htmlFor="tags">Tags</Label>
-                          <Textarea
-                            id="tags"
-                            name="tags"
-                            value={String(form.tags || "")}
-                            onChange={(event) => updateField("tags", event.target.value)}
-                            placeholder="Uma tag por linha"
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="enabled_buttons">Botões habilitados</Label>
-                          <Textarea
-                            id="enabled_buttons"
-                            name="enabled_buttons"
-                            value={String(form.enabled_buttons || "")}
-                            onChange={(event) => updateField("enabled_buttons", event.target.value)}
-                            placeholder={"whatsapp\nmapa\ntelefone"}
-                          />
-                        </div>
+
+                      <div className="grid gap-2">
+                        <Label>Logo oficial</Label>
+                        <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/50 p-4 text-center hover:bg-background/80">
+                          {isUploading ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mb-2 h-5 w-5" />}
+                          <span className="text-sm font-medium">Enviar logo</span>
+                          <span className="mt-1 text-xs text-muted-foreground">Exibida inteira, sem corte, sobre fundo neutro.</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("logo_url", event.target.files); event.target.value = ""; }} />
+                        </label>
+                        <Input name="logo_url" value={String(form.logo_url || "")} onChange={(event) => updateField("logo_url", event.target.value)} placeholder="URL da logo" />
+                        {isSafePreviewImage(String(form.logo_url || "")) ? (
+                          <div className="flex items-center gap-3 rounded-md border border-border bg-background/60 p-2">
+                            <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-md bg-white">
+                              <NextImage src={String(form.logo_url)} alt="Prévia da logo do serviço" fill sizes="80px" className="object-contain p-1" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs text-muted-foreground">{imageSourceLabel(String(form.logo_url))}</p>
+                              <Button type="button" variant="ghost" size="sm" disabled={isGalleryPending} onClick={() => removeCityServiceAsset("logo_url")}>
+                                {galleryAction === "city-service-logo_url" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                Remover logo
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Tipo de imagem do card</Label>
+                        <Select value={String(form.image_type || "auto")} onValueChange={(value) => updateField("image_type", value)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Automático: foto antes da logo</SelectItem>
+                            <SelectItem value="photo">Foto</SelectItem>
+                            <SelectItem value="logo">Logo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <input type="hidden" name="image_type" value={String(form.image_type || "auto")} />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="important_message">Mensagem importante</Label>
-                        <Textarea
-                          id="important_message"
-                          name="important_message"
-                          value={String(form.important_message || "")}
-                          onChange={(event) => updateField("important_message", event.target.value)}
-                          placeholder="Aviso ou informação essencial para o visitante."
-                        />
+                        <Label htmlFor="alt_text">Texto alternativo da imagem</Label>
+                        <Input id="alt_text" name="alt_text" value={String(form.alt_text || "")} onChange={(event) => updateField("alt_text", event.target.value)} placeholder="Fachada da Farmácia..." />
                       </div>
-                    </>
-                  ) : null}
+                    </div>
 
+                    <div className="grid gap-2">
+                      <Label>Fotos da galeria da página individual</Label>
+                      <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/50 p-4 text-center hover:bg-background/80">
+                        <ImagePlus className="mb-2 h-5 w-5" />
+                        <span className="text-sm font-medium">Adicionar fotos à galeria</span>
+                        <span className="mt-1 text-xs text-muted-foreground">Até 5 arquivos por envio. A seção só aparece quando estiver ativada e possuir fotos.</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("gallery_urls", event.target.files); event.target.value = ""; }} />
+                      </label>
+                      <Textarea name="gallery_urls" value={String(form.gallery_urls || "")} onChange={(event) => updateField("gallery_urls", event.target.value)} placeholder="Uma URL por linha" />
+                      {cityServiceGalleryImages.length ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {cityServiceGalleryImages.map((image, index) => (
+                            <div key={image} className="flex items-center gap-2 rounded-md border border-border bg-background/60 p-2">
+                              <div className="relative h-14 w-16 shrink-0 overflow-hidden rounded-md bg-accent">
+                                <NextImage src={image} alt={`Foto ${index + 1} da galeria`} fill sizes="64px" className="object-cover" />
+                              </div>
+                              <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
+                                <Button type="button" variant="ghost" size="icon" disabled={index === 0 || isGalleryPending} onClick={() => moveCityServiceGalleryImage(index, -1)} aria-label="Mover foto para cima">
+                                  <ArrowUp className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" disabled={index === cityServiceGalleryImages.length - 1 || isGalleryPending} onClick={() => moveCityServiceGalleryImage(index, 1)} aria-label="Mover foto para baixo">
+                                  <ArrowDown className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" disabled={isGalleryPending} onClick={() => removeCityServiceGalleryPhoto(image)} aria-label="Remover foto da galeria">
+                                  {galleryAction === image ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="tags">Palavras-chave</Label>
+                      <Textarea id="tags" name="tags" value={String(form.tags || "")} onChange={(event) => updateField("tags", event.target.value)} placeholder="Uma palavra por linha" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="enabled_buttons">Botões habilitados</Label>
+                      <Textarea id="enabled_buttons" name="enabled_buttons" value={String(form.enabled_buttons || "")} onChange={(event) => updateField("enabled_buttons", event.target.value)} placeholder={"whatsapp\nmapa\ntelefone"} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="public_notice">Aviso público</Label>
+                    <Textarea id="public_notice" name="public_notice" value={String(form.public_notice || "")} onChange={(event) => updateField("public_notice", event.target.value)} placeholder="Informação importante que será exibida ao visitante." />
+                  </div>
                   <BusinessHoursEditor
                     value={form.business_hours}
                     onChange={(value) => updateField("business_hours", value)}
@@ -2114,6 +2265,35 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     </label>
                   </div>
 
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="sort_order">Ordem manual</Label>
+                      <Input id="sort_order" name="sort_order" type="number" min="0" value={String(form.sort_order || "")} onChange={(event) => updateField("sort_order", event.target.value)} placeholder="Opcional" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="last_confirmed_at">Data da confirmação</Label>
+                      <Input id="last_confirmed_at" name="last_confirmed_at" type="date" value={String(form.last_confirmed_at || "")} onChange={(event) => updateField("last_confirmed_at", event.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex items-start gap-3 rounded-md border border-border bg-accent/20 p-3 text-sm">
+                      <input type="checkbox" name="is_published" checked={Boolean(form.is_published)} onChange={(event) => updateField("is_published", event.target.checked)} className="mt-0.5 h-4 w-4" />
+                      <span><strong className="block">Publicado</strong><span className="text-xs text-muted-foreground">Somente itens ativos e publicados aparecem no guia.</span></span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-md border border-border bg-accent/20 p-3 text-sm">
+                      <input type="checkbox" name="details_enabled" checked={Boolean(form.details_enabled)} onChange={(event) => updateField("details_enabled", event.target.checked)} className="mt-0.5 h-4 w-4" />
+                      <span><strong className="block">Página individual</strong><span className="text-xs text-muted-foreground">Mostra o botão Ver detalhes e habilita /servicos/[slug].</span></span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-md border border-border bg-accent/20 p-3 text-sm">
+                      <input type="checkbox" name="gallery_enabled" checked={Boolean(form.gallery_enabled)} onChange={(event) => updateField("gallery_enabled", event.target.checked)} className="mt-0.5 h-4 w-4" />
+                      <span><strong className="block">Galeria ativa</strong><span className="text-xs text-muted-foreground">Só é exibida quando também houver fotos.</span></span>
+                    </label>
+                    <label className="flex items-start gap-3 rounded-md border border-border bg-accent/20 p-3 text-sm">
+                      <input type="checkbox" name="is_24h" checked={Boolean(form.is_24h)} onChange={(event) => updateField("is_24h", event.target.checked)} className="mt-0.5 h-4 w-4" />
+                      <span><strong className="block">Atendimento 24 horas</strong><span className="text-xs text-muted-foreground">Use apenas quando a informação estiver confirmada.</span></span>
+                    </label>
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="notes">Observações</Label>
                     <Textarea
@@ -2138,6 +2318,21 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       onChange={(event) => updateField("localizacao", event.target.value)}
                       required
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="info_url">Link externo do botão Saiba mais</Label>
+                    <Input
+                      id="info_url"
+                      name="info_url"
+                      type="url"
+                      inputMode="url"
+                      value={String(form.info_url || "")}
+                      onChange={(event) => updateField("info_url", event.target.value)}
+                      placeholder="https://pt.wikipedia.org/wiki/..."
+                    />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Cole uma página confiável com mais informações sobre o ponto turístico. Se ficar vazio, o portal usará uma pesquisa externa pelo nome do local.
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="imagem_url">Imagem principal e fotos adicionais</Label>
@@ -2328,7 +2523,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
-                  {isGoldSelected ? (
                   <div className="grid gap-2">
                     <Label htmlFor="historia">História / texto completo</Label>
                     <Textarea
@@ -2339,7 +2533,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Texto maior para a seção Sobre a hospedagem."
                     />
                   </div>
-                  ) : <input type="hidden" name="historia" value={String(form.historia || "")} />}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="localizacao">Localização</Label>
@@ -2500,8 +2693,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                   </div>
                   <MediaDestinationGuide
                     kind="lodging"
-                    plan={selectedPlan}
-                    carouselLimit={Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit}
                   />
                   <div className="grid gap-2">
                     <Label htmlFor="hero_image_url">1. Foto principal da página</Label>
@@ -2652,7 +2843,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {isUploading ? "Enviando imagens..." : "Selecionar fotos para a galeria"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        A primeira foto será a capa do card. No Prata, todas aparecem apenas na galeria. No Ouro, as primeiras fotos também formam o carrossel conforme a ordem abaixo.
+                        A primeira foto sera a capa do card. As demais alimentam a galeria e, quando ativo, o carrossel conforme a ordem abaixo.
                       </span>
                       <input
                         type="file"
@@ -2678,7 +2869,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold">
-                              {selectedPlan === "gold" ? "Galeria e ordem do carrossel" : "Fotos da galeria"}
+                              Galeria e ordem do carrossel
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                               A primeira foto é a capa da listagem. A foto principal da página usa o campo separado acima.
@@ -2719,7 +2910,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold">Foto {index + 1}</p>
-                                      {selectedPlan === "gold" && index < (Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit) ? (
+                                      {Boolean(form.carousel_enabled) && index < 10 ? (
                                         <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-alpine-wine">
                                           Carrossel · posição {index + 1}
                                         </p>
@@ -2907,7 +3098,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       />
                     </div>
                   </div>
-                  {hasIndividualPagePlan ? (
                   <div className="grid gap-2">
                     <Label htmlFor="descricao_completa">Descrição completa</Label>
                     <Textarea
@@ -2918,7 +3108,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                       placeholder="Texto maior para a seção Sobre da página individual."
                     />
                   </div>
-                  ) : <input type="hidden" name="descricao_completa" value={String(form.descricao_completa || "")} />}
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
                       <Label htmlFor="horario_funcionamento">Horário</Label>
@@ -3045,8 +3234,6 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                   </div>
                   <MediaDestinationGuide
                     kind="restaurant"
-                    plan={selectedPlan}
-                    carouselLimit={Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit}
                   />
                   <div className="grid gap-2">
                     <Label htmlFor="imagem_url">1. Foto principal / capa do card</Label>
@@ -3060,7 +3247,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {isUploading ? "Enviando imagem..." : "Selecionar foto principal"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        Esta é a imagem principal do card. No Ouro, ela também será a primeira imagem do carrossel.
+                        Esta e a imagem principal do card e a primeira imagem do carrossel quando ele estiver ativo.
                       </span>
                       <input
                         type="file"
@@ -3160,7 +3347,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         {isUploading ? "Enviando imagens..." : "Selecionar fotos para a galeria"}
                       </span>
                       <span className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
-                        Use fotos de pratos, ambiente ou fachada. No Prata, elas aparecem na galeria. No Ouro, as primeiras também entram no carrossel conforme a ordem abaixo.
+                        Use fotos de pratos, ambiente ou fachada. Elas aparecem na galeria e entram no carrossel conforme a ordem abaixo.
                       </span>
                       <input
                         type="file"
@@ -3186,7 +3373,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold">
-                              {selectedPlan === "gold" ? "Galeria e ordem do carrossel" : "Fotos da galeria"}
+                              Galeria e ordem do carrossel
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                               A foto principal aparece primeiro. Use as setas para organizar a galeria.
@@ -3227,7 +3414,7 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                                   <div className="flex flex-col justify-between gap-2 lg:flex-row lg:items-start">
                                     <div className="min-w-0">
                                       <p className="text-sm font-semibold">Foto {index + 1}</p>
-                                      {selectedPlan === "gold" && index < (Number(form.carousel_photo_limit) || planDefinitions.gold.defaultCarouselPhotoLimit) ? (
+                                      {Boolean(form.carousel_enabled) && index < 10 ? (
                                         <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-alpine-wine">
                                           Carrossel · posição {index + 1}
                                         </p>
@@ -3400,12 +3587,21 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
           <CardHeader>
             <CardTitle>{entityLabels[entity]} cadastrados</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {rows.length} item{rows.length === 1 ? "" : "s"} encontrado{rows.length === 1 ? "" : "s"}.
+              {filteredRows.length} item{filteredRows.length === 1 ? "" : "s"} encontrado{filteredRows.length === 1 ? "" : "s"}.
             </p>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {rows.length ? (
-              rows.map((row) => (
+            {entity === "city_services" ? (
+              <Input
+                type="search"
+                value={adminSearch}
+                onChange={(event) => setAdminSearch(event.target.value)}
+                placeholder="Buscar serviço por nome, categoria ou endereço"
+                aria-label="Buscar serviços cadastrados"
+              />
+            ) : null}
+            {filteredRows.length ? (
+              filteredRows.map((row) => (
                 <div
                   key={row.id}
                   className="flex flex-col justify-between gap-4 rounded-md border border-border bg-background/60 p-4 md:flex-row md:items-center"
@@ -3420,6 +3616,12 @@ export function AdminDashboard({ initialData }: { initialData: AdminData }) {
                     <p className="mt-1 text-sm text-muted-foreground">{rowSummary(entity, row)}</p>
                   </div>
                   <div className="flex gap-2">
+                    {entity === "city_services" ? (
+                      <Button type="button" variant="outline" size="sm" onClick={() => duplicateRow(row)}>
+                        <Copy className="h-4 w-4" />
+                        Duplicar
+                      </Button>
+                    ) : null}
                     <Button type="button" variant="outline" size="sm" onClick={() => editRow(row)}>
                       <Edit3 className="h-4 w-4" />
                       Editar

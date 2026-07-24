@@ -13,7 +13,6 @@ type LodgingGalleryProps = {
   name: string;
   entityId?: string;
   category?: string;
-  planType?: string;
 };
 
 type ImageSize = {
@@ -23,7 +22,7 @@ type ImageSize = {
 
 const fallbackImage = "/images/cerro-cora.jpg";
 
-export function LodgingGallery({ images, name, entityId, category, planType }: LodgingGalleryProps) {
+export function LodgingGallery({ images, name, entityId, category }: LodgingGalleryProps) {
   const uniqueImages = useMemo(
     () => Array.from(new Set(images.map((image) => image.trim()).filter(Boolean))),
     [images],
@@ -90,9 +89,8 @@ export function LodgingGallery({ images, name, entityId, category, planType }: L
       eventType,
       establishmentName: name,
       category,
-      planType,
     });
-  }, [category, entityId, name, planType]);
+  }, [category, entityId, name]);
 
   const goToPrevious = useCallback(() => {
     trackGalleryInteraction("carousel_click");

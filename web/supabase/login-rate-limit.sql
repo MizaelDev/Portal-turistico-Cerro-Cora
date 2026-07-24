@@ -21,8 +21,8 @@ as $$
 declare
   attempt_row public.login_rate_limits%rowtype;
 begin
-  if p_identifier is null or length(trim(p_identifier)) = 0 then
-    return false;
+  if p_identifier is null or p_identifier !~ '^[0-9a-f]{64}$' then
+    return true;
   end if;
 
   delete from public.login_rate_limits
@@ -32,7 +32,7 @@ begin
   values (
     p_identifier,
     1,
-    now() + make_interval(secs => greatest(p_window_seconds, 60)),
+    now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600))),
     now()
   )
   on conflict (identifier) do update
@@ -43,13 +43,14 @@ begin
     end,
     reset_at = case
       when public.login_rate_limits.reset_at <= now()
-        then now() + make_interval(secs => greatest(p_window_seconds, 60))
+        then now() + make_interval(secs => greatest(60, least(p_window_seconds, 3600)))
       else public.login_rate_limits.reset_at
     end,
     updated_at = now()
   returning * into attempt_row;
 
-  return attempt_row.reset_at > now() and attempt_row.attempts > greatest(p_max_attempts, 1);
+  return attempt_row.reset_at > now()
+    and attempt_row.attempts > greatest(3, least(p_max_attempts, 20));
 end;
 $$;
 
@@ -66,7 +67,7 @@ $$;
 revoke all on function public.check_login_rate_limit(text, integer, integer) from public;
 revoke all on function public.clear_login_rate_limit(text) from public;
 grant execute on function public.check_login_rate_limit(text, integer, integer) to anon, authenticated;
-grant execute on function public.clear_login_rate_limit(text) to anon, authenticated;
+grant execute on function public.clear_login_rate_limit(text) to authenticated;
 
 alter table public.login_rate_limits enable row level security;
 revoke all on public.login_rate_limits from anon, authenticated;

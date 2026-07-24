@@ -1,5 +1,3 @@
-import type { CommercialFeatures } from "@/lib/commercial";
-
 export type AnalyticsEntityType = "restaurant" | "lodging" | "city_service";
 export type AnalyticsEventType =
   | "card_view"
@@ -13,30 +11,21 @@ export type AnalyticsEventType =
   | "details_click"
   | "gallery_click"
   | "carousel_click"
+  | "share_click"
   | "cta_click";
 
 export type AnalyticsEntity = {
   id: string;
   name: string;
   category: string;
-  plan: "bronze" | "silver" | "gold" | "public_service";
-  features: CommercialFeatures;
 };
 
 export function isAnalyticsEventAllowed(
   eventType: AnalyticsEventType,
   entity: AnalyticsEntity,
 ) {
-  if (eventType === "page_view" || eventType === "details_click") {
-    return entity.features.individualPage;
-  }
-  if (eventType === "gallery_click") return entity.features.gallery;
-  if (eventType === "carousel_click") return entity.features.carousel;
-  if (eventType === "reserve_click") return entity.features.bookingButton;
-  if (eventType === "instagram_click") return entity.features.instagram;
-  if (eventType === "whatsapp_click") return entity.features.whatsapp;
-  if (eventType === "map_click") return entity.features.maps;
-
+  void eventType;
+  void entity;
   return true;
 }
 

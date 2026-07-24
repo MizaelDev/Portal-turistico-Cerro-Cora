@@ -11,7 +11,6 @@ type TrackViewProps = {
   className?: string;
   establishmentName?: string;
   category?: string;
-  planType?: string;
 };
 
 export function TrackView({
@@ -22,7 +21,6 @@ export function TrackView({
   className,
   establishmentName,
   category,
-  planType,
 }: TrackViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const sentRef = useRef(false);
@@ -40,7 +38,6 @@ export function TrackView({
         eventType,
         establishmentName,
         category,
-        planType,
       }, { dedupe: "session" });
     };
 
@@ -56,7 +53,7 @@ export function TrackView({
 
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [category, entityId, entityType, establishmentName, eventType, planType]);
+  }, [category, entityId, entityType, establishmentName, eventType]);
 
   return (
     <div ref={ref} className={className}>

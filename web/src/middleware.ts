@@ -2,6 +2,34 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isSupabaseConfigured, supabaseAnonKey, supabaseUrl } from "@/lib/supabase";
 
+function getAdminSessionMaxMs() {
+  const configuredHours = Number(process.env.ADMIN_SESSION_MAX_HOURS || 12);
+  const hours = Number.isFinite(configuredHours)
+    ? Math.min(Math.max(configuredHours, 1), 168)
+    : 12;
+
+  return hours * 60 * 60 * 1000;
+}
+
+function redirectWithCookies(
+  request: NextRequest,
+  response: NextResponse,
+  pathname: string,
+  params?: Record<string, string>,
+) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+
+  for (const [key, value] of Object.entries(params || {})) {
+    url.searchParams.set(key, value);
+  }
+
+  const redirectResponse = NextResponse.redirect(url);
+  response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+  return redirectResponse;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminRoute = pathname.startsWith("/admin");
@@ -57,13 +85,28 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user && !isLoginRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/login";
-    url.searchParams.set("redirectedFrom", pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(request, response, "/admin/login", {
+      redirectedFrom: pathname,
+    });
   }
 
   if (user) {
+    const signedInAt = Date.parse(user.last_sign_in_at || "");
+    const sessionExpired =
+      Number.isFinite(signedInAt) && Date.now() - signedInAt > getAdminSessionMaxMs();
+
+    if (sessionExpired) {
+      await supabase.auth.signOut();
+
+      if (isLoginRoute) {
+        return response;
+      }
+
+      return redirectWithCookies(request, response, "/admin/login", {
+        expired: "1",
+      });
+    }
+
     const { data: isAdmin, error: adminError } = await supabase.rpc("is_admin", {
       user_id: user.id,
     });
@@ -75,18 +118,14 @@ export async function middleware(request: NextRequest) {
         return response;
       }
 
-      const url = request.nextUrl.clone();
-      url.pathname = "/admin/login";
-      url.searchParams.set("unauthorized", "1");
-      return NextResponse.redirect(url);
+      return redirectWithCookies(request, response, "/admin/login", {
+        unauthorized: "1",
+      });
     }
   }
 
   if (user && isLoginRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    url.search = "";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(request, response, "/admin");
   }
 
   return response;

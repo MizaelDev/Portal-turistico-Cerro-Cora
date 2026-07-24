@@ -13,12 +13,11 @@ type RestaurantGalleryProps = {
   name: string;
   entityId?: string;
   category?: string;
-  planType?: string;
 };
 
 const fallbackImage = "/images/cerro-cora.jpg";
 
-export function RestaurantGallery({ images, name, entityId, category, planType }: RestaurantGalleryProps) {
+export function RestaurantGallery({ images, name, entityId, category }: RestaurantGalleryProps) {
   const uniqueImages = useMemo(
     () => Array.from(new Set(images.map((image) => image.trim()).filter(Boolean))),
     [images],
@@ -46,9 +45,8 @@ export function RestaurantGallery({ images, name, entityId, category, planType }
       eventType,
       establishmentName: name,
       category,
-      planType,
     });
-  }, [category, entityId, name, planType]);
+  }, [category, entityId, name]);
 
   const goToPrevious = useCallback(() => {
     trackGalleryInteraction("carousel_click");

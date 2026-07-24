@@ -207,15 +207,13 @@ export const AttractionCard = memo(function AttractionCard({
           >
             <MapPin className="h-4 w-4 shrink-0 text-alpine-wine" /> {attraction.location}
           </a>
-          <Button asChild className="w-full" variant="outline">
-            <a
-              href={attraction.infoUrl || `/o-que-fazer#${attraction.slug}`}
-              target={attraction.infoUrl ? "_blank" : undefined}
-              rel={attraction.infoUrl ? "noopener noreferrer" : undefined}
-            >
-              Saiba mais <ArrowRight className="h-4 w-4" />
-            </a>
-          </Button>
+          {attraction.infoUrl ? (
+            <Button asChild className="w-full" variant="outline">
+              <a href={attraction.infoUrl} target="_blank" rel="noopener noreferrer">
+                Saiba mais <ArrowRight className="h-4 w-4" />
+              </a>
+            </Button>
+          ) : null}
         </div>
       </div>
     </article>
