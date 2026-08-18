@@ -13,7 +13,7 @@ export const metadata: Metadata = createMetadata({
     "Restaurantes, cafés, bares e lanchonetes em Cerro Corá com horário, WhatsApp, Instagram e localização.",
 });
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 export default async function GastronomyPage() {
   const { items: foodPlaces, error } = await getPublicFoodPlaces();

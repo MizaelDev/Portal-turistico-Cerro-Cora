@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { BusinessStatusBadge } from "@/components/business-status-badge";
+import { EstablishmentLogo } from "@/components/establishment-logo";
 import { FoodCard } from "@/components/food-card";
 import { JsonLd } from "@/components/json-ld";
 import { RestaurantGallery } from "@/components/restaurant-gallery";
@@ -59,7 +60,7 @@ type RestaurantPageProps = {
   }>;
 };
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 const logoImageSignals = ["logo", "marca", "brand", "avatar", "profile"];
 const fallbackHeroImage =
@@ -318,16 +319,12 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
         <div className="container relative z-10 grid min-h-[280px] content-center py-14 md:min-h-[340px] md:py-16">
           <div className="mx-auto grid max-w-4xl justify-items-center gap-4 text-center md:gap-5">
             {logoImage ? (
-              <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2.5 shadow-glass ring-1 ring-black/5 md:h-28 md:w-28 md:p-3">
-                <SafeImage
-                  src={logoImage}
-                  alt={`Logo de ${place.name}`}
-                  fill
-                  priority
-                  sizes="(min-width: 768px) 112px, 80px"
-                  className="object-contain p-2"
-                />
-              </div>
+              <EstablishmentLogo
+                src={logoImage}
+                name={place.name}
+                imageType={isLogoImage(logoImage) ? "logo" : "photo"}
+                priority
+              />
             ) : null}
 
             <h1 className="font-display text-5xl font-semibold leading-[0.95] md:text-7xl">{place.name}</h1>
@@ -352,6 +349,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
                   alt={`Sugestão da casa em ${place.name}`}
                   fill
                   sizes="(min-width: 768px) 220px, 100vw"
+                  quality={88}
                   className="object-cover"
                 />
               </div>

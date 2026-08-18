@@ -32,7 +32,12 @@ const gaMeasurementId =
     ? configuredGaMeasurementId
     : undefined;
 
-export const metadata: Metadata = createMetadata();
+export const metadata: Metadata = {
+  ...createMetadata(),
+  icons: {
+    icon: "/icon.svg?v=2",
+  },
+};
 
 export const viewport: Viewport = {
   width: "device-width",

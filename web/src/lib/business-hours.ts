@@ -467,6 +467,55 @@ export function parseBusinessHours(value: unknown): BusinessHours | null {
   return null;
 }
 
+export function formatBusinessHours(
+  value?: BusinessHours | string | null,
+  fallback?: string | null,
+) {
+  const hours = parseBusinessHours(value) || parseLegacyBusinessHours(fallback);
+
+  if (!hours) return fallback?.trim() || null;
+  if (hours.mode === "24h") return "Atendimento 24 horas";
+  if (hours.mode === "appointment") return "Atendimento mediante agendamento";
+
+  const shortLabels: Record<WeekdayKey, string> = {
+    monday: "Seg",
+    tuesday: "Ter",
+    wednesday: "Qua",
+    thursday: "Qui",
+    friday: "Sex",
+    saturday: "Sáb",
+    sunday: "Dom",
+  };
+  const schedules = weekdays.map((day) => {
+    const schedule = hours.days?.[day];
+    const firstPeriod = schedule?.open && schedule?.close
+      ? `${schedule.open} às ${schedule.close}`
+      : "Fechado";
+    const secondPeriod = schedule?.secondOpen && schedule?.secondClose
+      ? ` · ${schedule.secondOpen} às ${schedule.secondClose}`
+      : "";
+
+    return { day, value: `${firstPeriod}${secondPeriod}` };
+  });
+
+  const groups: Array<{ start: WeekdayKey; end: WeekdayKey; value: string }> = [];
+  for (const schedule of schedules) {
+    const previous = groups.at(-1);
+    if (previous && previous.value === schedule.value) {
+      previous.end = schedule.day;
+    } else {
+      groups.push({ start: schedule.day, end: schedule.day, value: schedule.value });
+    }
+  }
+
+  return groups
+    .map(({ start, end, value }) =>
+      start === end
+        ? `${shortLabels[start]}: ${value}`
+        : `${shortLabels[start]} a ${shortLabels[end]}: ${value}`,
+    )
+    .join(" | ");
+}
 export function serializeBusinessHours(value?: BusinessHours | null) {
   return JSON.stringify(normalizeBusinessHours(value) || { mode: "regular", days: {} });
 }

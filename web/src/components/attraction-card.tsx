@@ -5,6 +5,7 @@ import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, Images, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAdjacentImagePreload } from "@/hooks/use-adjacent-image-preload";
 import type { Attraction } from "@/lib/data";
 import { googleMapsSearchUrl } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,14 @@ export const AttractionCard = memo(function AttractionCard({
   const hasCarousel = images.length > 1;
   const isActiveLoaded = loadedImages.has(activeSrc);
 
+  useAdjacentImagePreload({
+    images,
+    activeIndex: visibleIndex,
+    sizes: imageSizes,
+    quality: 76,
+    enabled: hasCarousel,
+  });
+
   const showPreviousImage = useCallback(() => {
     setCurrentImage((current) => (current === 0 ? images.length - 1 : current - 1));
   }, [images.length]);
@@ -73,17 +82,6 @@ export const AttractionCard = memo(function AttractionCard({
       return next;
     });
   }, []);
-
-  const preloadImages = useMemo(() => {
-    if (!hasCarousel) return [];
-
-    const previous = visibleIndex === 0 ? images.length - 1 : visibleIndex - 1;
-    const next = (visibleIndex + 1) % images.length;
-
-    return uniqueImages([images[previous], images[next]]).filter(
-      (image) => image !== activeImage && !failedImages.has(image),
-    );
-  }, [activeImage, failedImages, hasCarousel, images, visibleIndex]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     pointerStartX.current = event.clientX;
@@ -134,21 +132,6 @@ export const AttractionCard = memo(function AttractionCard({
           onLoad={() => markLoaded(activeSrc)}
           onError={() => markFailed(activeImage)}
         />
-        {preloadImages.map((image) => (
-          <Image
-            key={`preload-${image}`}
-            src={image}
-            alt=""
-            width={32}
-            height={24}
-            sizes="32px"
-            loading="lazy"
-            aria-hidden="true"
-            className="pointer-events-none absolute h-px w-px opacity-0"
-            onLoad={() => markLoaded(image)}
-            onError={() => markFailed(image)}
-          />
-        ))}
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 to-transparent" />
         <div className="absolute left-4 top-4">
           <Badge className="bg-white/86 backdrop-blur">{attraction.category}</Badge>

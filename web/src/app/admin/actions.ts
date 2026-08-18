@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
@@ -8,6 +8,7 @@ import {
   foodPlaces as defaultFoodPlaces,
   lodgings as defaultLodgings,
 } from "@/lib/data";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { parseBusinessHours, parseLegacyBusinessHours, type BusinessHours } from "@/lib/business-hours";
 import { assertSameOriginRequest } from "@/lib/server-request-security";
@@ -30,6 +31,12 @@ const maxUploadFiles = 5;
 const maxGalleryImages = 60;
 const allowedExternalImageHosts = ["images.unsplash.com", "images.pexels.com"];
 const adminEntitySchema = z.enum(["pontos_turisticos", "pousadas", "restaurantes", "city_services"]);
+const orderableAdminEntitySchema = z.enum(["pousadas", "restaurantes", "city_services"]);
+const displayOrderIdsSchema = z
+  .array(z.string().uuid("Identificador inválido."))
+  .min(1)
+  .max(500)
+  .refine((ids) => new Set(ids).size === ids.length, "A lista de posições contém itens duplicados.");
 const uuidSchema = z.string().uuid("Identificador invÃ¡lido.");
 
 function isHttpsUrl(value: string) {
@@ -177,6 +184,11 @@ const businessHoursSchema: z.ZodType<BusinessHours | null> = z
   .strict()
   .nullable();
 
+const optionalIsoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida.")
+  .nullable();
+
 const pontoTuristicoSchema = z.object({
   nome: requiredText(2, 160, "Informe o nome."),
   descricao: requiredText(10, 5000, "Informe uma descrição mais completa."),
@@ -220,9 +232,25 @@ const pousadaSchema = z.object({
   diferenciais: textListSchema(60).default([]),
   diferencial_principal: optionalTextSchema(300),
   aceita_reservas: z.boolean(),
+  reservation_availability: z.enum(["available", "limited", "unavailable", "consult"]).nullable(),
+  reservation_availability_note: optionalTextSchema(240),
+  reservation_availability_start: optionalIsoDateSchema,
+  reservation_availability_end: optionalIsoDateSchema,
   whatsapp_message: optionalTextSchema(800),
   site_url: optionalUrl,
   ativo: z.boolean(),
+}).superRefine((data, context) => {
+  if (
+    data.reservation_availability_start &&
+    data.reservation_availability_end &&
+    data.reservation_availability_start > data.reservation_availability_end
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["reservation_availability_end"],
+      message: "A data de término deve ser igual ou posterior à data de início.",
+    });
+  }
 });
 
 const restauranteSchema = z.object({
@@ -293,8 +321,14 @@ const cityServiceSchema = z.object({
   image_type: z.enum(["photo", "logo", "auto"]).default("auto"),
   alt_text: optionalTextSchema(240),
   details_enabled: z.boolean(),
+  cover_url: optionalPathOrUrl,
   gallery_enabled: z.boolean(),
   gallery_urls: z.array(pathOrUrl).max(maxGalleryImages).default([]),
+  gallery_alt_texts: z.array(z.string().trim().max(240)).max(maxGalleryImages).default([]),
+  differentials: textListSchema(60).default([]),
+  additional_information: optionalTextSchema(4000),
+  seo_title: optionalTextSchema(120),
+  seo_description: optionalTextSchema(320),
   is_published: z.boolean(),
   sort_order: z.number().int().min(0).nullable(),
   last_confirmed_at: z.string().trim().max(40).nullable(),
@@ -347,7 +381,7 @@ const restaurantAssetSchema = z.object({
 
 const cityServiceAssetSchema = z.object({
   serviceId: z.string().uuid("Serviço inválido.").nullable().optional(),
-  field: z.enum(["photo_url", "logo_url"]),
+  field: z.enum(["photo_url", "logo_url", "cover_url"]),
   imageUrl: pathOrUrl.nullable(),
   nextUrl: optionalPathOrUrl,
 });
@@ -356,6 +390,8 @@ const removeCityServiceImageSchema = z.object({
   serviceId: z.string().uuid("Serviço inválido.").nullable().optional(),
   imageUrl: pathOrUrl,
   gallery_urls: z.array(pathOrUrl).max(maxGalleryImages).default([]),
+  gallery_alt_texts: z.array(z.string().trim().max(240)).max(maxGalleryImages).default([]),
+  cover_url: optionalPathOrUrl,
 });
 
 const lodgingGallerySchema = z.object({
@@ -400,6 +436,18 @@ function textList(value: FormDataEntryValue | null) {
     .split(/[\n,]+/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function orderedTextList(value: FormDataEntryValue | null) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim());
+  } catch {
+    // Mantem compatibilidade com valores antigos separados por linha.
+  }
+  return text.split(/\n/).map((item) => item.trim());
 }
 
 function uniqueImageList(images: string[]) {
@@ -494,8 +542,14 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
       image_type: formData.get("image_type") || "auto",
       alt_text: optionalText(formData.get("alt_text")),
       details_enabled: formData.get("details_enabled") === "on",
+      cover_url: optionalText(formData.get("cover_url")),
       gallery_enabled: formData.get("gallery_enabled") === "on",
       gallery_urls: imageList(formData.get("gallery_urls")),
+      gallery_alt_texts: orderedTextList(formData.get("gallery_alt_texts")),
+      differentials: textList(formData.get("differentials")),
+      additional_information: optionalText(formData.get("additional_information")),
+      seo_title: optionalText(formData.get("seo_title")),
+      seo_description: optionalText(formData.get("seo_description")),
       is_published: formData.get("is_published") === "on",
       sort_order: optionalNumber(formData.get("sort_order")),
       last_confirmed_at: optionalText(formData.get("last_confirmed_at")),
@@ -546,6 +600,10 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
       diferenciais: formData.getAll("diferenciais").map((item) => String(item).trim()).filter(Boolean),
       diferencial_principal: optionalText(formData.get("diferencial_principal")),
       aceita_reservas: formData.get("aceita_reservas") === "on",
+      reservation_availability: optionalText(formData.get("reservation_availability")),
+      reservation_availability_note: optionalText(formData.get("reservation_availability_note")),
+      reservation_availability_start: optionalText(formData.get("reservation_availability_start")),
+      reservation_availability_end: optionalText(formData.get("reservation_availability_end")),
       whatsapp_message: optionalText(formData.get("whatsapp_message")),
       site_url: optionalText(formData.get("site_url")),
       ativo: formData.get("ativo") === "on",
@@ -587,12 +645,19 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
 
 function revalidatePublicPages() {
   revalidatePath("/admin");
+  revalidateTag(PUBLIC_CACHE_TAGS.attractions);
+  revalidateTag(PUBLIC_CACHE_TAGS.lodgings);
+  revalidateTag(PUBLIC_CACHE_TAGS.restaurants);
+  revalidateTag(PUBLIC_CACHE_TAGS.cityServices);
+  revalidateTag(PUBLIC_CACHE_TAGS.serviceCategories);
+  revalidateTag(PUBLIC_CACHE_TAGS.routeLeaflet);
   revalidatePath("/o-que-fazer");
   revalidatePath("/pousadas");
   revalidatePath("/pousadas/[slug]", "page");
   revalidatePath("/gastronomia");
   revalidatePath("/restaurantes/[slug]", "page");
   revalidatePath("/servicos");
+  revalidatePath("/servicos/[slug]", "page");
   revalidatePath("/");
 }
 
@@ -656,6 +721,123 @@ async function insertOrUpdateByName(
   return supabase.from(table).insert(payload as never);
 }
 
+type OrderableAdminEntity = z.infer<typeof orderableAdminEntitySchema>;
+
+function displayOrderColumn(entity: OrderableAdminEntity) {
+  return entity === "city_services" ? "sort_order" : "featured_order";
+}
+
+async function persistDisplayOrder(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  entity: OrderableAdminEntity,
+  orderedIds: string[],
+) {
+  const orderColumn = displayOrderColumn(entity);
+  const batchSize = 20;
+
+  for (let offset = 0; offset < orderedIds.length; offset += batchSize) {
+    const batch = orderedIds.slice(offset, offset + batchSize);
+    const results = await Promise.all(
+      batch.map((id, index) =>
+        supabase
+          .from(entity)
+          .update({ [orderColumn]: offset + index + 1 } as never)
+          .eq("id", id),
+      ),
+    );
+    const failed = results.find((result) => result.error);
+    if (failed?.error) return failed.error;
+  }
+
+  return null;
+}
+
+async function normalizeRequestedDisplayOrder(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  entity: OrderableAdminEntity,
+  preferredId: string,
+  requestedOrder: number,
+) {
+  const orderColumn = displayOrderColumn(entity);
+  const nameColumn = entity === "city_services" ? "name" : "nome";
+  const { data, error } = await supabase
+    .from(entity)
+    .select("id," + nameColumn + "," + orderColumn)
+    .limit(500);
+
+  if (error) return error;
+
+  const rows = ((data || []) as unknown as Array<Record<string, unknown>>)
+    .filter((row) => typeof row.id === "string")
+    .sort((first, second) => {
+      const firstOrder =
+        typeof first[orderColumn] === "number"
+          ? Number(first[orderColumn])
+          : Number.MAX_SAFE_INTEGER;
+      const secondOrder =
+        typeof second[orderColumn] === "number"
+          ? Number(second[orderColumn])
+          : Number.MAX_SAFE_INTEGER;
+      const orderDifference = firstOrder - secondOrder;
+      if (orderDifference) return orderDifference;
+      return String(first[nameColumn] || "").localeCompare(
+        String(second[nameColumn] || ""),
+        "pt-BR",
+      );
+    });
+
+  const preferred = rows.find((row) => row.id === preferredId);
+  if (!preferred) return new Error("O item salvo não foi encontrado para organizar a posição.");
+
+  const remainingIds = rows
+    .filter((row) => row.id !== preferredId)
+    .map((row) => String(row.id));
+  const targetIndex = Math.max(0, Math.min(requestedOrder - 1, remainingIds.length));
+  remainingIds.splice(targetIndex, 0, preferredId);
+
+  return persistDisplayOrder(supabase, entity, remainingIds);
+}
+
+export async function saveAdminDisplayOrder(
+  entity: OrderableAdminEntity,
+  orderedIds: string[],
+): Promise<ActionResult> {
+  try {
+    await assertSameOrigin();
+    const supabase = await requireAdmin();
+    const safeEntity = orderableAdminEntitySchema.parse(entity);
+    const safeIds = displayOrderIdsSchema.parse(orderedIds);
+
+    const { data, error: readError } = await supabase
+      .from(safeEntity)
+      .select("id")
+      .in("id", safeIds);
+
+    if (readError) {
+      logAdminError("display-order-read", readError);
+      return { ok: false, message: "Não foi possível validar os itens antes de salvar a ordem." };
+    }
+
+    if ((data || []).length !== safeIds.length) {
+      return { ok: false, message: "A lista mudou. Atualize o painel e tente novamente." };
+    }
+
+    const error = await persistDisplayOrder(supabase, safeEntity, safeIds);
+    if (error) {
+      logAdminError("display-order-save", error);
+      return { ok: false, message: "Não foi possível salvar todas as posições." };
+    }
+
+    revalidatePublicPages();
+    return { ok: true, message: "Ordem de exibição salva com sucesso." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, message: error.errors[0]?.message || "Ordem inválida." };
+    }
+    logAdminError("display-order", error);
+    return { ok: false, message: "Não foi possível salvar a ordem de exibição." };
+  }
+}
 export async function saveAdminItem(
   entity: AdminEntity,
   id: string | null,
@@ -768,6 +950,29 @@ export async function saveAdminItem(
       };
     }
 
+    if (
+      safeEntity === "restaurantes" ||
+      safeEntity === "pousadas" ||
+      safeEntity === "city_services"
+    ) {
+      const orderColumn = displayOrderColumn(safeEntity);
+      const requestedOrder = (payload as Record<string, unknown>)[orderColumn];
+      if (typeof requestedOrder === "number") {
+        const orderError = await normalizeRequestedDisplayOrder(
+          supabase,
+          safeEntity,
+          data.id,
+          requestedOrder,
+        );
+        if (orderError) {
+          logAdminError("display-order-normalize", orderError);
+          return {
+            ok: false,
+            message: "O item foi salvo, mas não foi possível reorganizar as posições. Use o botão Salvar ordem.",
+          };
+        }
+      }
+    }
     revalidatePublicPages();
     const savedName = "nome" in data ? data.nome : data.name;
 
@@ -1116,12 +1321,14 @@ export async function updateCityServiceAssetImage(input: unknown): Promise<Actio
         return { ok: false, message: "Não foi possível localizar o serviço antes de alterar a imagem." };
       }
 
-      const currentAsset = currentRow as { photo_url?: string | null; logo_url?: string | null };
+      const currentAsset = currentRow as { photo_url?: string | null; logo_url?: string | null; cover_url?: string | null };
       previousValue = String(currentAsset[payload.field] || "") || null;
       const updatePayload =
         payload.field === "photo_url"
           ? { photo_url: payload.nextUrl, image_url: payload.nextUrl }
-          : { logo_url: payload.nextUrl };
+          : payload.field === "logo_url"
+            ? { logo_url: payload.nextUrl }
+            : { cover_url: payload.nextUrl };
       const { error: updateError } = await supabase
         .from("city_services")
         .update(updatePayload)
@@ -1143,7 +1350,9 @@ export async function updateCityServiceAssetImage(input: unknown): Promise<Actio
           const rollbackPayload =
             payload.field === "photo_url"
               ? { photo_url: previousValue, image_url: previousValue }
-              : { logo_url: previousValue };
+              : payload.field === "logo_url"
+                ? { logo_url: previousValue }
+                : { cover_url: previousValue };
           await supabase
             .from("city_services")
             .update(rollbackPayload)
@@ -1157,6 +1366,7 @@ export async function updateCityServiceAssetImage(input: unknown): Promise<Actio
       }
     }
 
+    revalidateTag(PUBLIC_CACHE_TAGS.cityServices);
     revalidatePath("/admin");
     revalidatePath("/servicos");
     return { ok: true, message: "Imagem do serviço atualizada com sucesso." };
@@ -1176,11 +1386,13 @@ export async function removeCityServiceGalleryImage(input: unknown): Promise<Act
     const gallery = uniqueImageList(payload.gallery_urls);
     const storagePath = storagePathFromPublicUrl(payload.imageUrl);
     let previousGallery: string[] = [];
+    let previousAltTexts: string[] = [];
+    let previousCoverUrl: string | null = null;
 
     if (payload.serviceId) {
       const { data: currentRow, error: currentError } = await supabase
         .from("city_services")
-        .select("gallery_urls")
+        .select("gallery_urls,gallery_alt_texts,cover_url")
         .eq("id", payload.serviceId)
         .single();
       if (currentError || !currentRow) {
@@ -1188,9 +1400,11 @@ export async function removeCityServiceGalleryImage(input: unknown): Promise<Act
         return { ok: false, message: "Não foi possível localizar o serviço antes de remover a foto." };
       }
       previousGallery = (currentRow.gallery_urls || []) as string[];
+      previousAltTexts = (currentRow.gallery_alt_texts || []) as string[];
+      previousCoverUrl = (currentRow.cover_url as string | null) || null;
       const { error: updateError } = await supabase
         .from("city_services")
-        .update({ gallery_urls: gallery, gallery_enabled: gallery.length > 0 })
+        .update({ gallery_urls: gallery, gallery_alt_texts: payload.gallery_alt_texts, gallery_enabled: gallery.length > 0, cover_url: payload.cover_url })
         .eq("id", payload.serviceId);
       if (updateError) {
         logAdminError("city-service-gallery-update", updateError);
@@ -1206,7 +1420,7 @@ export async function removeCityServiceGalleryImage(input: unknown): Promise<Act
         if (payload.serviceId) {
           await supabase
             .from("city_services")
-            .update({ gallery_urls: previousGallery, gallery_enabled: previousGallery.length > 0 })
+            .update({ gallery_urls: previousGallery, gallery_alt_texts: previousAltTexts, gallery_enabled: previousGallery.length > 0, cover_url: previousCoverUrl })
             .eq("id", payload.serviceId);
         }
         logAdminError("city-service-gallery-storage-remove", storageError);
@@ -1216,6 +1430,7 @@ export async function removeCityServiceGalleryImage(input: unknown): Promise<Act
         };
       }
     }
+    revalidateTag(PUBLIC_CACHE_TAGS.cityServices);
 
     revalidatePath("/admin");
     revalidatePath("/servicos");
@@ -1557,7 +1772,7 @@ function hasImageSignature(type: string, bytes: Uint8Array) {
 }
 
 export async function uploadAdminImages(
-  entity: AdminEntity,
+  entity: AdminEntity | "route_leaflet",
   formData: FormData,
 ): Promise<UploadResult> {
   try {

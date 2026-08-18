@@ -69,6 +69,10 @@ export type PousadaRow = {
   diferenciais?: string[] | null;
   diferencial_principal?: string | null;
   aceita_reservas?: boolean | null;
+  reservation_availability?: "available" | "limited" | "unavailable" | "consult" | null;
+  reservation_availability_note?: string | null;
+  reservation_availability_start?: string | null;
+  reservation_availability_end?: string | null;
   destaque?: boolean | null;
   plano?: DeprecatedCommercialPlan | DeprecatedLegacyPlan | null;
   plan_type?: DeprecatedCommercialPlan | null;
@@ -186,8 +190,14 @@ export type CityServiceRow = {
   image_type?: "photo" | "logo" | "auto" | null;
   alt_text?: string | null;
   details_enabled?: boolean | null;
+  cover_url?: string | null;
   gallery_enabled?: boolean | null;
   gallery_urls?: string[] | null;
+  gallery_alt_texts?: string[] | null;
+  differentials?: string[] | null;
+  additional_information?: string | null;
+  seo_title?: string | null;
+  seo_description?: string | null;
   is_published?: boolean | null;
   sort_order?: number | null;
   last_confirmed_at?: string | null;

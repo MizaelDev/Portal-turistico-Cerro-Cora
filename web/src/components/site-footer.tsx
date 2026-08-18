@@ -38,13 +38,13 @@ export function SiteFooter() {
               <MapPin className="h-4 w-4" /> Cerro Corá, Rio Grande do Norte
             </span>
             <span className="flex items-center gap-2">
-              <Phone className="h-4 w-4" /> (84) 8896-7852
+              <Phone className="h-4 w-4" /> (84) 98879-1401
             </span>
             <span className="flex items-center gap-2">
               <Instagram className="h-4 w-4" /> @bz.software_
             </span>
             <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" /> eduardo@bzsoftware.com.br
+              <Mail className="h-4 w-4" /> cerrocorargn@gmail.com
             </span>
           </div>
         </div>

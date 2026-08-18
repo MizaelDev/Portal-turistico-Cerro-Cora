@@ -8,11 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
-    "test": "node --test --experimental-strip-types tests/unit/*.test.ts",
+    "test": "node --test --experimental-strip-types tests/unit/*.test.ts && tsx --test tests/game/*.test.ts",
     "k6:smoke": "k6 run tests/k6/load-test.js",
     "k6:load": "k6 run -e PROFILE=load tests/k6/load-test.js",
     "k6:stress": "k6 run -e PROFILE=stress tests/k6/load-test.js",
-    "k6:cloud": "k6 cloud -e PROFILE=load tests/k6/load-test.js"
+    "k6:cloud": "k6 cloud -e PROFILE=load tests/k6/load-test.js",
+    "test:mobile": "tsx tests/game/mobile-qa.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -48,8 +49,10 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.20.1",
     "eslint-config-next": "^15.5.19",
+    "playwright-core": "^1.62.1",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.1",
     "typescript": "^5.7.3"
   },
   "overrides": {

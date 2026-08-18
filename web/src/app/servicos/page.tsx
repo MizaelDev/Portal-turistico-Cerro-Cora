@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     : { index: false, follow: false },
 };
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 type ServiceFilter = "all" | "public" | "health" | "security" | "commerce" | "open";
 

@@ -83,7 +83,7 @@ const nextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    qualities: [45, 52, 75, 76, 78, 82, 84, 90],
+    qualities: [45, 52, 75, 76, 78, 82, 84, 85, 88, 90, 92],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {

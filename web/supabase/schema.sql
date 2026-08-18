@@ -15,6 +15,35 @@ create table if not exists public.pontos_turisticos (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.route_leaflet_settings (
+  id smallint primary key default 1 check (id = 1),
+  image_url text not null,
+  alt_text text not null,
+  download_url text,
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now(),
+  constraint route_leaflet_image_url_check
+    check (image_url ~* '^https://' or (image_url like '/%' and image_url not like '//%')),
+  constraint route_leaflet_download_url_check
+    check (download_url is null or download_url ~* '^https://' or (download_url like '/%' and download_url not like '//%'))
+);
+
+insert into public.route_leaflet_settings (
+  id,
+  image_url,
+  alt_text,
+  download_url,
+  is_active
+)
+values (
+  1,
+  '/images/roteiros/roteiros-turisticos-cerro-cora.jpeg',
+  'Panfleto oficial com os cinco roteiros turísticos de Cerro Corá-RN',
+  '/images/roteiros/roteiros-turisticos-cerro-cora.jpeg',
+  true
+)
+on conflict (id) do nothing;
+
 create table if not exists public.pousadas (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
@@ -48,6 +77,10 @@ create table if not exists public.pousadas (
   diferenciais text[] not null default '{}',
   diferencial_principal text,
   aceita_reservas boolean not null default true,
+  reservation_availability text check (reservation_availability in ('available', 'limited', 'unavailable', 'consult')),
+  reservation_availability_note text,
+  reservation_availability_start date,
+  reservation_availability_end date,
   whatsapp_message text,
   site_url text,
   destaque boolean not null default false,
@@ -168,6 +201,10 @@ alter table public.pousadas
   add column if not exists diferenciais text[] not null default '{}',
   add column if not exists diferencial_principal text,
   add column if not exists aceita_reservas boolean not null default true,
+  add column if not exists reservation_availability text check (reservation_availability in ('available', 'limited', 'unavailable', 'consult')),
+  add column if not exists reservation_availability_note text,
+  add column if not exists reservation_availability_start date,
+  add column if not exists reservation_availability_end date,
   add column if not exists whatsapp_message text,
   add column if not exists site_url text,
   add column if not exists destaque boolean not null default false,
@@ -202,7 +239,13 @@ alter table public.pontos_turisticos
   check (info_url is null or info_url ~* '^https://');
 
 alter table public.city_services
-  add column if not exists business_hours jsonb;
+  add column if not exists business_hours jsonb,
+  add column if not exists cover_url text,
+  add column if not exists gallery_alt_texts text[] not null default '{}',
+  add column if not exists differentials text[] not null default '{}',
+  add column if not exists additional_information text,
+  add column if not exists seo_title text,
+  add column if not exists seo_description text;
 
 -- Categorias de servicos sao administraveis e nao devem exigir nova migration.
 alter table public.city_services
@@ -317,6 +360,7 @@ set
 where id = 'tourism';
 
 alter table public.pontos_turisticos enable row level security;
+alter table public.route_leaflet_settings enable row level security;
 alter table public.pousadas enable row level security;
 alter table public.restaurantes enable row level security;
 alter table public.city_services enable row level security;
@@ -325,11 +369,13 @@ alter table public.login_rate_limits enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select on public.pontos_turisticos to anon, authenticated;
+grant select on public.route_leaflet_settings to anon, authenticated;
 grant select on public.pousadas to anon, authenticated;
 grant select on public.restaurantes to anon, authenticated;
 grant select on public.city_services to anon, authenticated;
 grant select on public.admin_users to authenticated;
 grant insert, update, delete on public.pontos_turisticos to authenticated;
+grant insert, update, delete on public.route_leaflet_settings to authenticated;
 grant insert, update, delete on public.pousadas to authenticated;
 grant insert, update, delete on public.restaurantes to authenticated;
 grant insert, update, delete on public.city_services to authenticated;
@@ -351,6 +397,9 @@ drop policy if exists "Admin read pontos_turisticos" on public.pontos_turisticos
 drop policy if exists "Admin insert pontos_turisticos" on public.pontos_turisticos;
 drop policy if exists "Admin update pontos_turisticos" on public.pontos_turisticos;
 drop policy if exists "Admin delete pontos_turisticos" on public.pontos_turisticos;
+
+drop policy if exists "Public read route leaflet settings" on public.route_leaflet_settings;
+drop policy if exists "Admin manage route leaflet settings" on public.route_leaflet_settings;
 
 drop policy if exists "Public read active pousadas" on public.pousadas;
 drop policy if exists "Authenticated read pousadas" on public.pousadas;
@@ -397,6 +446,17 @@ create policy "Admin delete pontos_turisticos"
   on public.pontos_turisticos for delete
   to authenticated
   using (public.is_admin(auth.uid()));
+
+create policy "Public read route leaflet settings"
+  on public.route_leaflet_settings for select
+  to anon, authenticated
+  using (true);
+
+create policy "Admin manage route leaflet settings"
+  on public.route_leaflet_settings for all
+  to authenticated
+  using (public.is_admin(auth.uid()))
+  with check (public.is_admin(auth.uid()));
 
 create policy "Public read active pousadas"
   on public.pousadas for select

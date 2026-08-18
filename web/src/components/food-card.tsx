@@ -77,7 +77,7 @@ function getVisibleTags(place: FoodPlace) {
   };
 }
 
-function FoodImage({ place }: { place: FoodPlace }) {
+function FoodImage({ place, priority = false }: { place: FoodPlace; priority?: boolean }) {
   const image = place.image?.trim();
   const logo = place.logo?.trim();
   const galleryPhoto = place.galleryEnabled !== false
@@ -95,8 +95,10 @@ function FoodImage({ place }: { place: FoodPlace }) {
         src={displayImage}
         alt={`Imagem de ${place.name}`}
         fill
-        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-        quality={84}
+        sizes="(min-width: 1280px) 400px, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+        quality={88}
+        priority={priority}
+        loading={priority ? "eager" : "lazy"}
         className={cn(displaysLogo ? "bg-white object-contain" : "object-cover")}
       />
     );
@@ -115,7 +117,15 @@ function FoodImage({ place }: { place: FoodPlace }) {
   );
 }
 
-export function FoodCard({ place, compact = false }: { place: FoodPlace; compact?: boolean }) {
+export function FoodCard({
+  place,
+  compact = false,
+  priority = false,
+}: {
+  place: FoodPlace;
+  compact?: boolean;
+  priority?: boolean;
+}) {
   const instagramHref = place.instagram ? place.instagramUrl || instagramUrlFromHandle(place.instagram) : null;
   const mapHref = place.mapUrl || (place.location ? googleMapsSearchUrl(place.name, place.location) : undefined);
   const detailHref = `/restaurantes/${place.slug || slugify(place.name)}`;
@@ -152,9 +162,12 @@ export function FoodCard({ place, compact = false }: { place: FoodPlace; compact
             category={place.category}
             limit={10}
             logoImage={place.logo}
+            priority={priority}
+            sizes="(min-width: 1280px) 400px, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+            quality={88}
           />
         ) : (
-          <FoodImage place={place} />
+          <FoodImage place={place} priority={priority} />
         )}
       </div>
       <div className={cn("flex flex-1 flex-col", compact ? "gap-4 p-4 lg:p-5" : "gap-5 p-5")}>

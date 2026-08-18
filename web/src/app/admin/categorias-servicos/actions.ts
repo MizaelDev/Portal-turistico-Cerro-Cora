@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { assertSameOriginRequest } from "@/lib/server-request-security";
 import { slugifyServiceCategory } from "@/lib/city-service-catalog";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cache-tags";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const categorySchema = z.object({
@@ -124,6 +125,8 @@ export async function saveServiceCategoryAction(
 
   revalidatePath("/admin/categorias-servicos");
   revalidatePath("/servicos");
+  revalidateTag(PUBLIC_CACHE_TAGS.serviceCategories);
+  revalidateTag(PUBLIC_CACHE_TAGS.cityServices);
   redirectWithFeedback(feedback);
 }
 
@@ -173,6 +176,8 @@ export async function deactivateServiceCategoryAction(
   } catch {
     feedback = { type: "error", message: "Categoria inválida." };
   }
+  revalidateTag(PUBLIC_CACHE_TAGS.serviceCategories);
+  revalidateTag(PUBLIC_CACHE_TAGS.cityServices);
 
   revalidatePath("/admin/categorias-servicos");
   revalidatePath("/servicos");

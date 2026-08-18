@@ -16,7 +16,6 @@ import {
   Fuel,
   Hospital,
   Info,
-  Instagram,
   Landmark,
   MapPin,
   MessageCircle,
@@ -122,24 +121,15 @@ function getServiceGroup(service: CityService): ServiceGroup | null {
   const identity = normalizeText(`${service.name} ${service.subcategory}`);
   if (excludedTerms.some((term) => identity.includes(term))) return null;
 
-  if (["hospital", "maternidade", "ubs", "posto de saude", "farmacia"].some((term) => identity.includes(term))) {
+  if (service.category === "saude" || ["hospital", "maternidade", "ubs", "posto de saude", "farmacia", "clinica", "academia", "veterinaria"].some((term) => identity.includes(term))) {
     return "health";
   }
 
-  if (["delegacia", "policia militar", "correios", "prefeitura", "secretaria", "orgao publico", "servico publico", "conselho tutelar", "cartorio"].some((term) => identity.includes(term))) {
+  if (service.category === "servicos-publicos" || ["delegacia", "policia militar", "correios", "prefeitura", "secretaria", "orgao publico", "servico publico", "conselho tutelar", "cartorio"].some((term) => identity.includes(term))) {
     return "security";
   }
 
-  if (["banco", "loterica", "mercado", "supermercado", "padaria", "combustivel", "oficina", "borracharia", "academia", "material de construcao", "materiais de construcao", "loja de construcao"].some((term) => identity.includes(term))) {
-    return "commerce";
-  }
-
-  return service.listingType === "public_service" ? "security" : null;
-}
-
-function phoneHref(phone?: string) {
-  const digits = phone?.replace(/\D/g, "");
-  return digits ? `tel:${digits}` : null;
+  return service.listingType === "public_service" ? "security" : "commerce";
 }
 
 function whatsappHref(service: CityService) {
@@ -149,12 +139,6 @@ function whatsappHref(service: CityService) {
   const message = service.whatsappMessage ||
     `Olá! Encontrei ${service.name} no Portal Turístico de Cerro Corá e gostaria de obter mais informações.`;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-}
-
-function instagramHref(service: CityService) {
-  if (service.instagramUrl) return service.instagramUrl;
-  const handle = service.instagram?.replace(/^@/, "").trim();
-  return handle ? `https://www.instagram.com/${handle}/` : null;
 }
 
 function isServiceOpen(service: CityService, now: Date | null) {
@@ -213,31 +197,20 @@ function ServiceMedia({ service, icon: Icon }: { service: CityService; icon: Luc
 }
 
 function ServiceActions({ service }: { service: CityService }) {
-  const callUrl = phoneHref(service.phone || service.whatsapp);
   const whatsappUrl = whatsappHref(service);
-  const instagramUrl = instagramHref(service);
   const meta = { establishmentName: service.name, category: service.category };
-  const primaryAction = service.isEmergency || service.listingType === "public_service"
-    ? "phone"
-    : service.detailsEnabled
-      ? "details"
-      : whatsappUrl
-        ? "whatsapp"
-        : "maps";
+  const primaryAction = service.detailsEnabled
+    ? "details"
+    : whatsappUrl
+      ? "whatsapp"
+      : "maps";
   const buttonClass = "h-10 w-full rounded-[9px] px-3 text-xs sm:w-auto";
 
   return (
     <div className="flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:flex-wrap lg:justify-end lg:border-0 lg:pt-0">
-      {callUrl ? (
-        <Button asChild variant={primaryAction === "phone" ? "warm" : "outline"} className={buttonClass}>
-          <TrackedLink href={callUrl} entityType="city_service" entityId={service.id} eventType="phone_click" {...meta}>
-            <Phone className="h-4 w-4" /> Ligar
-          </TrackedLink>
-        </Button>
-      ) : null}
       {service.detailsEnabled ? (
         <Button asChild variant={primaryAction === "details" ? "warm" : "outline"} className={buttonClass}>
-          <TrackedLink href={`/servicos/${service.slug}`} entityType="city_service" entityId={service.id} eventType="details_click" {...meta}>
+          <TrackedLink href={"/servicos/" + service.slug} entityType="city_service" entityId={service.id} eventType="details_click" {...meta}>
             Ver detalhes <ChevronRight className="h-4 w-4" />
           </TrackedLink>
         </Button>
@@ -253,13 +226,6 @@ function ServiceActions({ service }: { service: CityService }) {
         <Button asChild variant={primaryAction === "whatsapp" ? "warm" : "outline"} className={buttonClass}>
           <TrackedLink href={whatsappUrl} target="_blank" rel="noopener noreferrer" entityType="city_service" entityId={service.id} eventType="whatsapp_click" {...meta}>
             <MessageCircle className="h-4 w-4" /> WhatsApp
-          </TrackedLink>
-        </Button>
-      ) : null}
-      {instagramUrl ? (
-        <Button asChild variant="ghost" className={buttonClass}>
-          <TrackedLink href={instagramUrl} target="_blank" rel="noopener noreferrer" entityType="city_service" entityId={service.id} eventType="instagram_click" {...meta}>
-            <Instagram className="h-4 w-4" /> Instagram
           </TrackedLink>
         </Button>
       ) : null}

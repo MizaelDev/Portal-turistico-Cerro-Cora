@@ -13,7 +13,7 @@ export const metadata: Metadata = createMetadata({
     "Pousadas e chalés em Cerro Corá com galeria, descrição, WhatsApp, reserva, localização e faixa de preço.",
 });
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 export default async function LodgingsPage() {
   const { items: lodgings, error } = await getPublicLodgings();
@@ -39,8 +39,8 @@ export default async function LodgingsPage() {
 
       {lodgings.length ? (
         <div className="mt-12 grid gap-8">
-          {lodgings.map((lodging) => (
-            <LodgingCard key={lodging.name} lodging={lodging} />
+          {lodgings.map((lodging, index) => (
+            <LodgingCard key={lodging.name} lodging={lodging} priority={index === 0} />
           ))}
         </div>
       ) : (

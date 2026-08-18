@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAdjacentImagePreload } from "@/hooks/use-adjacent-image-preload";
 import { analyticsService } from "@/lib/analytics";
 import { useCarouselSwipe } from "@/hooks/use-carousel-swipe";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,8 @@ type ImageSize = {
 };
 
 const fallbackImage = "/images/cerro-cora.jpg";
+const responsiveImageSizes = "(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw";
+const galleryQuality = 90;
 
 export function LodgingGallery({ images, name, entityId, category }: LodgingGalleryProps) {
   const uniqueImages = useMemo(
@@ -35,6 +38,14 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
   const hasMultipleImages = uniqueImages.length > 1;
   const activeImage = uniqueImages[activeIndex] || "";
   const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
+
+  useAdjacentImagePreload({
+    images: uniqueImages,
+    activeIndex,
+    sizes: responsiveImageSizes,
+    quality: galleryQuality,
+    enabled: hasMultipleImages,
+  });
 
   useEffect(() => {
     if (activeImage) {
@@ -129,8 +140,8 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
           src={activeSrc}
           alt={`Foto ${activeIndex + 1} da hospedagem ${name}`}
           fill
-          sizes="(min-width: 1280px) 1024px, (min-width: 768px) 90vw, 100vw"
-          quality={82}
+          sizes={responsiveImageSizes}
+          quality={galleryQuality}
           loading="lazy"
           onLoad={(event) => {
             registerImageSize(activeSrc, event.currentTarget);
@@ -211,7 +222,7 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
                 alt={`Miniatura ${index + 1} de ${name}`}
                 fill
                 sizes="120px"
-                quality={52}
+                quality={75}
                 loading="lazy"
                 onError={() => markImageAsFailed(image)}
                 className="object-cover"
@@ -245,7 +256,7 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
               alt={`Foto ${activeIndex + 1} da hospedagem ${name}`}
               fill
               sizes="100vw"
-              quality={90}
+              quality={92}
               onError={() => markImageAsFailed(activeImage)}
               className="object-contain"
             />

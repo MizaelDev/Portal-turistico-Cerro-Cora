@@ -46,8 +46,14 @@ alter table public.city_services
   add column if not exists image_type text not null default 'auto',
   add column if not exists alt_text text,
   add column if not exists details_enabled boolean not null default false,
+  add column if not exists cover_url text,
   add column if not exists gallery_enabled boolean not null default false,
   add column if not exists gallery_urls text[] not null default '{}',
+  add column if not exists gallery_alt_texts text[] not null default '{}',
+  add column if not exists differentials text[] not null default '{}',
+  add column if not exists additional_information text,
+  add column if not exists seo_title text,
+  add column if not exists seo_description text,
   add column if not exists tags text[] not null default '{}',
   add column if not exists enabled_buttons text[] not null default '{}',
   add column if not exists important_message text,
@@ -122,6 +128,7 @@ with subcategories(parent_slug, name, slug, sort_order) as (
     ('compras','Eletrônicos','eletronicos',3009),
     ('compras','Papelarias','papelarias',3010),
     ('compras','Lojas de variedades','lojas-de-variedades',3011),
+    ('compras','Produtos artesanais','produtos-artesanais',3012),
     ('casa-construcao','Materiais de construção','materiais-de-construcao',4001),
     ('casa-construcao','Materiais elétricos','materiais-eletricos',4002),
     ('casa-construcao','Materiais hidráulicos','materiais-hidraulicos',4003),
@@ -187,6 +194,34 @@ join public.service_categories parent
   and parent.parent_id is null
 on conflict do nothing;
 
+update public.service_categories
+set
+  name = 'Comércio e conveniência',
+  description = 'Compras do dia a dia, produtos locais e comércio de conveniência.'
+where slug = 'compras'
+  and parent_id is null;
+-- Mantém o cadastro existente no grupo correto sem apagar nenhum conteúdo.
+with category as (
+  select id
+  from public.service_categories
+  where slug = 'compras'
+    and parent_id is null
+  limit 1
+), subcategory as (
+  select id
+  from public.service_categories
+  where slug = 'produtos-artesanais'
+  limit 1
+)
+update public.city_services
+set
+  category = 'compras',
+  category_id = category.id,
+  subcategory = 'Produtos artesanais',
+  subcategory_id = subcategory.id,
+  updated_at = now()
+from category, subcategory
+where lower(trim(public.city_services.name)) = 'picles do bezeril';
 update public.city_services
 set
   short_description = coalesce(short_description, description),

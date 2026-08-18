@@ -63,6 +63,8 @@ export type FoodPlace = {
   updatedAt?: string;
 };
 
+export type ReservationAvailability = "available" | "limited" | "unavailable" | "consult";
+
 export type Lodging = {
   id?: string;
   slug?: string;
@@ -94,6 +96,10 @@ export type Lodging = {
   amenities?: string[];
   highlights?: string[];
   acceptsReservations?: boolean;
+  reservationAvailability?: ReservationAvailability;
+  reservationAvailabilityNote?: string;
+  reservationAvailabilityStart?: string;
+  reservationAvailabilityEnd?: string;
   isFeatured?: boolean;
   featuredOrder?: number;
   listingType?: ListingType;

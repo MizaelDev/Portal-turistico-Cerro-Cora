@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { analyticsService, type CommercialEntityType } from "@/lib/analytics";
+import { useAdjacentImagePreload } from "@/hooks/use-adjacent-image-preload";
 import { useCarouselSwipe } from "@/hooks/use-carousel-swipe";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,12 @@ type CardMediaCarouselProps = {
   limit: number;
   logoImage?: string;
   className?: string;
+  priority?: boolean;
+  sizes?: string;
+  quality?: number;
 };
+
+const defaultImageSizes = "(min-width: 1280px) 400px, (min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw";
 
 const logoSignals = ["logo", "marca", "brand", "avatar", "profile", "/banners/", "encontro.webp"];
 
@@ -34,6 +40,9 @@ export function CardMediaCarousel({
   limit,
   logoImage,
   className,
+  priority = false,
+  sizes = defaultImageSizes,
+  quality = 88,
 }: CardMediaCarouselProps) {
   const availableImages = useMemo(() => {
     const uniqueImages = Array.from(new Set(images.map((image) => image.trim()).filter(Boolean)));
@@ -53,6 +62,14 @@ export function CardMediaCarousel({
   const hasMultipleImages = availableImages.length > 1;
   const activeImage = availableImages[activeIndex] || "/images/cerro-cora.jpg";
   const activeSrc = failedImages.has(activeImage) ? "/images/cerro-cora.jpg" : activeImage;
+
+  useAdjacentImagePreload({
+    images: availableImages,
+    activeIndex,
+    sizes,
+    quality,
+    enabled: hasMultipleImages,
+  });
 
   const trackCarousel = useCallback(() => {
     analyticsService.track({
@@ -87,9 +104,10 @@ export function CardMediaCarousel({
         src={activeSrc}
         alt={`Foto ${activeIndex + 1} de ${name}`}
         fill
-        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-        quality={82}
-        loading="lazy"
+        sizes={sizes}
+        quality={quality}
+        priority={priority && activeIndex === 0}
+        loading={priority && activeIndex === 0 ? "eager" : "lazy"}
         onError={() => {
           setFailedImages((current) => new Set(current).add(activeImage));
         }}

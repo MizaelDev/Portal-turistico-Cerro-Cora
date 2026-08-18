@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import { AdminDashboard } from "@/components/admin-dashboard";
+import { RouteLeafletAdmin } from "@/components/route-leaflet-admin";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireAdminSession } from "@/lib/admin-auth";
+import {
+  defaultRouteLeafletSettings,
+  normalizeRouteLeafletSettings,
+  type RouteLeafletSettings,
+} from "@/lib/route-leaflet";
 import { createMetadata } from "@/lib/seo";
 import {
   isSupabaseConfigured,
@@ -29,6 +35,7 @@ const adminQueryLimit = 500;
 type AdminLoadResult = {
   data: AdminData;
   serviceCategories: ServiceCategoryRow[];
+  routeLeaflet: RouteLeafletSettings;
   errors: string[];
 };
 
@@ -36,8 +43,15 @@ async function getAdminData(): Promise<AdminLoadResult> {
   const supabase = await createSupabaseServerClient();
   await requireAdminSession(supabase);
 
-  const [pontos, pousadas, restaurantes, cityServices, serviceCategories, bucket] =
-    await Promise.all([
+  const [
+    pontos,
+    pousadas,
+    restaurantes,
+    cityServices,
+    serviceCategories,
+    routeLeaflet,
+    bucket,
+  ] = await Promise.all([
       supabase
         .from("pontos_turisticos")
         .select("*")
@@ -63,6 +77,11 @@ async function getAdminData(): Promise<AdminLoadResult> {
         .select("*")
         .order("sort_order")
         .limit(300),
+      supabase
+        .from("route_leaflet_settings")
+        .select("image_url,alt_text,download_url,is_active")
+        .eq("id", 1)
+        .maybeSingle(),
       supabase.storage.getBucket("tourism"),
     ]);
 
@@ -76,6 +95,9 @@ async function getAdminData(): Promise<AdminLoadResult> {
     serviceCategories.error
       ? "As categorias de serviços ainda não foram carregadas. Rode web/supabase/city-services-guide.sql."
       : null,
+    routeLeaflet.error
+      ? "A configuração do panfleto usa o arquivo local até você rodar web/supabase/schema.sql."
+      : null,
     bucket.error ? "Não foi possível verificar o bucket de imagens." : null,
   ].filter(Boolean) as string[];
 
@@ -87,6 +109,9 @@ async function getAdminData(): Promise<AdminLoadResult> {
       city_services: cityServices.data || [],
     } as AdminData,
     serviceCategories: (serviceCategories.data || []) as ServiceCategoryRow[],
+    routeLeaflet: routeLeaflet.data
+      ? normalizeRouteLeafletSettings(routeLeaflet.data)
+      : defaultRouteLeafletSettings,
     errors,
   };
 }
@@ -110,7 +135,12 @@ export default async function AdminPage() {
     );
   }
 
-  const { data: initialData, serviceCategories, errors } = await getAdminData();
+  const {
+    data: initialData,
+    serviceCategories,
+    routeLeaflet,
+    errors,
+  } = await getAdminData();
 
   return (
     <section className="container py-20">
@@ -129,6 +159,7 @@ export default async function AdminPage() {
             </CardContent>
           </Card>
         ) : null}
+        <RouteLeafletAdmin initialSettings={routeLeaflet} />
         <AdminDashboard
           initialData={initialData}
           serviceCategories={serviceCategories}

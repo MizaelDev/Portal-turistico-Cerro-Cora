@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
-import { Compass, MessageCircle } from "lucide-react";
+import { Compass, Info, MessageCircle } from "lucide-react";
 import { AttractionCard } from "@/components/attraction-card";
 import { JsonLd } from "@/components/json-ld";
 import { MapEmbed } from "@/components/map-embed";
 import { MotionReveal } from "@/components/motion-reveal";
+import { RouteLeafletSection } from "@/components/route-leaflet-section";
 import { SectionHeader } from "@/components/section-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { tourGuides } from "@/lib/data";
 import { getPublicAttractions } from "@/lib/public-content";
+import { getRouteLeafletSettings } from "@/lib/route-leaflet";
 import { createMetadata, touristAttractionsSchema } from "@/lib/seo";
 
 export const metadata: Metadata = createMetadata({
@@ -18,7 +20,7 @@ export const metadata: Metadata = createMetadata({
     "Conheça Mirante do Cruzeiro, Nascente do Rio Potengi, Vale Vulcânico, Tanques Naturais, Escorrego, Serra Verde, Pinturas Rupestres e Casa Grande.",
 });
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 function whatsappUrl(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -28,7 +30,10 @@ function whatsappUrl(phone: string) {
 }
 
 export default async function RoutesPage() {
-  const { items: attractions, error } = await getPublicAttractions();
+  const [{ items: attractions, error }, routeLeaflet] = await Promise.all([
+    getPublicAttractions(),
+    getRouteLeafletSettings(),
+  ]);
 
   return (
     <>
@@ -47,7 +52,26 @@ export default async function RoutesPage() {
         </div>
       </section>
 
+      <RouteLeafletSection settings={routeLeaflet} />
+
       <section className="container py-16">
+        <div className="mb-6 flex max-w-4xl items-start gap-3 rounded-md border border-border bg-muted/35 px-4 py-3 text-sm leading-6 text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-alpine-wine" aria-hidden="true" />
+          <p>
+            Algumas atrações possuem regras específicas de acesso. Verifique a necessidade de
+            guia, agendamento ou pagamento de entrada nas informações de cada ponto turístico.
+          </p>
+        </div>
+        <div className="mb-9 max-w-3xl">
+          <h2 className="font-display text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
+            Principais roteiros
+          </h2>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
+            Conheça os lugares que fazem parte dos roteiros e consulte fotos,
+            localização e informações de cada parada.
+          </p>
+        </div>
+
         {error ? (
           <Card className="mb-8 border-destructive/30 bg-destructive/10">
             <CardContent className="text-sm text-destructive">

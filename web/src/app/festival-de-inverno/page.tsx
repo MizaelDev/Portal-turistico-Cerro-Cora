@@ -12,7 +12,6 @@ import {
   Utensils,
   Wheat,
 } from "lucide-react";
-import { Countdown } from "@/components/countdown";
 import { FestivalProgram } from "@/components/festival-program";
 import { JsonLd } from "@/components/json-ld";
 import { MapEmbed } from "@/components/map-embed";
@@ -77,9 +76,6 @@ export default function FestivalPage() {
                 <MapPinned className="h-4 w-4 text-alpine-sunset" />
                 Praça Pública
               </span>
-            </div>
-            <div className="mt-9 max-w-3xl">
-              <Countdown />
             </div>
           </div>
 

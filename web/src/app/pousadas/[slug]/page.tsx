@@ -21,7 +21,6 @@ import {
   Mountain,
   PawPrint,
   Snowflake,
-  Sparkles,
   Trees,
   Tv,
   Utensils,
@@ -31,7 +30,9 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { BusinessStatusBadge } from "@/components/business-status-badge";
+import { EstablishmentLogo } from "@/components/establishment-logo";
 import { JsonLd } from "@/components/json-ld";
+import { LodgingAvailability } from "@/components/lodging-availability";
 import { LodgingCard } from "@/components/lodging-card";
 import { LodgingGallery } from "@/components/lodging-gallery";
 import { SafeImage } from "@/components/safe-image";
@@ -53,7 +54,7 @@ type LodgingPageProps = {
   }>;
 };
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 function lodgingSlug(lodging: Lodging) {
   return lodging.slug || slugify(lodging.name);
@@ -259,6 +260,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
             fill
             priority
             sizes="100vw"
+            quality={90}
             className="object-cover"
           />
         ) : null}
@@ -266,16 +268,12 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
         <div className="container relative z-10 grid min-h-[520px] content-end py-12 md:min-h-[560px] md:py-14">
           <div className="max-w-4xl">
             {lodging.logo ? (
-              <div className="relative mb-5 h-16 w-16 overflow-hidden rounded-xl border border-white/20 bg-white/95 p-2 shadow-glass sm:h-20 sm:w-20 md:h-24 md:w-24">
-                <SafeImage
-                  src={lodging.logo}
-                  alt={`Logo de ${lodging.name}`}
-                  fill
-                  priority={!heroImage}
-                  sizes="96px"
-                  className="object-contain p-2"
-                />
-              </div>
+              <EstablishmentLogo
+                src={lodging.logo}
+                name={lodging.name}
+                priority={!heroImage}
+                className="mb-5"
+              />
             ) : null}
 
             <div className="flex flex-wrap gap-2">
@@ -384,6 +382,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
 
           <SectionShell title="Informações úteis" eyebrow="Planeje sua reserva">
             <BusinessStatusBadge businessHours={lodging.businessHours} context="lodging" className="w-fit" />
+            <LodgingAvailability lodging={lodging} showNote />
             <div className="grid gap-3 sm:grid-cols-2">
               <InfoCard icon={Clock} label="Check-in" value={lodging.checkIn || "A combinar"} />
               <InfoCard icon={Clock} label="Check-out" value={lodging.checkOut || "A combinar"} />
@@ -421,8 +420,7 @@ export default async function LodgingDetailPage({ params }: LodgingPageProps) {
           <SectionShell title="Por que escolher esta hospedagem?">
             <div className="grid gap-x-7 sm:grid-cols-2 lg:grid-cols-3">
               {highlights.map((highlight) => (
-                <div key={highlight} className="flex min-h-14 items-center gap-3 border-b border-border/70 py-4">
-                  <Sparkles className="h-5 w-5 shrink-0 text-alpine-sunset" />
+                <div key={highlight} className="flex min-h-14 items-center border-b border-border/70 py-4">
                   <p className="text-sm font-semibold">{highlight}</p>
                 </div>
               ))}

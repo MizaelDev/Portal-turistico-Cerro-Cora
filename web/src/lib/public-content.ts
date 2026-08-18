@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import {
+  PUBLIC_CACHE_TAGS,
+  PUBLIC_CONTENT_CACHE_SECONDS,
+} from "@/lib/cache-tags";
 import {
   attractions as fallbackAttractions,
   foodPlaces as fallbackFoodPlaces,
@@ -34,6 +39,7 @@ const lodgingColumns =
 const legacyExtendedLodgingColumns =
   "id,nome,slug,descricao,historia,categoria,localizacao,endereco,mapa_url,distancia_centro,faixa_preco_min,faixa_preco_max,whatsapp,telefone,instagram,instagram_url,logo_url,hero_image_url,imagens_urls,check_in,check_out,business_hours,capacidade,tipos_acomodacao,formas_pagamento,comodidades,diferenciais,diferencial_principal,aceita_reservas,destaque,whatsapp_message,site_url,ativo,created_at,updated_at";
 const extendedLodgingColumns = `${legacyExtendedLodgingColumns},gallery_enabled,carousel_enabled,featured_order`;
+const availabilityLodgingColumns = `${extendedLodgingColumns},reservation_availability,reservation_availability_note,reservation_availability_start,reservation_availability_end`;
 const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const legacyExtendedRestaurantColumns =
@@ -159,6 +165,10 @@ function mapPousada(row: PousadaRow): Lodging {
     amenities: row.comodidades || undefined,
     highlights: row.diferenciais || undefined,
     acceptsReservations: row.aceita_reservas ?? true,
+    reservationAvailability: row.reservation_availability || undefined,
+    reservationAvailabilityNote: row.reservation_availability_note || undefined,
+    reservationAvailabilityStart: row.reservation_availability_start || undefined,
+    reservationAvailabilityEnd: row.reservation_availability_end || undefined,
     isFeatured: Boolean(row.destaque),
     carouselEnabled,
     galleryEnabled,
@@ -276,7 +286,7 @@ function sortContentItems<T extends {
   });
 }
 
-export async function getPublicAttractions(): Promise<PublicContent<Attraction>> {
+async function fetchPublicAttractions(): Promise<PublicContent<Attraction>> {
   const supabase = createSupabasePublicClient();
   if (!supabase) {
     return { items: fallbackAttractions, error: null, source: "mock" };
@@ -314,16 +324,25 @@ export async function getPublicAttractions(): Promise<PublicContent<Attraction>>
     source: "supabase",
   };
 }
+export const getPublicAttractions = unstable_cache(
+  fetchPublicAttractions,
+  [PUBLIC_CACHE_TAGS.attractions],
+  {
+    revalidate: PUBLIC_CONTENT_CACHE_SECONDS,
+    tags: [PUBLIC_CACHE_TAGS.attractions],
+  },
+);
 
-export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
+
+async function fetchPublicLodgings(): Promise<PublicContent<Lodging>> {
   const supabase = createSupabasePublicClient();
   if (!supabase) {
-    return { items: fallbackLodgings, error: null, source: "mock" };
+    return { items: sortContentItems(fallbackLodgings), error: null, source: "mock" };
   }
 
   const extendedResult = await supabase
     .from("pousadas")
-    .select(extendedLodgingColumns)
+    .select(availabilityLodgingColumns)
     .eq("ativo", true)
     .order("nome")
     .limit(100);
@@ -331,25 +350,37 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
   let error = extendedResult.error;
 
   if (isSchemaCacheError(error)) {
-    const legacyFallback = await supabase
+    const extendedFallback = await supabase
       .from("pousadas")
-      .select(legacyExtendedLodgingColumns)
+      .select(extendedLodgingColumns)
       .eq("ativo", true)
       .order("nome")
       .limit(100);
 
-    data = legacyFallback.data as PousadaRow[] | null;
-    error = legacyFallback.error;
+    data = extendedFallback.data as PousadaRow[] | null;
+    error = extendedFallback.error;
 
     if (isSchemaCacheError(error)) {
-      const minimalFallback = await supabase
+      const legacyFallback = await supabase
         .from("pousadas")
-        .select(lodgingColumns)
+        .select(legacyExtendedLodgingColumns)
         .eq("ativo", true)
         .order("nome")
         .limit(100);
-      data = minimalFallback.data as PousadaRow[] | null;
-      error = minimalFallback.error;
+
+      data = legacyFallback.data as PousadaRow[] | null;
+      error = legacyFallback.error;
+
+      if (isSchemaCacheError(error)) {
+        const minimalFallback = await supabase
+          .from("pousadas")
+          .select(lodgingColumns)
+          .eq("ativo", true)
+          .order("nome")
+          .limit(100);
+        data = minimalFallback.data as PousadaRow[] | null;
+        error = minimalFallback.error;
+      }
     }
   }
 
@@ -364,11 +395,20 @@ export async function getPublicLodgings(): Promise<PublicContent<Lodging>> {
     source: "supabase",
   };
 }
+export const getPublicLodgings = unstable_cache(
+  fetchPublicLodgings,
+  [PUBLIC_CACHE_TAGS.lodgings],
+  {
+    revalidate: PUBLIC_CONTENT_CACHE_SECONDS,
+    tags: [PUBLIC_CACHE_TAGS.lodgings],
+  },
+);
 
-export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
+
+async function fetchPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
   const supabase = createSupabasePublicClient();
   if (!supabase) {
-    return { items: fallbackFoodPlaces, error: null, source: "mock" };
+    return { items: sortContentItems(fallbackFoodPlaces), error: null, source: "mock" };
   }
 
   const extendedResult = await supabase
@@ -415,6 +455,15 @@ export async function getPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
   };
 }
 
+export const getPublicFoodPlaces = unstable_cache(
+  fetchPublicFoodPlaces,
+  [PUBLIC_CACHE_TAGS.restaurants],
+  {
+    revalidate: PUBLIC_CONTENT_CACHE_SECONDS,
+    tags: [PUBLIC_CACHE_TAGS.restaurants],
+  },
+);
+
 async function fetchPublicLodgingPage(
   slug: string,
 ): Promise<PublicContent<Lodging> & { item: Lodging | null; related: Lodging[] }> {
@@ -441,7 +490,7 @@ async function fetchPublicLodgingPage(
 
   const itemResult = await supabase
     .from("pousadas")
-    .select(extendedLodgingColumns)
+    .select(availabilityLodgingColumns)
     .eq("ativo", true)
     .eq("slug", slug)
     .maybeSingle();
@@ -478,7 +527,7 @@ async function fetchPublicLodgingPage(
   const item = mapPousada(itemResult.data as PousadaRow);
   const relatedResult = await supabase
     .from("pousadas")
-    .select(extendedLodgingColumns)
+    .select(availabilityLodgingColumns)
     .eq("ativo", true)
     .neq("id", item.id)
     .order("nome")
@@ -501,7 +550,16 @@ async function fetchPublicLodgingPage(
   };
 }
 
-export const getPublicLodgingPage = cache(fetchPublicLodgingPage);
+const getCachedPublicLodgingPage = unstable_cache(
+  fetchPublicLodgingPage,
+  ["public-lodging-page"],
+  {
+    revalidate: PUBLIC_CONTENT_CACHE_SECONDS,
+    tags: [PUBLIC_CACHE_TAGS.lodgings],
+  },
+);
+
+export const getPublicLodgingPage = cache(getCachedPublicLodgingPage);
 
 async function fetchPublicRestaurantPage(slug: string): Promise<
   PublicContent<FoodPlace> & {
@@ -602,4 +660,13 @@ async function fetchPublicRestaurantPage(slug: string): Promise<
   };
 }
 
-export const getPublicRestaurantPage = cache(fetchPublicRestaurantPage);
+const getCachedPublicRestaurantPage = unstable_cache(
+  fetchPublicRestaurantPage,
+  ["public-restaurant-page"],
+  {
+    revalidate: PUBLIC_CONTENT_CACHE_SECONDS,
+    tags: [PUBLIC_CACHE_TAGS.restaurants],
+  },
+);
+
+export const getPublicRestaurantPage = cache(getCachedPublicRestaurantPage);

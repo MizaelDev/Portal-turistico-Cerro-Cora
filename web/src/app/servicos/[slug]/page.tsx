@@ -9,11 +9,12 @@ import {
   MessageCircle,
   Phone,
 } from "lucide-react";
-import { BusinessStatusBadge } from "@/components/business-status-badge";
-import { SafeImage } from "@/components/safe-image";
+import { RestaurantGallery } from "@/components/restaurant-gallery";
+import { EstablishmentLogo } from "@/components/establishment-logo";
 import { TrackView } from "@/components/track-view";
 import { TrackedLink } from "@/components/tracked-link";
 import { Button } from "@/components/ui/button";
+import { formatBusinessHours } from "@/lib/business-hours";
 import {
   getCityServiceBySlug,
   getCityServiceCategoryLabel,
@@ -29,27 +30,29 @@ type ServiceDetailPageProps = {
 
 function phoneHref(value?: string) {
   const digits = value?.replace(/\D/g, "");
-  return digits ? `tel:${digits}` : null;
+  return digits ? "tel:" + digits : null;
 }
 
 function whatsappHref(service: CityService) {
   const digits = service.whatsapp?.replace(/\D/g, "");
   if (!digits) return null;
-  const number = digits.startsWith("55") ? digits : `55${digits}`;
+  const number = digits.startsWith("55") ? digits : "55" + digits;
   const message =
     service.whatsappMessage ||
-    `Olá! Encontrei ${service.name} no Portal Turístico de Cerro Corá e gostaria de obter mais informações.`;
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+    "Olá! Encontrei " +
+      service.name +
+      " no Portal Turístico de Cerro Corá e gostaria de obter mais informações.";
+  return "https://wa.me/" + number + "?text=" + encodeURIComponent(message);
 }
 
 function instagramHref(service: CityService) {
   if (service.instagramUrl) return service.instagramUrl;
   const handle = service.instagram?.replace(/^@/, "").trim();
-  return handle ? `https://www.instagram.com/${handle}/` : null;
+  return handle ? "https://www.instagram.com/" + handle + "/" : null;
 }
 
 function serviceSchema(service: CityService, category: string) {
-  const normalized = `${service.name} ${service.subcategory}`.toLowerCase();
+  const normalized = (service.name + " " + service.subcategory).toLowerCase();
   const type = normalized.includes("hospital")
     ? "Hospital"
     : normalized.includes("delegacia")
@@ -57,14 +60,15 @@ function serviceSchema(service: CityService, category: string) {
       : service.listingType === "public_service"
         ? "GovernmentOffice"
         : "LocalBusiness";
+  const image = service.coverUrl || service.photoUrl || service.logoUrl;
 
   return {
     "@context": "https://schema.org",
     "@type": type,
     name: service.name,
-    description: service.fullDescription || service.shortDescription,
-    url: siteUrl(`/servicos/${service.slug}`),
-    image: service.photoUrl || service.logoUrl,
+    description: service.seoDescription || service.fullDescription || service.shortDescription,
+    url: siteUrl("/servicos/" + service.slug),
+    image,
     telephone: service.phone || service.whatsapp,
     address: service.address
       ? {
@@ -87,13 +91,14 @@ export async function generateMetadata({
   if (!service) notFound();
 
   return createMetadata({
-    title: `${service.name} em Cerro Corá-RN`,
-    path: `/servicos/${service.slug}`,
+    title: service.seoTitle || service.name + " em Cerro Corá-RN",
+    path: "/servicos/" + service.slug,
     description:
+      service.seoDescription ||
       service.fullDescription ||
       service.shortDescription ||
-      `Informações, contato e localização de ${service.name} em Cerro Corá-RN.`,
-    image: service.photoUrl || service.logoUrl,
+      "Informações, contato e localização de " + service.name + " em Cerro Corá-RN.",
+    image: service.coverUrl || service.photoUrl || service.logoUrl,
   });
 }
 
@@ -119,6 +124,11 @@ export default async function ServiceDetailPage({
     service.galleryEnabled && service.galleryUrls?.length
       ? service.galleryUrls
       : [];
+  const heroImage = service.coverUrl || service.photoUrl || service.logoUrl;
+  const heroUsesPhoto = Boolean(service.coverUrl || service.photoUrl);
+  const categoryLine = [category, service.subcategory].filter(Boolean).join(" · ");
+  const location = [service.address, service.neighborhood].filter(Boolean).join(" · ");
+  const openingHours = formatBusinessHours(service.businessHours, service.openingHours);
 
   return (
     <TrackView
@@ -138,11 +148,13 @@ export default async function ServiceDetailPage({
       />
 
       <section className="border-b border-border bg-primary text-primary-foreground">
-        <div className="container grid gap-8 py-12 md:grid-cols-[minmax(0,1fr)_320px] md:items-center md:py-16">
+        <div className="container grid gap-8 py-12 md:grid-cols-[minmax(0,1fr)_176px] md:items-center md:py-16">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-foreground/65">
-              {category} · {service.subcategory}
-            </p>
+            {categoryLine ? (
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-foreground/65">
+                {categoryLine}
+              </p>
+            ) : null}
             <h1 className="mt-3 max-w-3xl font-display text-4xl font-semibold md:text-6xl">
               {service.name}
             </h1>
@@ -151,45 +163,44 @@ export default async function ServiceDetailPage({
                 {service.shortDescription}
               </p>
             ) : null}
-            <div className="mt-5">
-              {service.specialStatus ? (
+            {location ? (
+              <p className="mt-3 flex max-w-2xl items-start gap-2 text-sm text-primary-foreground/70">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                {location}
+              </p>
+            ) : null}
+            {service.specialStatus ? (
+              <div className="mt-5">
                 <span className="rounded-md border border-white/20 px-3 py-2 text-sm font-semibold">
                   {service.specialStatus}
                 </span>
-              ) : (
-                <BusinessStatusBadge
-                  businessHours={service.businessHours}
-                  fallbackHours={service.openingHours}
-                  context="service"
-                />
-              )}
-            </div>
+              </div>
+            ) : null}
           </div>
-          {service.photoUrl || service.logoUrl ? (
-            <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-white/15 bg-white/95 shadow-lg">
-              <SafeImage
-                src={service.photoUrl || service.logoUrl}
-                alt={service.altText || service.name}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 320px"
-                className={service.photoUrl ? "object-cover" : "object-contain p-5"}
-              />
-            </div>
+
+          {heroImage ? (
+            <EstablishmentLogo
+              src={heroImage}
+              name={service.name}
+              imageType={heroUsesPhoto ? "photo" : "logo"}
+              priority
+              className="justify-self-center md:justify-self-end"
+            />
           ) : null}
         </div>
       </section>
 
       <div className="container grid gap-10 py-12 lg:grid-cols-[minmax(0,1fr)_360px]">
         <main className="space-y-10">
+          {service.importantMessage ? (
+            <aside className="rounded-md border border-border bg-muted/45 px-4 py-3 text-sm leading-6">
+              {service.importantMessage}
+            </aside>
+          ) : null}
+
           {service.fullDescription ? (
             <section>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-alpine-wine">
-                Informações
-              </p>
-              <h2 className="mt-2 font-display text-3xl font-semibold">
-                Sobre o serviço
-              </h2>
+              <h2 className="font-display text-3xl font-semibold">Sobre</h2>
               <p className="mt-4 max-w-3xl whitespace-pre-line leading-8 text-muted-foreground">
                 {service.fullDescription}
               </p>
@@ -199,7 +210,7 @@ export default async function ServiceDetailPage({
           {service.servicesOffered?.length ? (
             <section>
               <h2 className="font-display text-3xl font-semibold">
-                Serviços oferecidos
+                Produtos e serviços
               </h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {service.servicesOffered.map((item) => (
@@ -214,25 +225,45 @@ export default async function ServiceDetailPage({
             </section>
           ) : null}
 
+          {service.differentials?.length ? (
+            <section>
+              <h2 className="font-display text-3xl font-semibold">Diferenciais</h2>
+              <ul className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                {service.differentials.map((item) => (
+                  <li key={item} className="border-l-2 border-primary/35 pl-3 text-sm leading-6">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           {gallery.length ? (
             <section>
               <h2 className="font-display text-3xl font-semibold">Galeria</h2>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {gallery.map((image, index) => (
-                  <div
-                    key={image}
-                    className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border"
-                  >
-                    <SafeImage
-                      src={image}
-                      alt={`${service.name}, foto ${index + 1}`}
-                      fill
-                      sizes="(max-width: 640px) 100vw, 50vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
+              <div className="mt-4">
+                <RestaurantGallery
+                  images={gallery}
+                  altTexts={service.galleryAltTexts}
+                  name={service.name}
+                  entityType="city_service"
+                  entityId={service.id}
+                  category={service.category}
+                  mainImageFit="contain"
+                  enableLightbox
+                />
               </div>
+            </section>
+          ) : null}
+
+          {service.additionalInformation ? (
+            <section>
+              <h2 className="font-display text-3xl font-semibold">
+                Informações adicionais
+              </h2>
+              <p className="mt-4 whitespace-pre-line leading-8 text-muted-foreground">
+                {service.additionalInformation}
+              </p>
             </section>
           ) : null}
         </main>
@@ -242,16 +273,21 @@ export default async function ServiceDetailPage({
             Informações úteis
           </h2>
           <div className="mt-4 divide-y divide-border text-sm">
-            {service.address ? (
+            {location ? (
               <p className="flex gap-3 py-3">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-alpine-wine" />
-                {[service.address, service.neighborhood].filter(Boolean).join(" · ")}
+                {location}
               </p>
             ) : null}
-            {service.openingHours ? (
+            {openingHours ? (
               <p className="flex gap-3 py-3">
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 text-alpine-wine" />
-                {service.openingHours}
+                <span>
+                  <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Horário de funcionamento
+                  </span>
+                  <span className="mt-1 block leading-6">{openingHours}</span>
+                </span>
               </p>
             ) : null}
             {service.phone || service.whatsapp ? (
@@ -261,6 +297,7 @@ export default async function ServiceDetailPage({
               </p>
             ) : null}
           </div>
+
           <div className="mt-5 grid gap-2">
             {callUrl ? (
               <Button asChild variant="warm">

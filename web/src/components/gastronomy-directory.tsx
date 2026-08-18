@@ -125,8 +125,13 @@ function FilterButton({
 function PlacesGrid({ places }: { places: FoodPlace[] }) {
   return (
     <div className="grid items-stretch gap-5 md:grid-cols-2 lg:grid-cols-3">
-      {places.map((place) => (
-        <FoodCard key={place.id || place.slug || place.name} place={place} compact />
+      {places.map((place, index) => (
+        <FoodCard
+          key={place.id || place.slug || place.name}
+          place={place}
+          compact
+          priority={index === 0}
+        />
       ))}
     </div>
   );
