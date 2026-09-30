@@ -282,6 +282,7 @@ const restauranteSchema = z.object({
   dica_turista: optionalTextSchema(1000),
   cardapio_url: optionalUrl,
   faixa_preco: z.enum(["R$", "R$$", "R$$$"]).nullable(),
+  faixa_valores: optionalTextSchema(120),
   whatsapp_message: optionalTextSchema(800),
   site_url: optionalUrl,
   ativo: z.boolean(),
@@ -637,6 +638,7 @@ function parsePayload(entity: AdminEntity, formData: FormData) {
     dica_turista: optionalText(formData.get("dica_turista")),
     cardapio_url: optionalText(formData.get("cardapio_url")),
     faixa_preco: optionalText(formData.get("faixa_preco")),
+    faixa_valores: optionalText(formData.get("faixa_valores")),
     whatsapp_message: optionalText(formData.get("whatsapp_message")),
     site_url: optionalText(formData.get("site_url")),
     ativo: formData.get("ativo") === "on",
@@ -1703,6 +1705,7 @@ export async function seedDefaultContent(): Promise<ActionResult> {
         dica_turista: place.firstVisitTip || null,
         cardapio_url: place.menuUrl || null,
         faixa_preco: place.priceRange || null,
+        faixa_valores: place.priceValueRange || null,
         destaque: Boolean(place.isFeatured),
         ativo: true,
       };

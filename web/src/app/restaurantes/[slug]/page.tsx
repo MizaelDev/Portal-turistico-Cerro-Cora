@@ -114,8 +114,8 @@ function detailDescription(place: FoodPlace) {
   return `Conheça ${place.name} em Cerro Corá-RN: ${specialty.toLowerCase()}, horários, fotos, localização e contato para visitantes.`;
 }
 
-function formatPriceRange(priceRange?: FoodPlace["priceRange"]) {
-  return priceRange || "R$ - R$$$";
+function formatPriceRange(priceValueRange?: string, priceRange?: FoodPlace["priceRange"]) {
+  return priceValueRange?.trim() || priceRange || "Consultar valores";
 }
 
 type HouseOffering = {
@@ -304,7 +304,7 @@ export default async function RestaurantDetailPage({ params }: RestaurantPagePro
   const features = place.features || [];
   const houseOfferings = getHouseOfferings(place, specialties, features);
   const paymentMethods = place.paymentMethods || [];
-  const priceRange = formatPriceRange(place.priceRange);
+  const priceRange = formatPriceRange(place.priceValueRange, place.priceRange);
   const analyticsMeta = {
     establishmentName: place.name,
     category: place.category,

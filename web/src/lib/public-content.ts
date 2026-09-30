@@ -44,7 +44,8 @@ const restaurantColumns =
   "id,nome,descricao,categoria,horario_funcionamento,endereco,mapa_url,instagram,instagram_url,whatsapp,imagem_url,tags,ativo,created_at";
 const legacyExtendedRestaurantColumns =
   "id,nome,slug,descricao,descricao_completa,categoria,horario_funcionamento,business_hours,endereco,localizacao_resumida,mapa_url,instagram,instagram_url,whatsapp,telefone,imagem_url,logo_url,imagens_urls,tags,formas_pagamento,diferenciais,especialidades,prato_recomendado,dica_turista,cardapio_url,faixa_preco,destaque,whatsapp_message,site_url,ativo,created_at,updated_at";
-const extendedRestaurantColumns = `${legacyExtendedRestaurantColumns},gallery_enabled,carousel_enabled,featured_order`;
+const orderedRestaurantColumns = `${legacyExtendedRestaurantColumns},gallery_enabled,carousel_enabled,featured_order`;
+const extendedRestaurantColumns = `${orderedRestaurantColumns},faixa_valores`;
 const publicContentTimeoutMs = 8000;
 
 const fetchWithTimeout: typeof fetch = async (input, init) => {
@@ -238,6 +239,7 @@ function mapRestaurante(row: RestauranteRow): FoodPlace {
     mapUrl: row.mapa_url || undefined,
     menuUrl: row.cardapio_url || undefined,
     priceRange: row.faixa_preco || undefined,
+    priceValueRange: row.faixa_valores || undefined,
     paymentMethods: row.formas_pagamento || undefined,
     features: row.diferenciais || undefined,
     specialties,
@@ -421,25 +423,37 @@ async function fetchPublicFoodPlaces(): Promise<PublicContent<FoodPlace>> {
   let error = extendedResult.error;
 
   if (isSchemaCacheError(error)) {
-    const legacyFallback = await supabase
+    const orderedFallback = await supabase
       .from("restaurantes")
-      .select(legacyExtendedRestaurantColumns)
+      .select(orderedRestaurantColumns)
       .eq("ativo", true)
       .order("nome")
       .limit(200);
 
-    data = legacyFallback.data as RestauranteRow[] | null;
-    error = legacyFallback.error;
+    data = orderedFallback.data as RestauranteRow[] | null;
+    error = orderedFallback.error;
 
     if (isSchemaCacheError(error)) {
-      const minimalFallback = await supabase
+      const legacyFallback = await supabase
         .from("restaurantes")
-        .select(restaurantColumns)
+        .select(legacyExtendedRestaurantColumns)
         .eq("ativo", true)
         .order("nome")
         .limit(200);
-      data = minimalFallback.data as RestauranteRow[] | null;
-      error = minimalFallback.error;
+
+      data = legacyFallback.data as RestauranteRow[] | null;
+      error = legacyFallback.error;
+
+      if (isSchemaCacheError(error)) {
+        const minimalFallback = await supabase
+          .from("restaurantes")
+          .select(restaurantColumns)
+          .eq("ativo", true)
+          .order("nome")
+          .limit(200);
+        data = minimalFallback.data as RestauranteRow[] | null;
+        error = minimalFallback.error;
+      }
     }
   }
 

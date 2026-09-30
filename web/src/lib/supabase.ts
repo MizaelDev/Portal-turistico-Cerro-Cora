@@ -131,6 +131,7 @@ export type RestauranteRow = {
   dica_turista?: string | null;
   cardapio_url?: string | null;
   faixa_preco?: "R$" | "R$$" | "R$$$" | null;
+  faixa_valores?: string | null;
   destaque?: boolean | null;
   plano?: DeprecatedCommercialPlan | DeprecatedLegacyPlan | null;
   plan_type?: DeprecatedCommercialPlan | null;

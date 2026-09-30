@@ -48,6 +48,7 @@ export type FoodPlace = {
   mapUrl?: string;
   menuUrl?: string;
   priceRange?: "R$" | "R$$" | "R$$$";
+  priceValueRange?: string;
   paymentMethods?: string[];
   features?: string[];
   specialties?: string[];

@@ -171,6 +171,7 @@ const emptyForms: Record<AdminEntity, FormState> = {
     dica_turista: "",
     cardapio_url: "",
     faixa_preco: "",
+    faixa_valores: "",
     whatsapp_message: "",
     site_url: "",
     ativo: true,
@@ -750,6 +751,7 @@ function rowToForm(entity: AdminEntity, row: AdminRow): FormState {
       dica_turista: restaurant.dica_turista || "",
       cardapio_url: restaurant.cardapio_url || "",
       faixa_preco: restaurant.faixa_preco || "",
+      faixa_valores: restaurant.faixa_valores || "",
       whatsapp_message: restaurant.whatsapp_message || "",
       site_url: restaurant.site_url || "",
       ativo: restaurant.ativo,
@@ -3402,15 +3404,37 @@ export function AdminDashboard({
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="faixa_preco">Faixa de preço</Label>
-                      <Input
-                        id="faixa_preco"
-                        name="faixa_preco"
-                        value={String(form.faixa_preco || "")}
-                        onChange={(event) => updateField("faixa_preco", event.target.value)}
-                        placeholder="R$, R$$ ou R$$$"
-                      />
+                      <Label htmlFor="faixa_preco">Categoria de preço</Label>
+                      <input type="hidden" name="faixa_preco" value={String(form.faixa_preco || "")} />
+                      <Select
+                        value={String(form.faixa_preco || "not_informed")}
+                        onValueChange={(value) => updateField("faixa_preco", value === "not_informed" ? "" : value)}
+                      >
+                        <SelectTrigger id="faixa_preco">
+                          <SelectValue placeholder="Não informada" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_informed">Não informada</SelectItem>
+                          <SelectItem value="R$">R$</SelectItem>
+                          <SelectItem value="R$$">R$$</SelectItem>
+                          <SelectItem value="R$$$">R$$$</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="faixa_valores">Faixa de valores</Label>
+                    <Input
+                      id="faixa_valores"
+                      name="faixa_valores"
+                      value={String(form.faixa_valores || "")}
+                      onChange={(event) => updateField("faixa_valores", event.target.value)}
+                      placeholder="Ex: R$ 15 a R$ 70"
+                      maxLength={120}
+                    />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Opcional. Quando preenchida, esta informação aparece no site no lugar da categoria de preço.
+                    </p>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="descricao_completa">Descrição completa</Label>
