@@ -48,6 +48,8 @@ export function RestaurantGallery({
   const hasMultipleImages = uniqueImages.length > 1;
   const activeImage = uniqueImages[activeIndex] || "";
   const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
+  const thumbnailImages = uniqueImages.slice(0, 4);
+  const remainingImageCount = Math.max(0, uniqueImages.length - thumbnailImages.length);
 
   useAdjacentImagePreload({
     images: uniqueImages,
@@ -195,20 +197,30 @@ export function RestaurantGallery({
         </span>
       </div>
 
-      {hasMultipleImages ? (
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
-          {uniqueImages.map((image, index) => (
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+        {thumbnailImages.map((image, index) => {
+          const isOverflowThumbnail = index === 3 && remainingImageCount > 0;
+          const isActiveThumbnail =
+            activeIndex === index || (isOverflowThumbnail && activeIndex >= index);
+          const remainingLabel = `+${remainingImageCount} ${remainingImageCount === 1 ? "foto" : "fotos"}`;
+
+          return (
             <button
               key={image}
               type="button"
-              aria-label={`Abrir foto ${index + 1}`}
+              aria-label={
+                isOverflowThumbnail
+                  ? `Abrir galeria com mais ${remainingImageCount} ${remainingImageCount === 1 ? "foto" : "fotos"}`
+                  : `Abrir foto ${index + 1}`
+              }
               onClick={() => {
                 trackGalleryInteraction("gallery_click");
                 setActiveIndex(index);
+                if (isOverflowThumbnail) setIsLightboxOpen(true);
               }}
               className={cn(
-                "relative aspect-[4/3] overflow-hidden rounded-md border bg-muted transition-all",
-                activeIndex === index
+                "relative aspect-[4/3] min-w-0 overflow-hidden rounded-md border bg-muted transition-all",
+                isActiveThumbnail
                   ? "border-alpine-sunset ring-2 ring-alpine-sunset/30"
                   : "border-border opacity-75 hover:opacity-100",
               )}
@@ -217,18 +229,23 @@ export function RestaurantGallery({
                 src={failedImages.has(image) ? fallbackImage : image}
                 alt={imageAltTexts[index] || `Miniatura ${index + 1} de ${name}`}
                 fill
-                sizes="120px"
+                sizes="(min-width: 640px) 180px, 25vw"
                 quality={75}
                 loading="lazy"
                 onError={() => markImageAsFailed(image)}
                 className="object-cover"
               />
+              {isOverflowThumbnail ? (
+                <span className="absolute inset-0 flex items-end justify-end bg-gradient-to-t from-black/65 via-black/10 to-transparent p-2 text-xs font-semibold text-white drop-shadow-sm sm:p-3">
+                  {remainingLabel}
+                </span>
+              ) : null}
             </button>
-          ))}
-        </div>
-      ) : null}
+          );
+        })}
+      </div>
 
-      {enableLightbox && isLightboxOpen ? (
+      {isLightboxOpen ? (
         <div
           role="dialog"
           aria-modal="true"
