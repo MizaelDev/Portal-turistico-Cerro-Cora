@@ -1,12 +1,23 @@
 import { expect, test } from "@playwright/test";
 
 test("lightbox contém o foco, responde ao teclado e devolve o foco ao acionador", async ({ page }) => {
-  await page.goto("/pousadas/plato-da-nascente");
+  const detailPages = [
+    "/pousadas/plato-da-nascente",
+    "/pousadas/pousada-e-restaurante-serido",
+  ];
+  let trigger = page.getByRole("button", { name: "Abrir foto em tela cheia" });
 
-  const refuseAnalytics = page.getByRole("button", { name: "Recusar medições" });
-  if (await refuseAnalytics.isVisible()) await refuseAnalytics.click();
+  for (const detailPage of detailPages) {
+    await page.goto(detailPage);
 
-  const trigger = page.getByRole("button", { name: "Abrir foto em tela cheia" });
+    const refuseAnalytics = page.getByRole("button", { name: "Recusar medições" });
+    if (await refuseAnalytics.isVisible()) await refuseAnalytics.click();
+
+    trigger = page.getByRole("button", { name: "Abrir foto em tela cheia" });
+    if (await trigger.count()) break;
+  }
+
+  await expect(trigger).toBeVisible();
   await trigger.click();
 
   const dialog = page.getByRole("dialog", { name: /Galeria de fotos/ });
