@@ -15,6 +15,12 @@ import { assertSameOriginRequest } from "@/lib/server-request-security";
 import { slugify } from "@/lib/slug";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { supabaseUrl, type AdminEntity } from "@/lib/supabase";
+import {
+  ImageUploadError,
+  maxUploadFiles,
+  normalizeUploadedImage,
+} from "@/lib/image-upload";
+import { reportServerError } from "@/lib/server-logger";
 
 type ActionResult = {
   ok: boolean;
@@ -25,9 +31,6 @@ type UploadResult = ActionResult & {
   urls: string[];
 };
 
-const allowedImageTypes = ["image/jpeg", "image/png", "image/webp", "image/avif"];
-const maxImageSize = 6 * 1024 * 1024;
-const maxUploadFiles = 5;
 const maxGalleryImages = 60;
 const allowedExternalImageHosts = ["images.unsplash.com", "images.pexels.com"];
 const adminEntitySchema = z.enum(["pontos_turisticos", "pousadas", "restaurantes", "city_services"]);
@@ -62,8 +65,13 @@ function isSafeImagePathOrUrl(value: string) {
   if (!isHttpsUrl(value)) return false;
 
   try {
-    const hostname = new URL(value).hostname;
-    return allowedExternalImageHosts.includes(hostname) || hostname.endsWith(".supabase.co");
+    const imageUrl = new URL(value);
+    const configuredSupabaseHostname = supabaseUrl ? new URL(supabaseUrl).hostname : null;
+    return (
+      allowedExternalImageHosts.includes(imageUrl.hostname) ||
+      (imageUrl.hostname === configuredSupabaseHostname &&
+        imageUrl.pathname.startsWith("/storage/v1/object/public/tourism/"))
+    );
   } catch {
     return false;
   }
@@ -474,9 +482,7 @@ function storagePathFromPublicUrl(url: string) {
 }
 
 function logAdminError(scope: string, error: unknown) {
-  if (process.env.NODE_ENV !== "production") {
-    console.error(`[admin:${scope}]`, error);
-  }
+  reportServerError(`admin:${scope}`, error);
 }
 
 async function requireAdmin() {
@@ -1743,37 +1749,6 @@ function sanitizeFileName(name: string) {
   return base || "imagem";
 }
 
-function extensionFromType(type: string) {
-  if (type === "image/png") return "png";
-  if (type === "image/webp") return "webp";
-  return "jpg";
-}
-
-function hasImageSignature(type: string, bytes: Uint8Array) {
-  if (type === "image/jpeg") {
-    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-
-  if (type === "image/png") {
-    return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-  }
-
-  if (type === "image/webp") {
-    return (
-      bytes[0] === 0x52 &&
-      bytes[1] === 0x49 &&
-      bytes[2] === 0x46 &&
-      bytes[3] === 0x46 &&
-      bytes[8] === 0x57 &&
-      bytes[9] === 0x45 &&
-      bytes[10] === 0x42 &&
-      bytes[11] === 0x50
-    );
-  }
-
-  return false;
-}
-
 export async function uploadAdminImages(
   entity: AdminEntity | "route_leaflet",
   formData: FormData,
@@ -1793,37 +1768,39 @@ export async function uploadAdminImages(
       return { ok: false, message: `Envie no máximo ${maxUploadFiles} imagens por vez.`, urls: [] };
     }
 
-    const validatedFiles: Array<{ file: File; safeName: string; extension: string }> = [];
+    const validatedFiles: Array<{
+      data: Buffer;
+      safeName: string;
+      extension: "webp";
+      contentType: "image/webp";
+    }> = [];
     for (const file of files) {
-      if (!allowedImageTypes.includes(file.type)) {
-        return { ok: false, message: "Use apenas imagens JPG, PNG ou WebP.", urls: [] };
+      try {
+        const normalized = await normalizeUploadedImage(file);
+        validatedFiles.push({
+          data: normalized.data,
+          safeName: sanitizeFileName(file.name),
+          extension: normalized.extension,
+          contentType: normalized.contentType,
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof ImageUploadError ? error.message : "Não foi possível validar a imagem.",
+          urls: [],
+        };
       }
-
-      if (file.size > maxImageSize) {
-        return { ok: false, message: "Cada imagem deve ter no máximo 6 MB.", urls: [] };
-      }
-
-      const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-      if (!hasImageSignature(file.type, bytes)) {
-        return { ok: false, message: "O arquivo enviado não parece ser uma imagem válida.", urls: [] };
-      }
-
-      validatedFiles.push({
-        file,
-        safeName: sanitizeFileName(file.name),
-        extension: extensionFromType(file.type),
-      });
     }
 
     const urls: string[] = [];
     const uploadedPaths: string[] = [];
 
-    for (const { file, safeName, extension } of validatedFiles) {
+    for (const { data: fileData, safeName, extension, contentType } of validatedFiles) {
       const path = `${entity}/${Date.now()}-${crypto.randomUUID()}-${safeName}.${extension}`;
-      const { error } = await supabase.storage.from("tourism").upload(path, file, {
+      const { error } = await supabase.storage.from("tourism").upload(path, fileData, {
         cacheControl: "31536000",
         upsert: false,
-        contentType: file.type,
+        contentType,
       });
 
       if (error) {

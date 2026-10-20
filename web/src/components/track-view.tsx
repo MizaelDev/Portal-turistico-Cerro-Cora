@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { analyticsService, type CommercialEntityType } from "@/lib/analytics";
+import { useAnalyticsConsent } from "@/components/analytics-consent-provider";
 
 type TrackViewProps = {
   children: ReactNode;
@@ -24,9 +25,10 @@ export function TrackView({
 }: TrackViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const sentRef = useRef(false);
+  const { consent } = useAnalyticsConsent();
 
   useEffect(() => {
-    if (!entityId || sentRef.current || !ref.current) return;
+    if (consent !== "granted" || !entityId || sentRef.current || !ref.current) return;
 
     const send = () => {
       if (sentRef.current) return;
@@ -53,7 +55,7 @@ export function TrackView({
 
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [category, entityId, entityType, establishmentName, eventType]);
+  }, [category, consent, entityId, entityType, establishmentName, eventType]);
 
   return (
     <div ref={ref} className={className}>

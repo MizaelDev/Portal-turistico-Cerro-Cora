@@ -12,7 +12,7 @@ Execute em ambiente local ou Preview protegido, nunca de forma destrutiva em pro
 8. Envie analytics com `eventType` fora da allowlist: HTTP 400.
 9. Envie analytics com UUID inexistente/inativo: HTTP 404.
 10. Repita o mesmo clique rapidamente: somente uma janela deve ser contabilizada depois da migration.
-11. Envie SVG, HTML renomeado, JPEG com assinatura falsa e imagem acima de 6 MB: todos devem falhar.
+11. Envie SVG, AVIF, GIF, HTML renomeado, JPEG com assinatura falsa e imagem acima de 5 MB: todos devem falhar.
 12. Teste `javascript:`, `data:`, `file:` e URL de host falso nos campos externos: a validacao deve falhar.
 13. Cadastre texto contendo `<script>alert(1)</script>`: deve aparecer como texto, nunca executar.
 14. Bloqueie GA4 no navegador: navegacao e CTAs devem continuar funcionando.
@@ -22,7 +22,7 @@ Execute em ambiente local ou Preview protegido, nunca de forma destrutiva em pro
 18. Compare contagens de analytics antes/depois sem consultar ou apagar eventos individuais.
 19. Configure ADMIN_SESSION_MAX_HOURS=12, autentique e confirme que uma sessao mais antiga e encerrada pelo middleware.
 20. Envie POST /api/track sem JSON, com origem externa e com mais de 16 KB: espere 415, 403 e 413.
-21. Confirme que um upload aceita no maximo 5 arquivos por lote, 6 MB por arquivo e somente JPG, PNG ou WebP validos.
+21. Confirme que um upload aceita no maximo 5 arquivos por lote, 5 MB por arquivo e somente JPG, PNG ou WebP validos; o objeto final deve ser WebP sem metadados da origem.
 22. Rode supabase/security-hardening.sql depois das migrations funcionais e verifique que clear_login_rate_limit nao pode ser chamado pela role anon.
 
 ## Configuracao de producao

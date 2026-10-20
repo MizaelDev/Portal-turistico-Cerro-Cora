@@ -4,8 +4,24 @@
 
 begin;
 
--- O reset de tentativas so e necessario depois que o login criou uma sessao.
-revoke execute on function public.clear_login_rate_limit(text) from anon;
+-- O reset de tentativas so e permitido para uma sessao administrativa valida.
+create or replace function public.clear_login_rate_limit(p_identifier text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null or not public.is_admin(auth.uid()) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  delete from public.login_rate_limits
+  where identifier = left(p_identifier, 160);
+end;
+$$;
+
+revoke all on function public.clear_login_rate_limit(text) from public, anon, authenticated;
 grant execute on function public.clear_login_rate_limit(text) to authenticated;
 
 create or replace function public.check_login_rate_limit(

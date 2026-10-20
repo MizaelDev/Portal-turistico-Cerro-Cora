@@ -56,12 +56,18 @@ $$;
 
 create or replace function public.clear_login_rate_limit(p_identifier text)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  if auth.uid() is null or not public.is_admin(auth.uid()) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
   delete from public.login_rate_limits
-  where identifier = p_identifier;
+  where identifier = left(p_identifier, 160);
+end;
 $$;
 
 revoke all on function public.check_login_rate_limit(text, integer, integer) from public;

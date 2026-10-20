@@ -8,6 +8,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import { reportServerError } from "@/lib/server-logger";
 import {
   PUBLIC_CACHE_TAGS,
   PUBLIC_CONTENT_CACHE_SECONDS,
@@ -357,7 +358,7 @@ async function fetchActiveCityServices() {
     .order("name")
     .limit(500);
   if (legacyResult.error) {
-    if (process.env.NODE_ENV !== "production") console.error("[city-services]", legacyResult.error);
+    reportServerError("city-services:list", legacyResult.error);
     return cityServices;
   }
   return ((legacyResult.data || []) as unknown as ExtendedCityServiceRow[]).map(mapCityService);
@@ -414,7 +415,7 @@ async function fetchCityServiceBySlug(slug: string) {
     .maybeSingle();
 
   if (legacyResult.error) {
-    if (process.env.NODE_ENV !== "production") console.error("[city-service]", legacyResult.error);
+    reportServerError("city-services:detail", legacyResult.error);
     return (
       cityServices.find((service) => service.slug === slug && service.detailsEnabled) ||
       null

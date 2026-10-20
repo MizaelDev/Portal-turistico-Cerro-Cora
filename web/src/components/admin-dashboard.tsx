@@ -1863,7 +1863,7 @@ export function AdminDashboard({
       } catch {
         setStatus({
           type: "error",
-          text: "Não foi possível enviar a imagem. Use JPEG, PNG, WebP ou AVIF com até 6 MB.",
+          text: "Não foi possível enviar a imagem. Use JPEG, PNG ou WebP com até 5 MB.",
         });
       }
     });
@@ -2246,8 +2246,8 @@ export function AdminDashboard({
                         <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border p-4 text-center hover:bg-accent/25">
                           {isUploading ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <ImagePlus className="mb-2 h-5 w-5" />}
                           <span className="text-sm font-medium">Enviar {selectedCityServiceAssetField === "logo_url" ? "logo" : "foto"}</span>
-                          <span className="mt-1 text-xs text-muted-foreground">JPEG, PNG, WebP ou AVIF, até 6 MB.</span>
-                          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset(selectedCityServiceAssetField, event.target.files); event.target.value = ""; }} />
+                          <span className="mt-1 text-xs text-muted-foreground">JPEG, PNG ou WebP, até 5 MB.</span>
+                          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset(selectedCityServiceAssetField, event.target.files); event.target.value = ""; }} />
                         </label>
                       )}
 
@@ -2322,7 +2322,7 @@ export function AdminDashboard({
                           <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border p-4 text-center hover:bg-accent/25">
                             {isUploading ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <ImagePlus className="mb-2 h-5 w-5" />}
                             <span className="text-sm font-medium">Enviar foto de capa</span>
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("cover_url", event.target.files); event.target.value = ""; }} />
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("cover_url", event.target.files); event.target.value = ""; }} />
                           </label>
                           {isSafePreviewImage(String(form.cover_url || "")) ? (
                             <div className="flex items-center gap-3 rounded-md border border-border p-2">
@@ -2344,7 +2344,7 @@ export function AdminDashboard({
                           <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border p-4 text-center hover:bg-accent/25">
                             {isUploading ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <ImagePlus className="mb-2 h-5 w-5" />}
                             <span className="text-sm font-medium">Enviar logo</span>
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("logo_url", event.target.files); event.target.value = ""; }} />
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("logo_url", event.target.files); event.target.value = ""; }} />
                           </label>
                           {isSafePreviewImage(String(form.logo_url || "")) ? (
                             <div className="flex items-center gap-3 rounded-md border border-border p-2">
@@ -2396,7 +2396,7 @@ export function AdminDashboard({
                           <ImagePlus className="mb-2 h-5 w-5" />
                           <span className="text-sm font-medium">Adicionar fotos à galeria</span>
                           <span className="mt-1 text-xs text-muted-foreground">As fotos são carregadas somente na página individual.</span>
-                          <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("gallery_urls", event.target.files); event.target.value = ""; }} />
+                          <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={isUploading} onChange={(event) => { uploadCityServiceAsset("gallery_urls", event.target.files); event.target.value = ""; }} />
                         </label>
                         <Textarea name="gallery_urls" value={String(form.gallery_urls || "")} onChange={(event) => updateField("gallery_urls", event.target.value)} placeholder="Uma URL por linha" />
                         <input type="hidden" name="gallery_alt_texts" value={String(form.gallery_alt_texts || "[]")} />
@@ -2598,7 +2598,7 @@ export function AdminDashboard({
                       </span>
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        accept="image/jpeg,image/png,image/webp"
                         multiple
                         className="sr-only"
                         disabled={isUploading}
@@ -3111,7 +3111,7 @@ export function AdminDashboard({
                           </span>
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            accept="image/jpeg,image/png,image/webp"
                             className="sr-only"
                             disabled={isUploading}
                             onChange={(event) => {
@@ -3163,7 +3163,7 @@ export function AdminDashboard({
                       </span>
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        accept="image/jpeg,image/png,image/webp"
                         multiple
                         className="sr-only"
                         disabled={isUploading}
@@ -3589,7 +3589,7 @@ export function AdminDashboard({
                       </span>
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        accept="image/jpeg,image/png,image/webp"
                         className="sr-only"
                         disabled={isUploading}
                         onChange={(event) => {
@@ -3637,7 +3637,7 @@ export function AdminDashboard({
                           </span>
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            accept="image/jpeg,image/png,image/webp"
                             className="sr-only"
                             disabled={isUploading}
                             onChange={(event) => {
@@ -3689,7 +3689,7 @@ export function AdminDashboard({
                       </span>
                       <input
                         type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        accept="image/jpeg,image/png,image/webp"
                         multiple
                         className="sr-only"
                         disabled={isUploading}

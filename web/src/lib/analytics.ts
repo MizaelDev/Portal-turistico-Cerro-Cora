@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  analyticsSessionKey,
+  analyticsViewDedupePrefix,
+  hasAnalyticsConsent,
+} from "@/lib/analytics-consent";
+
 export type CommercialEntityType = "restaurant" | "lodging" | "city_service";
 
 export type CommercialEventType =
@@ -31,12 +37,10 @@ type TrackOptions = {
 
 declare global {
   interface Window {
-    gtag?: (command: "event", eventName: string, params?: Record<string, unknown>) => void;
+    gtag?: (command: string, eventName: string, params?: Record<string, unknown>) => void;
   }
 }
 
-const sessionKey = "portal_commercial_session_id";
-const viewDedupePrefix = "portal_commercial_seen";
 const clickDebounceMs = 1500;
 const lastClickMap = new Map<string, number>();
 
@@ -60,11 +64,11 @@ function getSessionId() {
   if (typeof window === "undefined") return "";
 
   try {
-    const current = window.sessionStorage.getItem(sessionKey);
+    const current = window.sessionStorage.getItem(analyticsSessionKey);
     if (current) return current;
 
     const value = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    window.sessionStorage.setItem(sessionKey, value);
+    window.sessionStorage.setItem(analyticsSessionKey, value);
     return value;
   } catch {
     return window.crypto?.randomUUID?.() || "anonymous";
@@ -77,7 +81,7 @@ function shouldSkip(payload: AnalyticsPayload, dedupe: TrackOptions["dedupe"]) {
   const key = `${payload.entityType}:${payload.entityId}:${payload.eventType}`;
 
   if (dedupe === "session") {
-    const storageKey = `${viewDedupePrefix}:${key}`;
+    const storageKey = `${analyticsViewDedupePrefix}:${key}`;
     try {
       if (window.sessionStorage.getItem(storageKey)) return true;
       window.sessionStorage.setItem(storageKey, "1");
@@ -136,7 +140,7 @@ function sendToSupabase(payload: Required<Pick<AnalyticsPayload, "entityId">> & 
 
 export const analyticsService = {
   trackDirectoryEvent(eventName: "search" | "category_select" | "subcategory_select" | "quick_access_click", value: string) {
-    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+    if (!hasAnalyticsConsent() || typeof window === "undefined" || typeof window.gtag !== "function") return;
     try {
       window.gtag("event", `city_services_${eventName}`, {
         filter_value: value.slice(0, 120),
@@ -147,6 +151,7 @@ export const analyticsService = {
     }
   },
   track(payload: AnalyticsPayload, options: TrackOptions = { dedupe: "debounce" }) {
+    if (!hasAnalyticsConsent()) return;
     if (shouldSkip(payload, options.dedupe)) return;
 
     const normalizedPayload = {

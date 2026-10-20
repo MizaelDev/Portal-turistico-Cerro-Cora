@@ -23,16 +23,10 @@ export function WeatherWidget() {
   const [source, setSource] = useState("mock");
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-    if (!key) return;
-
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 6000);
 
-    fetch(
-      `https://api.openweathermap.org/data/2.5/weather?q=Cerro%20Cora,BR&units=metric&lang=pt_br&appid=${key}`,
-      { signal: controller.signal },
-    )
+    fetch("/api/weather", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Não foi possível carregar o clima.");
@@ -41,13 +35,8 @@ export function WeatherWidget() {
         return response.json();
       })
       .then((data) => {
-        if (!data?.main) return;
-        setWeather({
-          temp: Math.round(data.main.temp),
-          humidity: data.main.humidity,
-          wind: Math.round(data.wind?.speed * 3.6 || 0),
-          description: data.weather?.[0]?.description || fallback.description,
-        });
+        if (!data?.ok || !data.weather) return;
+        setWeather(data.weather);
         setSource("openweather");
       })
       .catch(() => setSource("mock"))

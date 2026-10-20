@@ -3,6 +3,22 @@ import { fileURLToPath } from "node:url";
 
 const appDir = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = process.env.NODE_ENV !== "production";
+const fallbackSupabaseHostname = "ywygulaxlbuzvnhhzlid.supabase.co";
+let supabaseHostname = fallbackSupabaseHostname;
+
+try {
+  const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (configuredSupabaseUrl) {
+    const configuredHostname = new URL(configuredSupabaseUrl).hostname;
+    if (/^[a-z0-9-]+\.supabase\.co$/i.test(configuredHostname)) {
+      supabaseHostname = configuredHostname;
+    }
+  }
+} catch {
+  // Mantém o host público conhecido; configuração inválida falhará na validação da aplicação.
+}
+
+const supabaseOrigin = `https://${supabaseHostname}`;
 
 const securityHeaders = [
   {
@@ -16,13 +32,13 @@ const securityHeaders = [
       "script-src-attr 'none'",
       `script-src 'self' 'unsafe-inline' https://www.googletagmanager.com${isDevelopment ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://images.unsplash.com https://images.pexels.com https://*.supabase.co https://www.google-analytics.com https://*.google-analytics.com",
+      `img-src 'self' data: blob: https://images.unsplash.com https://images.pexels.com ${supabaseOrigin} https://www.google-analytics.com https://*.google-analytics.com`,
       "font-src 'self' data:",
       "frame-src 'self' https://www.google.com https://maps.google.com",
-      "media-src 'self' https://*.supabase.co",
+      `media-src 'self' ${supabaseOrigin}`,
       "worker-src 'self' blob:",
       "manifest-src 'self'",
-      `connect-src 'self' https://api.openweathermap.org https://*.supabase.co https://vitals.vercel-insights.com https://www.google-analytics.com https://*.google-analytics.com${
+      `connect-src 'self' ${supabaseOrigin} https://vitals.vercel-insights.com https://www.google-analytics.com https://*.google-analytics.com${
         isDevelopment ? " ws://localhost:* http://localhost:*" : ""
       }`,
       ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
@@ -76,13 +92,14 @@ const adminHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: appDir,
+  poweredByHeader: false,
   experimental: {
     serverActions: {
-      bodySizeLimit: "32mb",
+      bodySizeLimit: "27mb",
     },
   },
   images: {
-    formats: ["image/avif", "image/webp"],
+    formats: ["image/webp"],
     qualities: [45, 52, 75, 76, 78, 82, 84, 85, 88, 90, 92],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
@@ -96,7 +113,8 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.supabase.co",
+        hostname: supabaseHostname,
+        pathname: "/storage/v1/object/public/tourism/**",
       },
     ],
   },

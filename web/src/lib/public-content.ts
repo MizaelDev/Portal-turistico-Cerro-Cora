@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import { reportServerError } from "@/lib/server-logger";
 import {
   PUBLIC_CACHE_TAGS,
   PUBLIC_CONTENT_CACHE_SECONDS,
@@ -74,9 +75,7 @@ const fetchWithTimeout: typeof fetch = async (input, init) => {
 };
 
 function logPublicContentError(scope: string, error: unknown) {
-  if (process.env.NODE_ENV !== "production") {
-    console.error(`[public-content:${scope}]`, error);
-  }
+  reportServerError(`public-content:${scope}`, error);
 }
 
 function titleCase(value: string) {

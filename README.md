@@ -8,10 +8,10 @@ MVP  em Next.js 15 para divulgar Cerro Corá, a "Suíça do Seridó", com págin
 - TypeScript
 - TailwindCSS
 - Framer Motion
-- Componentes estilo Shadcn/UI
+- Componentes próprios sobre Radix UI
 - Supabase Auth e Database
 - `@supabase/ssr` para sessão com cookies
-- 
+- Vercel para deploy e tarefas agendadas
 
 ## Principais telas
 
@@ -26,7 +26,7 @@ MVP  em Next.js 15 para divulgar Cerro Corá, a "Suíça do Seridó", com págin
 
 ```bash
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -42,20 +42,27 @@ NEXT_PUBLIC_WHATSAPP_NUMBER=5584999999999
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_GOOGLE_MAPS_EMBED_URL=https://www.google.com/maps?q=Cerro%20Cor%C3%A1%20RN&output=embed
-NEXT_PUBLIC_OPENWEATHER_API_KEY=
+OPENWEATHER_API_KEY=
+NEXT_PUBLIC_GA_MEASUREMENT_ID=
+ANALYTICS_HASH_SALT=
+SUPABASE_SERVICE_ROLE_KEY=
+ANALYTICS_RETENTION_DAYS=
+CRON_SECRET=
 ```
 
+Analytics é opcional e permanece desligado até a escolha do visitante. Variáveis privadas nunca devem usar o prefixo `NEXT_PUBLIC_`. Consulte `web/docs/SECURITY_VARIABLES.md`.
 
 
 ## Como conectar Supabase
 
-1. Crie um projeto no Supabase.
-2. Rode o SQL em `web/supabase/schema.sql` no SQL Editor.
-3. Opcionalmente, rode `web/supabase/seed.sql` para inserir os dados iniciais do portal.
-4. Em Authentication, crie um usuário com email e senha.
-5. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-6. Reinicie `npm run dev`.
-7. Acesse `/admin/login` e entre com o usuário criado.
+1. Crie um projeto Supabase isolado.
+2. Para instalação nova, siga exatamente a ordem em `web/supabase/MIGRATION_INVENTORY.md`.
+3. Para banco existente, não reaplique o schema. Execute primeiro `web/supabase/verification/read-only-security-audit.sql`, registre um baseline e aplique apenas migrations ausentes.
+4. `seed.sql` é opcional, apaga conteúdo das tabelas principais e só pode ser usado em projeto novo/descartável.
+5. Em Authentication, crie um usuário com email e senha.
+6. Preencha `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+7. Reinicie `npm run dev`.
+8. Acesse `/admin/login` e entre com o usuário criado.
 
 Depois de criar o usuário em Authentication, marque esse usuário como administrador no SQL Editor:
 
@@ -73,6 +80,31 @@ As tabelas usadas são:
 - `pousadas`
 - `restaurantes`
 - `admin_users`
+- `city_services`
+- `service_categories`
+- tabelas agregadas e internas de analytics protegidas por RLS
+
+## Verificações antes de revisar
+
+```bash
+cd web
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npm audit --omit=dev
+```
+
+O workflow de CI executa essas verificações sem segredos de produção e também roda os testes Playwright em Chromium. Testes de integração que escrevam no Supabase devem usar ambiente isolado e não fazem parte do conjunto unitário padrão.
+
+## Deploy
+
+- A Root Directory da Vercel deve ser `web`.
+- A branch de produção deve ser `main` protegida por CI.
+- O Cron de retenção exige `CRON_SECRET`, `ANALYTICS_RETENTION_DAYS` e service role somente no servidor.
+- O conteúdo legado em `api/` e `login.html` não faz parte do deploy; consulte `web/docs/LEGACY_CODE.md`.
+- Antes de publicar, siga `web/docs/RELEASE_CHECKLIST.md`; os avisos de dependências avaliados estão em `web/docs/DEPENDENCY_SECURITY.md`.
 
 
 

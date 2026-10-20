@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Instagram, Mail, MapPin, Mountain, Phone } from "lucide-react";
+import { Mail, MapPin, Mountain, Phone } from "lucide-react";
 import { navItems } from "@/lib/navigation";
+import { AnalyticsPreferencesButton } from "@/components/analytics-consent-provider";
 
 export function SiteFooter() {
   return (
@@ -41,15 +42,16 @@ export function SiteFooter() {
               <Phone className="h-4 w-4" /> (84) 98879-1401
             </span>
             <span className="flex items-center gap-2">
-              <Instagram className="h-4 w-4" /> @bz.software_
-            </span>
-            <span className="flex items-center gap-2">
               <Mail className="h-4 w-4" /> cerrocorargn@gmail.com
             </span>
           </div>
         </div>
       </div>
-      <div className="border-t border-white/10 py-5 text-center text-xs text-white/55">
+      <div className="border-t border-white/10 px-4 py-5 text-center text-xs text-white/55">
+        <div className="mb-2 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          <Link href="/politica-de-privacidade" className="hover:text-white">Política de privacidade</Link>
+          <AnalyticsPreferencesButton className="hover:text-white" />
+        </div>
         Desenvolvido por: <a href="https://www.instagram.com/_mizaelaraujo/" target="_blank" rel="noopener noreferrer">Mizael Araujo</a> & <a href="https://go.bzsoftware.com.br" target="_blank" rel="noopener noreferrer">BZ Software</a>
       </div>
     </footer>

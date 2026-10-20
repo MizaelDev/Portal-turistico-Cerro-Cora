@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GalleryLightbox } from "@/components/gallery-lightbox";
 import { useAdjacentImagePreload } from "@/hooks/use-adjacent-image-preload";
 import { analyticsService, type CommercialEntityType } from "@/lib/analytics";
 import { useCarouselSwipe } from "@/hooks/use-carousel-swipe";
@@ -45,6 +46,7 @@ export function RestaurantGallery({
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const lightboxTriggerRef = useRef<HTMLButtonElement | null>(null);
   const hasMultipleImages = uniqueImages.length > 1;
   const activeImage = uniqueImages[activeIndex] || "";
   const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
@@ -98,25 +100,6 @@ export function RestaurantGallery({
     onNext: goToNext,
   });
 
-  useEffect(() => {
-    if (!isLightboxOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsLightboxOpen(false);
-      if (event.key === "ArrowLeft" && hasMultipleImages) goToPrevious();
-      if (event.key === "ArrowRight" && hasMultipleImages) goToNext();
-    };
-
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [goToNext, goToPrevious, hasMultipleImages, isLightboxOpen]);
-
   if (!uniqueImages.length) return null;
 
   return (
@@ -158,7 +141,8 @@ export function RestaurantGallery({
             size="icon"
             aria-label="Ampliar foto"
             className="absolute right-3 top-3"
-            onClick={() => {
+            onClick={(event) => {
+              lightboxTriggerRef.current = event.currentTarget;
               trackGalleryInteraction("gallery_click");
               setIsLightboxOpen(true);
             }}
@@ -213,10 +197,13 @@ export function RestaurantGallery({
                   ? `Abrir galeria com mais ${remainingImageCount} ${remainingImageCount === 1 ? "foto" : "fotos"}`
                   : `Abrir foto ${index + 1}`
               }
-              onClick={() => {
+              onClick={(event) => {
                 trackGalleryInteraction("gallery_click");
                 setActiveIndex(index);
-                if (isOverflowThumbnail) setIsLightboxOpen(true);
+                if (isOverflowThumbnail) {
+                  lightboxTriggerRef.current = event.currentTarget;
+                  setIsLightboxOpen(true);
+                }
               }}
               className={cn(
                 "relative aspect-[4/3] min-w-0 overflow-hidden rounded-md border bg-muted transition-all",
@@ -245,75 +232,27 @@ export function RestaurantGallery({
         })}
       </div>
 
-      {isLightboxOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Galeria ampliada de ${name}`}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 sm:p-8"
-          onClick={() => setIsLightboxOpen(false)}
-        >
-          <button
-            type="button"
-            aria-label="Fechar galeria ampliada"
-            className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-md border border-white/20 bg-black/70 text-white transition-colors hover:bg-black sm:right-6 sm:top-6"
-            onClick={() => setIsLightboxOpen(false)}
-          >
-            <X className="h-6 w-6" />
-          </button>
-
-          <div
-            className="relative h-full w-full max-w-[1600px]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Image
-              key={`lightbox-${activeSrc}`}
-              src={activeSrc}
-              alt={imageAltTexts[activeIndex] || `Foto ${activeIndex + 1} de ${name}`}
-              fill
-              sizes="100vw"
-              quality={92}
-              onError={() => markImageAsFailed(activeImage)}
-              className="object-contain object-center"
-            />
-          </div>
-
-          {hasMultipleImages ? (
-            <>
-              <Button
-                type="button"
-                variant="glass"
-                size="icon"
-                aria-label="Foto anterior"
-                className="absolute left-3 top-1/2 z-20 -translate-y-1/2 sm:left-6"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  goToPrevious();
-                }}
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </Button>
-              <Button
-                type="button"
-                variant="glass"
-                size="icon"
-                aria-label="Próxima foto"
-                className="absolute right-3 top-1/2 z-20 -translate-y-1/2 sm:right-6"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  goToNext();
-                }}
-              >
-                <ChevronRight className="h-6 w-6" />
-              </Button>
-            </>
-          ) : null}
-
-          <span className="absolute bottom-4 right-4 z-20 rounded-md border border-white/20 bg-black/60 px-3 py-1 text-xs font-semibold text-white sm:bottom-6 sm:right-6">
-            {activeIndex + 1}/{uniqueImages.length}
-          </span>
-        </div>
-      ) : null}
+      <GalleryLightbox
+        open={isLightboxOpen}
+        onOpenChange={setIsLightboxOpen}
+        title={`Galeria ampliada de ${name}`}
+        hasMultipleImages={hasMultipleImages}
+        onPrevious={goToPrevious}
+        onNext={goToNext}
+        counter={`${activeIndex + 1}/${uniqueImages.length}`}
+        returnFocusRef={lightboxTriggerRef}
+      >
+        <Image
+          key={`lightbox-${activeSrc}`}
+          src={activeSrc}
+          alt={imageAltTexts[activeIndex] || `Foto ${activeIndex + 1} de ${name}`}
+          fill
+          sizes="100vw"
+          quality={92}
+          onError={() => markImageAsFailed(activeImage)}
+          className="object-contain object-center"
+        />
+      </GalleryLightbox>
     </div>
   );
 }

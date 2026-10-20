@@ -1,3 +1,10 @@
 {
-  "regions": ["gru1"]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["gru1"],
+  "crons": [
+    {
+      "path": "/api/cron/analytics-retention",
+      "schedule": "0 3 1 * *"
+    }
+  ]
 }

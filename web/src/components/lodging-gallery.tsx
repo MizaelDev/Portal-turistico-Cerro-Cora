@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GalleryLightbox } from "@/components/gallery-lightbox";
 import { useAdjacentImagePreload } from "@/hooks/use-adjacent-image-preload";
 import { analyticsService } from "@/lib/analytics";
 import { useCarouselSwipe } from "@/hooks/use-carousel-swipe";
@@ -35,6 +36,7 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
   const [imageSizes, setImageSizes] = useState<Record<string, ImageSize>>({});
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const lightboxTriggerRef = useRef<HTMLButtonElement | null>(null);
   const hasMultipleImages = uniqueImages.length > 1;
   const activeImage = uniqueImages[activeIndex] || "";
   const activeSrc = failedImages.has(activeImage) ? fallbackImage : activeImage;
@@ -54,17 +56,6 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
       setIsImageLoading(true);
     }
   }, [activeImage]);
-
-  useEffect(() => {
-    if (!isLightboxOpen) return undefined;
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsLightboxOpen(false);
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isLightboxOpen]);
 
   const registerImageSize = useCallback((src: string, image: HTMLImageElement) => {
     if (!image.naturalWidth || !image.naturalHeight) return;
@@ -163,7 +154,8 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
           size="icon"
           aria-label="Abrir foto em tela cheia"
           className="absolute right-4 top-4"
-          onClick={() => {
+          onClick={(event) => {
+            lightboxTriggerRef.current = event.currentTarget;
             trackGalleryInteraction("gallery_click");
             setIsLightboxOpen(true);
           }}
@@ -217,10 +209,13 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
                   ? `Abrir galeria com mais ${remainingImageCount} ${remainingImageCount === 1 ? "foto" : "fotos"}`
                   : `Abrir foto ${index + 1}`
               }
-              onClick={() => {
+              onClick={(event) => {
                 trackGalleryInteraction("gallery_click");
                 setActiveIndex(index);
-                if (isOverflowThumbnail) setIsLightboxOpen(true);
+                if (isOverflowThumbnail) {
+                  lightboxTriggerRef.current = event.currentTarget;
+                  setIsLightboxOpen(true);
+                }
               }}
               className={cn(
                 "relative aspect-[4/3] min-w-0 overflow-hidden rounded-md border bg-muted transition-all",
@@ -249,61 +244,27 @@ export function LodgingGallery({ images, name, entityId, category }: LodgingGall
         })}
       </div>
 
-      {isLightboxOpen ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Galeria de fotos de ${name}`}
-          className="fixed inset-0 z-50 grid place-items-center bg-black/88 p-4 backdrop-blur-sm"
-        >
-          <Button
-            type="button"
-            variant="glass"
-            size="icon"
-            aria-label="Fechar galeria"
-            autoFocus
-            className="absolute right-4 top-4"
-            onClick={() => setIsLightboxOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-          <div className="relative h-[78vh] w-full max-w-6xl overflow-hidden rounded-lg border border-white/15 bg-black">
-            <Image
-              src={activeSrc}
-              alt={`Foto ${activeIndex + 1} da hospedagem ${name}`}
-              fill
-              sizes="100vw"
-              quality={92}
-              onError={() => markImageAsFailed(activeImage)}
-              className="object-contain"
-            />
-          </div>
-          {hasMultipleImages ? (
-            <>
-              <Button
-                type="button"
-                variant="glass"
-                size="icon"
-                aria-label="Foto anterior"
-                className="absolute left-4 top-1/2 -translate-y-1/2"
-                onClick={goToPrevious}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <Button
-                type="button"
-                variant="glass"
-                size="icon"
-                aria-label="Próxima foto"
-                className="absolute right-4 top-1/2 -translate-y-1/2"
-                onClick={goToNext}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <GalleryLightbox
+        open={isLightboxOpen}
+        onOpenChange={setIsLightboxOpen}
+        title={`Galeria de fotos de ${name}`}
+        hasMultipleImages={hasMultipleImages}
+        onPrevious={goToPrevious}
+        onNext={goToNext}
+        counter={`${activeIndex + 1}/${uniqueImages.length}`}
+        imageContainerClassName="h-[78vh] max-w-6xl overflow-hidden rounded-lg border border-white/15 bg-black"
+        returnFocusRef={lightboxTriggerRef}
+      >
+        <Image
+          src={activeSrc}
+          alt={`Foto ${activeIndex + 1} da hospedagem ${name}`}
+          fill
+          sizes="100vw"
+          quality={92}
+          onError={() => markImageAsFailed(activeImage)}
+          className="object-contain"
+        />
+      </GalleryLightbox>
     </div>
   );
 }

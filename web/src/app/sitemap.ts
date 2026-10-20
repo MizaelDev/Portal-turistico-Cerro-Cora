@@ -16,10 +16,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const baseRoutes = navItems.map((item) => ({
     url: siteUrl(item.href),
-    lastModified: new Date(),
     changeFrequency: item.href === "/" ? ("weekly" as const) : ("monthly" as const),
     priority: item.href === "/" ? 1 : 0.8,
   }));
+
+  const institutionalRoutes = [
+    {
+      url: siteUrl("/politica-de-privacidade"),
+      changeFrequency: "yearly" as const,
+      priority: 0.3,
+    },
+  ];
 
   const restaurantRoutes = restaurants.map((place) => ({
     url: siteUrl(`/restaurantes/${place.slug || slugify(place.name)}`),
@@ -51,6 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...baseRoutes,
+    ...institutionalRoutes,
     ...restaurantRoutes,
     ...lodgingRoutes,
     ...serviceRoutes,
